@@ -1,0 +1,28 @@
+﻿# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+out/
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/**/*.dll
+src-tauri/**/*.exe
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
