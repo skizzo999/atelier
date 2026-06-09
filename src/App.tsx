@@ -1,51 +1,24 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+﻿import './App.css'
+import { FileTree } from './components/FileTree/FileTree'
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+    <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+      <aside className="sidebar">
+        <div style={{ padding: '15px', borderBottom: '1px solid #333' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', color: '#aaa' }}>EXPLORER</h3>
+        </div>
+        <FileTree />
+      </aside>
+      
+      <main className="main-content">
+        <div className="editor-container">
+          <h1>Editor Area</h1>
+          <p style={{ color: '#888' }}>Seleziona un file dalla sidebar per iniziare.</p>
+        </div>
+      </main>
+    </div>
+  )
 }
 
-export default App;
+export default App
