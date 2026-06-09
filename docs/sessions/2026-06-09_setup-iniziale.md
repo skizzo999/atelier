@@ -19,19 +19,34 @@ Setup ambiente di sviluppo Windows 11 per progetto Atelier (Tauri 2 + React + TS
 - Installazione plugin Tauri: tauri-plugin-fs, tauri-plugin-dialog
 - Configurazione permessi filesystem in capabilities/default.json
 - Componente FileTree base funzionante (pulsante "Apri cartella" seleziona directory)
+- **Migrazione a Tailwind CSS** (sostituito CSS custom con utility classes)
+- **Implementazione react-arborist** per file tree (caricamento lazy, struttura ad albero)
 
 ## Stato finale
 - Ambiente setup completo e funzionante
 - Repo GitHub privato attivo
-- App con layout a due pannelli (sidebar sinistra, editor destra)
-- FileTree: pulsante per selezionare cartella, visualizza lista file/cartelle (non ancora interattiva)
+- App con layout a due pannelli (sidebar sinistra, editor destra) usando Tailwind
+- FileTree: react-arborist installato, visualizza cartelle e file, ma espansione cartelle ha ancora bug da risolvere
+- Tailwind CSS configurato e funzionante
 
 ## Problemi riscontrati
 - PowerShell 5.1 non supporta -Encoding utf8NoBOM → risolto con [System.IO.File]::WriteAllText()
 - Permessi Tauri: servivano sia plugin frontend (npm) che backend (Rust)
+- Tailwind v4 installato di default → disinstallato, installato v3 per config classica
+- react-arborist: mutazione stato React vs riferimenti interni della libreria → problema ancora aperto, richiede debug
 
 ## Prossimi step (da fare domani)
-1. Rendere FileTree interattivo (clic su file → apre in editor)
-2. Implementare editor Markdown con TipTap
-3. Aggiungere salvataggio file
-4. Gestione stato "file modificato/non salvato"
+1. **Fix react-arborist**: risolvere problema espansione cartelle (mutazione stato vs re-render)
+2. **Developer mode context**: creare Zustand store con mode: 'standard' | 'developer'
+3. **Apertura file**: collegare click su file .md → lettura contenuto → visualizzazione in editor
+4. **Editor Markdown**: integrare TipTap per visualizzazione/modifica Markdown
+5. **Salvataggio**: implementare salvataggio atomico (tmp + rename)
+6. Sistemare commit messages con git rebase (opzionale)
+7. Configurare branch protection e CI GitHub Actions
+
+## Note tecniche
+- Progetto: C:\Users\matte\Documents\Obsidian Vault\20_UniversalFileEditor\atelier
+- Stack confermato: Tauri 2 + React + TypeScript + Tailwind CSS
+- Plugin Tauri attivi: fs, dialog, opener
+- Struttura cartelle: src/components/FileTree, Editor, DocxViewer, PdfViewer, hooks, lib, types
+- react-arborist richiede mutazione in-place + shallow copy per triggerare re-render corretti
