@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
+import { useAppStore } from '../../store/appStore'
 
 const MIME: Record<string, string> = {
   png: 'image/png',
@@ -68,6 +69,8 @@ const toolBtn =
 
 function EditableImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
+  const setImageBuffer = useAppStore((s) => s.setImageBuffer)
+  const clearImageBuffer = useAppStore((s) => s.clearImageBuffer)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -79,38 +82,44 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [reloadNonce, setReloadNonce] = useState(0)
   const [resizeOpen, setResizeOpen] = useState(false)
 
+  // Carica dal buffer (modifiche non salvate) se presente, altrimenti dal disco.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(false)
-    setDirty(false)
     setZoom(1)
     setFit(true)
-    readFile(filePath)
-      .then(async (bytes) => {
-        const blob = new Blob([bytes], { type: MIME[ext] ?? 'image/png' })
-        const bmp = await createImageBitmap(blob)
-        if (cancelled) {
-          bmp.close()
-          return
-        }
-        const cv = canvasRef.current
-        if (cv) {
-          cv.width = bmp.width
-          cv.height = bmp.height
-          cv.getContext('2d')!.drawImage(bmp, 0, 0)
-          setDims({ w: bmp.width, h: bmp.height })
-        }
+    const buffered = useAppStore.getState().imageBuffers[filePath]
+    ;(async () => {
+      let blob: Blob
+      if (buffered) {
+        blob = buffered
+      } else {
+        const bytes = await readFile(filePath)
+        blob = new Blob([bytes], { type: MIME[ext] ?? 'image/png' })
+      }
+      const bmp = await createImageBitmap(blob)
+      if (cancelled) {
         bmp.close()
+        return
+      }
+      const cv = canvasRef.current
+      if (cv) {
+        cv.width = bmp.width
+        cv.height = bmp.height
+        cv.getContext('2d')!.drawImage(bmp, 0, 0)
+        setDims({ w: bmp.width, h: bmp.height })
+      }
+      bmp.close()
+      setDirty(!!buffered)
+      setLoading(false)
+    })().catch((err) => {
+      console.error('Errore lettura immagine:', err)
+      if (!cancelled) {
+        setError(true)
         setLoading(false)
-      })
-      .catch((err) => {
-        console.error('Errore lettura immagine:', err)
-        if (!cancelled) {
-          setError(true)
-          setLoading(false)
-        }
-      })
+      }
+    })
     return () => {
       cancelled = true
     }
@@ -127,6 +136,10 @@ function EditableImage({ filePath }: { filePath: string }) {
     ctx.drawImage(result, 0, 0)
     setDims({ w: cv.width, h: cv.height })
     setDirty(true)
+    // Aggiorna il buffer (PNG lossless) così le modifiche sopravvivono al cambio file.
+    cv.toBlob((b) => {
+      if (b) setImageBuffer(filePath, b)
+    }, 'image/png')
   }
 
   function handleSave() {
@@ -139,6 +152,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           if (!blob) throw new Error('Encoding fallito')
           const buf = new Uint8Array(await blob.arrayBuffer())
           await writeFileBinaryAtomic(filePath, buf)
+          clearImageBuffer(filePath)
           setDirty(false)
         } catch (err) {
           console.error('Errore salvataggio immagine:', err)
@@ -211,7 +225,14 @@ function EditableImage({ filePath }: { filePath: string }) {
 
         <div className="w-px h-5 bg-zinc-700 mx-1" />
 
-        <button className={toolBtn} disabled={!dirty || saving} onClick={() => setReloadNonce((n) => n + 1)}>
+        <button
+          className={toolBtn}
+          disabled={!dirty || saving}
+          onClick={() => {
+            clearImageBuffer(filePath)
+            setReloadNonce((n) => n + 1)
+          }}
+        >
           Annulla
         </button>
         <button

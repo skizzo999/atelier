@@ -23,9 +23,9 @@
 ### 0b. Editing immagini (in corso)
 - [x] Fase 1: trasformazioni (ruota/capovolgi/ridimensiona) + salvataggio binario
   atomico (writeFileBinaryAtomic). Solo png/jpg/webp.
-- [ ] Ritaglio (crop) interattivo con selezione del rettangolo (fase 1b)
-- [ ] Buffer immagini: tenere il blob encodato per path così le modifiche non
-  salvate non si perdono cambiando file (come il buffer testo, ma binario)
+- [x] Buffer immagini: blob PNG per path, le modifiche non salvate sopravvivono al
+  cambio file (pallino nel tree); coordinato con rinomina/elimina
+- [ ] **Ritaglio (crop) interattivo** con selezione del rettangolo (fase 1b) ← PROSSIMO
 - [ ] Fase 2: annotazioni/markup (penna, frecce, riquadri, testo) → overlay canvas,
   flatten al salvataggio. Distruttive in V1.
 

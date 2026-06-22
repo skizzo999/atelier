@@ -16,6 +16,9 @@ interface AppState {
   // Termine da evidenziare nell'editor al prossimo caricamento file (one-shot,
   // impostato quando si apre un file da una ricerca nel contenuto). Non persistito.
   pendingHighlight: string | null
+  // Immagini con modifiche non salvate (path -> blob PNG dell'immagine editata).
+  // Non persistito. Permette di cambiare file senza perdere le modifiche immagine.
+  imageBuffers: Record<string, Blob>
 
   setVaultPath: (path: string) => void
   clearVault: () => void
@@ -27,6 +30,10 @@ interface AppState {
   clearBuffer: (path: string) => void
   clearBuffersUnder: (prefix: string) => void
   moveBuffer: (from: string, to: string) => void
+  setImageBuffer: (path: string, blob: Blob) => void
+  clearImageBuffer: (path: string) => void
+  clearImageBuffersUnder: (prefix: string) => void
+  moveImageBuffer: (from: string, to: string) => void
 }
 
 // Stato globale. Solo vaultPath e mode vengono persistiti in localStorage
@@ -39,8 +46,10 @@ export const useAppStore = create<AppState>()(
       selectedFile: null,
       dirtyBuffers: {},
       pendingHighlight: null,
+      imageBuffers: {},
       setVaultPath: (path) => set({ vaultPath: path }),
-      clearVault: () => set({ vaultPath: null, selectedFile: null, dirtyBuffers: {} }),
+      clearVault: () =>
+        set({ vaultPath: null, selectedFile: null, dirtyBuffers: {}, imageBuffers: {} }),
       setMode: (mode) => set({ mode }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
@@ -69,6 +78,30 @@ export const useAppStore = create<AppState>()(
           next[to] = next[from]
           delete next[from]
           return { dirtyBuffers: next }
+        }),
+      setImageBuffer: (path, blob) =>
+        set((state) => ({ imageBuffers: { ...state.imageBuffers, [path]: blob } })),
+      clearImageBuffer: (path) =>
+        set((state) => {
+          const next = { ...state.imageBuffers }
+          delete next[path]
+          return { imageBuffers: next }
+        }),
+      clearImageBuffersUnder: (prefix) =>
+        set((state) => {
+          const next: Record<string, Blob> = {}
+          for (const [k, v] of Object.entries(state.imageBuffers)) {
+            if (k !== prefix && !k.startsWith(prefix + '\\')) next[k] = v
+          }
+          return { imageBuffers: next }
+        }),
+      moveImageBuffer: (from, to) =>
+        set((state) => {
+          if (state.imageBuffers[from] === undefined) return {}
+          const next = { ...state.imageBuffers }
+          next[to] = next[from]
+          delete next[from]
+          return { imageBuffers: next }
         }),
     }),
     {

@@ -97,7 +97,11 @@ const TreeActionsContext = createContext<TreeActions>({
 function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   const { data } = node
   const { requestLoad, selectFile, openMenu } = useContext(TreeActionsContext)
-  const isDirty = useAppStore((s) => !data.isFolder && s.dirtyBuffers[data.path] !== undefined)
+  const isDirty = useAppStore(
+    (s) =>
+      !data.isFolder &&
+      (s.dirtyBuffers[data.path] !== undefined || s.imageBuffers[data.path] !== undefined),
+  )
   const icon = data.isFolder ? (node.isOpen ? '📂' : '📁') : '📄'
 
   return (
@@ -404,6 +408,7 @@ export function FileTree() {
         const np = await renameEntry(node.path, name)
         // Sposta l'eventuale buffer non salvato sul nuovo path (file rinominato).
         useAppStore.getState().moveBuffer(node.path, np)
+        useAppStore.getState().moveImageBuffer(node.path, np)
         // Aggiorna il file aperto se era questo (o se è dentro la cartella rinominata).
         const sel = useAppStore.getState().selectedFile
         if (sel === node.path) setSelectedFile(np)
@@ -440,6 +445,7 @@ export function FileTree() {
       await deleteEntry(confirmTarget.path, confirmTarget.isFolder)
       // Scarta eventuali buffer non salvati del file/cartella eliminati.
       useAppStore.getState().clearBuffersUnder(confirmTarget.path)
+      useAppStore.getState().clearImageBuffersUnder(confirmTarget.path)
       const sel = useAppStore.getState().selectedFile
       if (sel === confirmTarget.path || (sel && sel.startsWith(confirmTarget.path + '\\'))) {
         setSelectedFile(null)

@@ -20,8 +20,12 @@ Fase 1 dell'editing immagini: trasformazioni + pipeline di salvataggio binario.
   blob encodato per path). Da aggiungere.
 - Editing solo per formati raster ri-encodabili da canvas (png/jpg/webp).
 
+## Aggiunto dopo: buffer immagini
+- Store `imageBuffers` (path -> blob PNG), non persistito; modifiche immagine non
+  salvate sopravvivono al cambio file, pallino "non salvato" anche nel tree;
+  coordinato con rinomina/elimina (move/clearImageBuffersUnder). Svuotato al salvataggio.
+
 ## Prossimi step
-1. Ritaglio (crop) interattivo con selezione del rettangolo (fase 1b)
-2. Buffer immagini (no perdita modifiche cambiando file)
-3. Annotazioni/markup (fase 2)
-4. Altri viewer: PDF, DOCX
+1. Ritaglio (crop) interattivo con selezione del rettangolo (fase 1b) ← PROSSIMO
+2. Annotazioni/markup (fase 2)
+3. Altri viewer: PDF, DOCX

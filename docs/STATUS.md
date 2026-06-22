@@ -24,7 +24,7 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - [x] **Viewer immagini + routing per tipo**: FileView instrada per tipo; immagini (png/jpg/gif/webp/bmp/svg/ico/avif) con zoom/adatta; resto → editor testo
 
 ## Prossimi step (in ordine di priorità)
-1. **Editing immagini**: [x] trasformazioni (ruota/capovolgi/ridimensiona) — manca ritaglio (crop) interattivo e buffer immagini; poi fase 2 annotazioni/markup
+1. **Editing immagini**: [x] trasformazioni (ruota/capovolgi/ridimensiona) + [x] buffer (no perdita cambiando file) — **manca ritaglio (crop) interattivo**; poi fase 2 annotazioni/markup
 2. **Altri viewer**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
 3. **Editor Ibrido / live preview** (terza vista stile Obsidian) → CodeMirror 6
 4. Avviso "modifiche non salvate" alla chiusura dell'app
@@ -45,13 +45,11 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - Ricerca: src/lib/search.ts, src/components/SearchPalette/SearchPalette.tsx
 
 ## Problemi aperti
-- Buffer non salvati in memoria → persi se si chiude l'app senza salvare (avviso-alla-chiusura da fare)
+- Buffer non salvati (testo e immagini) in memoria → persi se si chiude l'app senza salvare (avviso-alla-chiusura da fare)
 - Risync editor solo al focus finestra (non real-time)
-- Modello dirty/salva solo per testo: servirà per i binari quando faremo l'editing immagini
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:
 1. Contenuto di docs/STATUS.md (questo file)
-2. Contenuto di docs/sessions/2026-06-22_save-model-ux.md
-2b. Contenuto di docs/sessions/2026-06-22_image-viewer.md
-3. Dire: "Continuiamo da dove abbiamo lasciato. Primo step: editing immagini fase 1 (trasformazioni)."
+2. Contenuto di docs/sessions/2026-06-22_image-transforms.md
+3. Dire: "Continuiamo da dove abbiamo lasciato. Primo step: ritaglio (crop) immagini interattivo."
