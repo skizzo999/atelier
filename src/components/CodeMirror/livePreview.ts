@@ -3,10 +3,8 @@ import { syntaxTree } from '@codemirror/language'
 import { Range, Extension, Text } from '@codemirror/state'
 
 // Live preview stile Obsidian: nasconde i marcatori markdown e formatta il
-// contenuto inline, mostrando la sintassi grezza sulla riga col cursore (per
-// poterla modificare). Costruito sull'albero sintattico di CodeMirror.
+// contenuto inline, mostrando la sintassi grezza sulla riga col cursore.
 
-// Sostituisce il marcatore di lista (-, *, +) con un punto elenco.
 class BulletWidget extends WidgetType {
   toDOM() {
     const s = document.createElement('span')
@@ -20,11 +18,30 @@ class BulletWidget extends WidgetType {
 }
 const bullet = Decoration.replace({ widget: new BulletWidget() })
 
+class CheckboxWidget extends WidgetType {
+  constructor(readonly checked: boolean) {
+    super()
+  }
+  toDOM() {
+    const i = document.createElement('input')
+    i.type = 'checkbox'
+    i.checked = this.checked
+    i.disabled = true
+    i.className = 'cm-lp-checkbox'
+    return i
+  }
+  eq(o: CheckboxWidget) {
+    return o.checked === this.checked
+  }
+}
+
 const hide = Decoration.replace({})
 const strong = Decoration.mark({ class: 'cm-lp-strong' })
 const em = Decoration.mark({ class: 'cm-lp-em' })
+const strike = Decoration.mark({ class: 'cm-lp-strike' })
 const code = Decoration.mark({ class: 'cm-lp-code' })
 const link = Decoration.mark({ class: 'cm-lp-link' })
+const highlight = Decoration.mark({ class: 'cm-lp-highlight' })
 const headings = [
   null,
   Decoration.mark({ class: 'cm-lp-h1' }),
@@ -35,11 +52,12 @@ const headings = [
   Decoration.mark({ class: 'cm-lp-h6' }),
 ]
 
-// Decorazioni di riga (blocchi multi-riga).
+// Decorazioni di riga.
 const quoteLine = Decoration.line({ class: 'cm-lp-quote' })
 const codeBlockLine = Decoration.line({ class: 'cm-lp-codeblock' })
 const tableLine = Decoration.line({ class: 'cm-lp-table' })
 const hrLine = Decoration.line({ class: 'cm-lp-hr' })
+const blockspace = Decoration.line({ class: 'cm-lp-blockspace' })
 
 function eachLine(doc: Text, from: number, to: number, fn: (lineFrom: number) => void) {
   const first = doc.lineAt(from).number
@@ -53,7 +71,6 @@ function buildDecorations(view: EditorView): DecorationSet {
     const { state } = view
     const doc = state.doc
 
-    // Righe che contengono cursore/selezione → mostra il markdown grezzo.
     const active = new Set<number>()
     for (const r of state.selection.ranges) {
       const a = doc.lineAt(r.from).number
@@ -68,14 +85,14 @@ function buildDecorations(view: EditorView): DecorationSet {
         enter: (node) => {
           const name = node.name
 
-          // --- Blocchi multi-riga (decorazione per-riga, sempre attiva) ---
+          // --- Blocchi multi-riga ---
           if (name === 'Blockquote') {
             eachLine(doc, node.from, node.to, (lf) => ranges.push(quoteLine.range(lf)))
-            return // continua nei figli (QuoteMark, contenuto)
+            return
           }
           if (name === 'FencedCode' || name === 'CodeBlock') {
             eachLine(doc, node.from, node.to, (lf) => ranges.push(codeBlockLine.range(lf)))
-            return false // non processare l'interno del codice
+            return false
           }
           if (name === 'Table') {
             eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
@@ -95,27 +112,60 @@ function buildDecorations(view: EditorView): DecorationSet {
               const h = headings[level]
               if (h && contentFrom < node.to) ranges.push(h.range(contentFrom, node.to))
             }
+            ranges.push(blockspace.range(doc.lineAt(node.from).from))
             return
           }
 
-          if (name === 'StrongEmphasis' || name === 'Emphasis' || name === 'InlineCode') {
-            const markName = name === 'InlineCode' ? 'CodeMark' : 'EmphasisMark'
+          const sm = name.match(/^SetextHeading(\d)$/)
+          if (sm) {
+            const level = +sm[1]
+            const headerMark = node.node.getChild('HeaderMark')
+            const contentTo = headerMark ? headerMark.from : node.to
+            const h = headings[level]
+            if (h && node.from < contentTo) ranges.push(h.range(node.from, contentTo))
+            if (headerMark) ranges.push(hide.range(headerMark.from, headerMark.to))
+            ranges.push(blockspace.range(doc.lineAt(node.from).from))
+            return false
+          }
+
+          if (name === 'StrongEmphasis' || name === 'Emphasis' || name === 'InlineCode' || name === 'Strikethrough') {
+            const markName =
+              name === 'InlineCode' ? 'CodeMark' : name === 'Strikethrough' ? 'StrikethroughMark' : 'EmphasisMark'
             const marks = node.node.getChildren(markName)
             if (marks.length >= 2) {
               const open = marks[0]
               const close = marks[marks.length - 1]
               ranges.push(hide.range(open.from, open.to))
               ranges.push(hide.range(close.from, close.to))
-              const deco = name === 'StrongEmphasis' ? strong : name === 'Emphasis' ? em : code
+              const deco =
+                name === 'StrongEmphasis'
+                  ? strong
+                  : name === 'Emphasis'
+                    ? em
+                    : name === 'Strikethrough'
+                      ? strike
+                      : code
               if (open.to < close.from) ranges.push(deco.range(open.to, close.from))
             }
             return
           }
 
+          if (name === 'Task') {
+            const text = doc.sliceString(node.from, node.to)
+            const checked = /\[x\]/i.test(text)
+            ranges.push(
+              Decoration.replace({ widget: new CheckboxWidget(checked) }).range(node.from, node.to),
+            )
+            return
+          }
+
           if (name === 'ListMark') {
-            const list = node.node.parent?.parent
+            const item = node.node.parent
+            const list = item?.parent
             if (list && list.name === 'BulletList') {
-              ranges.push(bullet.range(node.from, node.to))
+              // Task list: niente bullet (il checkbox lo rende il nodo Task).
+              if (item?.getChild('Task')) ranges.push(hide.range(node.from, node.to))
+              else ranges.push(bullet.range(node.from, node.to))
             }
             return
           }
@@ -134,8 +184,8 @@ function buildDecorations(view: EditorView): DecorationSet {
           if (name === 'Link') {
             const marks = node.node.getChildren('LinkMark')
             if (marks.length >= 2) {
-              const openBr = marks[0] // [
-              const closeBr = marks[1] // ]
+              const openBr = marks[0]
+              const closeBr = marks[1]
               ranges.push(hide.range(openBr.from, openBr.to))
               if (closeBr.from < node.to) ranges.push(hide.range(closeBr.from, node.to))
               if (openBr.to < closeBr.from) ranges.push(link.range(openBr.to, closeBr.from))
@@ -145,6 +195,26 @@ function buildDecorations(view: EditorView): DecorationSet {
         },
       })
     }
+
+    // Evidenziato ==testo== (estensione stile Obsidian, non nel parser): regex.
+    for (const { from, to } of view.visibleRanges) {
+      const first = doc.lineAt(from).number
+      const last = doc.lineAt(to).number
+      const re = /==([^=\n]+)==/g
+      for (let n = first; n <= last; n++) {
+        if (active.has(n)) continue
+        const line = doc.line(n)
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(line.text))) {
+          const s = line.from + m.index
+          const e = s + m[0].length
+          ranges.push(hide.range(s, s + 2))
+          ranges.push(highlight.range(s + 2, e - 2))
+          ranges.push(hide.range(e - 2, e))
+        }
+      }
+    }
   } catch (e) {
     console.error('livePreview build error:', e)
     return Decoration.none
@@ -152,23 +222,22 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-// In Ibrida l'highlight di oneDark è disattivato: aspetto "documento" (come la
-// vista Lettura) — font proporzionale, sfondo dell'app, dimensioni da prose.
+// Aspetto "documento" (come la vista Lettura): font proporzionale, sfondo app.
 const HEAD = '#e4e4e7'
 const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  // Usa lo sfondo dell'app (zinc-900) invece di quello di oneDark.
   '&': { backgroundColor: 'transparent' },
   '.cm-content': {
     fontFamily: PROSE_FONT,
     fontSize: '16px',
-    lineHeight: '1.7',
+    lineHeight: '1.75',
     padding: '24px',
     caretColor: '#e4e4e7',
     color: '#d4d4d8',
   },
+  '.cm-lp-blockspace': { paddingTop: '0.6em' },
   '.cm-lp-h1': { fontSize: '2em', fontWeight: '700', color: HEAD },
   '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '700', color: HEAD },
   '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
@@ -177,6 +246,8 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-h6': { fontWeight: '700', color: HEAD },
   '.cm-lp-strong': { fontWeight: '700', color: HEAD },
   '.cm-lp-em': { fontStyle: 'italic' },
+  '.cm-lp-strike': { textDecoration: 'line-through', color: '#9aa0aa' },
+  '.cm-lp-highlight': { backgroundColor: 'rgba(250, 204, 21, 0.25)', borderRadius: '3px', padding: '0 0.1em' },
   '.cm-lp-code': {
     fontFamily: MONO,
     fontSize: '0.875em',
@@ -186,18 +257,14 @@ const livePreviewTheme = EditorView.theme({
   },
   '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
   '.cm-lp-bullet': { color: '#9aa0aa' },
+  '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
   '.cm-lp-quote': {
     borderLeft: '3px solid #52525b',
     paddingLeft: '1em',
     color: '#a1a1aa',
     fontStyle: 'italic',
   },
-  '.cm-lp-codeblock': {
-    fontFamily: MONO,
-    fontSize: '0.875em',
-    background: 'rgba(255,255,255,0.05)',
-  },
-  // Le tabelle restano monospazio per allineare le colonne (boxate = step successivo).
+  '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
   '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
   '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
 })

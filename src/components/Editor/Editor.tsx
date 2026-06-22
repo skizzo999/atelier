@@ -7,6 +7,29 @@ import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 
+// Estensione marked per ==evidenziato== (così la Lettura combacia con l'Ibrida).
+marked.use({
+  extensions: [
+    {
+      name: 'highlight',
+      level: 'inline',
+      start(src: string) {
+        return src.indexOf('==')
+      },
+      tokenizer(src: string) {
+        const m = /^==([^=\n]+)==/.exec(src)
+        if (m) {
+          return { type: 'highlight', raw: m[0], text: m[1] }
+        }
+        return undefined
+      },
+      renderer(token) {
+        return `<mark>${(token as unknown as { text: string }).text}</mark>`
+      },
+    },
+  ],
+})
+
 type ViewMode = 'source' | 'live' | 'reading'
 
 function isMarkdown(path: string): boolean {
