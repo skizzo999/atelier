@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import type { EditorView } from '@codemirror/view'
 import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
+import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 
 type ViewMode = 'source' | 'reading'
 
@@ -27,7 +29,7 @@ export function Editor() {
   const [view, setView] = useState<ViewMode>('source')
   // Path di cui `content` è effettivamente caricato (per sapere quando è pronto).
   const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorViewRef = useRef<EditorView | null>(null)
 
   // Carica il contenuto quando cambia il file: dal buffer se ci sono modifiche
   // non salvate, altrimenti dal disco.
@@ -109,21 +111,20 @@ export function Editor() {
 
   // Highlight one-shot del termine cercato (apertura da ricerca nel contenuto):
   // scatta solo quando il contenuto del file corrente è effettivamente caricato,
-  // poi seleziona la prima occorrenza nella textarea e scrolla alla sua riga.
+  // poi seleziona la prima occorrenza in CodeMirror e scrolla alla sua riga.
   useEffect(() => {
     if (loadedFilePath !== filePath) return // contenuto non ancora del file corrente
     if (!pendingHighlight) return
     if (view === 'source') {
-      const ta = textareaRef.current
-      if (ta) {
+      const v = editorViewRef.current
+      if (v) {
         const idx = content.toLowerCase().indexOf(pendingHighlight.toLowerCase())
         if (idx >= 0) {
-          ta.focus()
-          ta.setSelectionRange(idx, idx + pendingHighlight.length)
-          const line = content.slice(0, idx).split('\n').length - 1
-          const totalLines = content.split('\n').length || 1
-          const lineHeight = ta.scrollHeight / totalLines
-          ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2)
+          v.dispatch({
+            selection: { anchor: idx, head: idx + pendingHighlight.length },
+            scrollIntoView: true,
+          })
+          v.focus()
         }
       }
     }
@@ -197,16 +198,14 @@ export function Editor() {
           />
         </div>
       ) : (
-        <textarea
-          ref={textareaRef}
+        <CodeMirrorEditor
           value={content}
-          onChange={(e) => {
-            const value = e.target.value
-            setContent(value)
-            setBuffer(filePath, value)
+          markdownMode={markdown}
+          viewRef={editorViewRef}
+          onChange={(v) => {
+            setContent(v)
+            setBuffer(filePath, v)
           }}
-          spellCheck={false}
-          className="flex-1 w-full bg-zinc-900 text-zinc-100 p-6 resize-none outline-none font-mono text-sm leading-relaxed"
         />
       )}
     </div>

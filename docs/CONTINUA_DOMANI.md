@@ -25,16 +25,17 @@
   atomico (writeFileBinaryAtomic). Solo png/jpg/webp.
 - [x] Buffer immagini: blob PNG per path, le modifiche non salvate sopravvivono al
   cambio file (pallino nel tree); coordinato con rinomina/elimina
-- [ ] **Ritaglio (crop) interattivo** con selezione del rettangolo (fase 1b) ← PROSSIMO
+- [x] Ritaglio (crop) interattivo con selezione del rettangolo (fase 1b)
+- [ ] Fase 2: annotazioni/markup (penna, frecce, riquadri, testo)
 - [ ] Fase 2: annotazioni/markup (penna, frecce, riquadri, testo) → overlay canvas,
   flatten al salvataggio. Distruttive in V1.
 
 ### 1. Editor Ibrido / live preview (la terza vista Obsidian)
-- Le viste Codice e Lettura ci sono; manca l'Ibrida (markdown che si renderizza inline
-  mentre scrivi, stile Obsidian Live Preview).
-- Richiede un motore dedicato: valutare **CodeMirror 6** (è quello che usa Obsidian,
-  supporta syntax highlight del sorgente + decorazioni per il live preview).
-- Sostituirà/affiancherà la textarea attuale nella vista Codice.
+- [x] Base CodeMirror 6: la vista "Codice" usa CM6 con highlight markdown
+  (CodeMirrorEditor.tsx, sostituita la textarea).
+- [ ] Manca l'**Ibrida**: decorazioni inline su CM6 che rendono il markdown mentre
+  scrivi (titoli, grassetto, link…), con sintassi grezza solo sulla riga attiva.
+  È il layer successivo, costruito sopra l'editor CM6 già integrato.
 
 ### 2. (fatto) Ricerca / quick-open
 - Ctrl+P quick-open per nome (tutti i tipi), Ctrl+Shift+F ricerca contenuto
