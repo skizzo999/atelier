@@ -1,4 +1,4 @@
-import { writeTextFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
+import { writeTextFile, writeFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
 
 function joinPath(dir: string, name: string): string {
   return `${dir}\\${name}`
@@ -43,5 +43,12 @@ export async function deleteEntry(path: string, isFolder: boolean): Promise<void
 export async function writeFileAtomic(path: string, content: string): Promise<void> {
   const tmp = `${path}.tmp`
   await writeTextFile(tmp, content)
+  await rename(tmp, path)
+}
+
+// Variante binaria del salvataggio atomico (es. immagini ri-encodate da canvas).
+export async function writeFileBinaryAtomic(path: string, data: Uint8Array): Promise<void> {
+  const tmp = `${path}.tmp`
+  await writeFile(tmp, data)
   await rename(tmp, path)
 }

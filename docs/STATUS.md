@@ -24,7 +24,7 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - [x] **Viewer immagini + routing per tipo**: FileView instrada per tipo; immagini (png/jpg/gif/webp/bmp/svg/ico/avif) con zoom/adatta; resto → editor testo
 
 ## Prossimi step (in ordine di priorità)
-1. **Editing immagini**: fase 1 trasformazioni (ruota/capovolgi/ritaglia/ridimensiona), fase 2 annotazioni/markup
+1. **Editing immagini**: [x] trasformazioni (ruota/capovolgi/ridimensiona) — manca ritaglio (crop) interattivo e buffer immagini; poi fase 2 annotazioni/markup
 2. **Altri viewer**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
 3. **Editor Ibrido / live preview** (terza vista stile Obsidian) → CodeMirror 6
 4. Avviso "modifiche non salvate" alla chiusura dell'app
@@ -36,7 +36,7 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - Progetto: C:\Users\matte\Desktop\Atelier\atelier
 - Stack: Tauri 2 + React 19 + TypeScript + Tailwind v3 (+typography) + Zustand 5 + react-arborist 3 + marked 18 + dompurify 3
 - Plugin Tauri: fs (feature `watch` attiva), dialog, opener
-- Permessi fs: read-text-file, write-text-file, read-file, read-dir, mkdir, exists, rename, remove, watch, unwatch
+- Permessi fs: read-text-file, write-text-file, read-file, write-file, read-dir, mkdir, exists, rename, remove, watch, unwatch
 - Comando Rust custom: `allow_path` → `FsExt::fs_scope().allow_directory(path, recursive=true)`
 - Persistenza: `zustand/persist` su localStorage, solo vaultPath+mode (`partialize`); selectedFile e dirtyBuffers nello store ma non persistiti
 - Editor: src/components/Editor/Editor.tsx (textarea + vista Lettura via marked+DOMPurify; buffer non salvati nello store)
