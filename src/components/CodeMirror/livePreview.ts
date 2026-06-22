@@ -1,10 +1,24 @@
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view'
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { Range, Extension } from '@codemirror/state'
 
 // Live preview stile Obsidian: nasconde i marcatori markdown e formatta il
 // contenuto inline, ma mostra la sintassi grezza sulla riga dove c'è il cursore
 // (così la puoi modificare). Costruito sopra l'albero sintattico di CodeMirror.
+
+// Sostituisce il marcatore di lista (-, *, +) con un punto elenco.
+class BulletWidget extends WidgetType {
+  toDOM() {
+    const s = document.createElement('span')
+    s.textContent = '•'
+    s.className = 'cm-lp-bullet'
+    return s
+  }
+  eq() {
+    return true
+  }
+}
+const bullet = Decoration.replace({ widget: new BulletWidget() })
 
 const hide = Decoration.replace({})
 const strong = Decoration.mark({ class: 'cm-lp-strong' })
@@ -70,6 +84,15 @@ function buildDecorations(view: EditorView): DecorationSet {
             return
           }
 
+          if (name === 'ListMark') {
+            // Solo liste puntate (non numerate): sostituisci -/*/+ con •.
+            const list = node.node.parent?.parent
+            if (list && list.name === 'BulletList') {
+              ranges.push(bullet.range(node.from, node.to))
+            }
+            return
+          }
+
           if (name === 'Link') {
             const marks = node.node.getChildren('LinkMark')
             if (marks.length >= 2) {
@@ -91,13 +114,17 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
+// In Ibrida l'highlight di oneDark è disattivato, quindi non serve combattere
+// i colori della sintassi: il testo è già neutro, qui si dà solo la formattazione.
+const HEAD = '#e4e4e7'
+
 const livePreviewTheme = EditorView.theme({
-  '.cm-lp-h1': { fontSize: '1.7em', fontWeight: '700' },
-  '.cm-lp-h2': { fontSize: '1.45em', fontWeight: '700' },
-  '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700' },
-  '.cm-lp-h4': { fontSize: '1.1em', fontWeight: '700' },
-  '.cm-lp-h5': { fontWeight: '700' },
-  '.cm-lp-h6': { fontWeight: '700', opacity: '0.8' },
+  '.cm-lp-h1': { fontSize: '1.7em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h2': { fontSize: '1.45em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h4': { fontSize: '1.1em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h5': { fontWeight: '700', color: HEAD },
+  '.cm-lp-h6': { fontWeight: '700', color: HEAD },
   '.cm-lp-strong': { fontWeight: '700' },
   '.cm-lp-em': { fontStyle: 'italic' },
   '.cm-lp-code': {
@@ -107,6 +134,7 @@ const livePreviewTheme = EditorView.theme({
     borderRadius: '3px',
   },
   '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
+  '.cm-lp-bullet': { color: '#9aa0aa' },
 })
 
 export function livePreview(): Extension {
