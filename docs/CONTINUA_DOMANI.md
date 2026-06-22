@@ -1,60 +1,52 @@
 # Prossimi step - Continuità
 
 ## Dove siamo arrivati
-- App Tauri + React funzionante
-- **Tailwind CSS configurato** (utility classes funzionanti)
-- Layout: sidebar (FileTree) + area editor
-- FileTree: react-arborist installato, seleziona cartella, mostra file
-- **Problema**: espansione cartelle non funziona correttamente (mutazione stato React)
+- FileTree con espansione lazy delle cartelle funzionante (bug react-arborist risolto)
+- Scope permessi risolto (comando Rust `allow_path`, accesso ricorsivo alla cartella scelta)
+- Sistema vault completo: store Zustand persistito, Welcome (Apri/Nuovo vault),
+  auto-apertura dell'ultimo vault all'avvio, validazione esistenza al boot
+- Toggle modalità standard/developer persistito (per ora solo stato, nessun comportamento)
 
-## Cosa fare domani (in ordine)
+## Cosa fare (in ordine)
 
-### 1. Fix react-arborist (URGENTE - 30 min)
-- Debug mutazione stato vs re-render
-- Soluzione: mutazione in-place parentNode.data.children + shallow copy setTreeData
-- Test: click su cartella → si espande mostrando figli
+### 1. Gestione modifiche filesystem a runtime (URGENTE)
+Problema: se il vault viene eliminato/spostato mentre l'app è aperta, l'app continua a mostrarlo.
+- **Soluzione completa**: fs watcher (tauri-plugin-fs `watch`, feature Cargo `watch` + permesso
+  `fs:allow-watch`) sul vault → su rimozione della root torna a Welcome; su cambi dei figli
+  refresh dell'albero (stile Obsidian).
+- **Quick win interim**: ri-validare `exists(vaultPath)` sul focus della finestra + gestire
+  gli errori di `readDir` (se la cartella è sparita → torna a Welcome con messaggio).
 
-### 2. Developer mode context (40 min)
-- Installare Zustand: pnpm add zustand
-- Creare store: src/store/appStore.ts
-- Aggiungere mode: 'standard' | 'developer'
-- Persistenza con tauri-plugin-store
-- Integrare in App.tsx
+### 2. Apertura file .md (1 ora)
+- onClick su file (già loggato in console) → `readTextFile` → stato contenuto → componente Editor
 
-### 3. Apertura file .md (1 ora)
-- Gestire onActivate in FileTree
-- Leggere contenuto file con Tauri fs API
-- Passare contenuto a componente Editor
-- Visualizzare testo in textarea base (poi TipTap)
+### 3. Editor Markdown con TipTap (2 ore)
+- Creare src/components/Editor/Editor.tsx con StarterKit
+- Mostrare il contenuto del file caricato e abilitare la modifica
 
-### 4. Editor Markdown con TipTap (2 ore)
-- Integrare TipTap in src/components/Editor/Editor.tsx
-- Configurare estensioni base (StarterKit)
-- Visualizzare contenuto file caricato
-- Abilitare modifica testo
+### 4. Salvataggio (1 ora)
+- Pulsante "Salva", salvataggio atomico (tmp file + rename), stato modificato/salvato
 
-### 5. Salvataggio (1 ora)
-- Pulsante "Salva" nell'header
-- Salvataggio atomico: tmp file + rename
-- Aggiornare stato "modificato/non salvato"
+### 5. Migrazione persistenza (opzionale)
+- Da `zustand/persist` (localStorage) a `tauri-plugin-store` quando servono più impostazioni
+  (cartella di default, tema, ecc.) — si fa una volta sola con un motivo concreto
 
-### 6. CI e process (30 min - opzionale)
-- GitHub Actions workflow
-- Branch protection settings
-- git rebase per fix commit messages
+### 6. CI e process (opzionale)
+- GitHub Actions workflow, branch protection
 
 ## Comandi utili
 pnpm tauri dev          # Avvia sviluppo
 git add . && git commit # Commit cambiamenti
-git push                # Push su GitHub (se rete ok)
+git push                # Push su GitHub
 
-## File principali da modificare
-- src/components/FileTree/FileTree.tsx (fix espansione cartelle)
-- src/store/appStore.ts (creare - nuovo file)
-- src/components/Editor/Editor.tsx (creare TipTap)
-- src/App.tsx (gestire stato file selezionato e contenuto)
+## File principali
+- src/store/appStore.ts        (store globale: vaultPath + mode)
+- src/lib/vault.ts             (apertura/creazione vault, scope)
+- src/components/FileTree/FileTree.tsx
+- src/components/Welcome/Welcome.tsx
+- src/components/Editor/Editor.tsx   (da creare)
+- src-tauri/src/lib.rs         (comando allow_path; qui andrà il watcher)
 
 ## Problemi noti
-- react-arborist: mutazione diretta stato React rompe riferimenti interni
-- Soluzione tentata: shallow copy [...prevData] dopo mutazione in-place
-- Da verificare se funziona o serve approccio diverso (key prop, ecc.)
+- Modifiche al filesystem esterne all'app non rilevate a runtime (vedi step 1)
+- Il toggle Developer cambia solo lo stato, non ancora il comportamento
