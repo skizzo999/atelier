@@ -41,8 +41,36 @@ marked.use({
         return `<mark>${(token as unknown as { text: string }).text}</mark>`
       },
     },
+    {
+      name: 'wikilink',
+      level: 'inline',
+      start(src: string) {
+        return src.indexOf('[[')
+      },
+      tokenizer(src: string) {
+        const m = /^\[\[([^\]\n]+)\]\]/.exec(src)
+        if (m) {
+          const inner = m[1]
+          const text = inner.includes('|') ? inner.split('|')[1] : inner
+          return { type: 'wikilink', raw: m[0], text }
+        }
+        return undefined
+      },
+      renderer(token) {
+        return `<a class="wikilink">${(token as unknown as { text: string }).text}</a>`
+      },
+    },
   ],
 })
+
+// Converte le citazioni callout "> [!tipo] Titolo" in box stilizzati (vista Lettura).
+function renderCallouts(html: string): string {
+  return html.replace(
+    /<blockquote>\s*<p>\s*\[!(\w+)\]([^<]*)/gi,
+    (_m, type: string, rest: string) =>
+      `<blockquote class="callout"><p class="callout-title">${type.toUpperCase()}</p><p>${rest.trim()}`,
+  )
+}
 
 type ViewMode = 'source' | 'live' | 'reading'
 
@@ -238,7 +266,7 @@ export function Editor() {
           <div
             className="prose prose-invert max-w-none"
             dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(marked.parse(content) as string),
+              __html: DOMPurify.sanitize(renderCallouts(marked.parse(content) as string)),
             }}
           />
         </div>

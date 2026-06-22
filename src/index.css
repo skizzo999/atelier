@@ -45,3 +45,21 @@ body {
   padding: 0 0.1em;
   border-radius: 3px;
 }
+.prose a.wikilink {
+  color: #7aa2f7;
+  font-weight: 400;
+}
+.prose blockquote.callout {
+  border-left: 3px solid #7aa2f7;
+  background: rgba(122, 162, 247, 0.08);
+  font-style: normal;
+  color: #dcddde;
+  padding: 0.5em 1em;
+}
+.prose blockquote.callout .callout-title {
+  font-weight: 700;
+  color: #7aa2f7;
+  margin: 0 0 0.3em;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+}

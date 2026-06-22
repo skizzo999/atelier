@@ -42,6 +42,7 @@ const strike = Decoration.mark({ class: 'cm-lp-strike' })
 const code = Decoration.mark({ class: 'cm-lp-code' })
 const link = Decoration.mark({ class: 'cm-lp-link' })
 const highlight = Decoration.mark({ class: 'cm-lp-highlight' })
+const wikilink = Decoration.mark({ class: 'cm-lp-wikilink' })
 const headings = [
   null,
   Decoration.mark({ class: 'cm-lp-h1' }),
@@ -54,6 +55,7 @@ const headings = [
 
 // Decorazioni di riga.
 const quoteLine = Decoration.line({ class: 'cm-lp-quote' })
+const calloutLine = Decoration.line({ class: 'cm-lp-callout' })
 const codeBlockLine = Decoration.line({ class: 'cm-lp-codeblock' })
 const tableLine = Decoration.line({ class: 'cm-lp-table' })
 const hrLine = Decoration.line({ class: 'cm-lp-hr' })
@@ -87,7 +89,15 @@ function buildDecorations(view: EditorView): DecorationSet {
 
           // --- Blocchi multi-riga ---
           if (name === 'Blockquote') {
-            eachLine(doc, node.from, node.to, (lf) => ranges.push(quoteLine.range(lf)))
+            // Callout stile Obsidian: prima riga tipo "> [!nota] Titolo".
+            const firstLine = doc.lineAt(node.from)
+            const cm = /\[!(\w+)\]/.exec(firstLine.text)
+            const lineDeco = cm ? calloutLine : quoteLine
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(lineDeco.range(lf)))
+            if (cm && !active.has(firstLine.number)) {
+              const s = firstLine.from + cm.index
+              ranges.push(hide.range(s, s + cm[0].length))
+            }
             return
           }
           if (name === 'FencedCode' || name === 'CodeBlock') {
@@ -215,6 +225,26 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
       }
     }
+
+    // Wikilink [[nota]] (stile Obsidian): mostra "nota" come link, nasconde [[ ]].
+    for (const { from, to } of view.visibleRanges) {
+      const first = doc.lineAt(from).number
+      const last = doc.lineAt(to).number
+      const re = /\[\[([^\]\n]+)\]\]/g
+      for (let n = first; n <= last; n++) {
+        if (active.has(n)) continue
+        const line = doc.line(n)
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(line.text))) {
+          const s = line.from + m.index
+          const e = s + m[0].length
+          ranges.push(hide.range(s, s + 2))
+          ranges.push(wikilink.range(s + 2, e - 2))
+          ranges.push(hide.range(e - 2, e))
+        }
+      }
+    }
   } catch (e) {
     console.error('livePreview build error:', e)
     return Decoration.none
@@ -257,6 +287,12 @@ const livePreviewTheme = EditorView.theme({
     borderRadius: '4px',
   },
   '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
+  '.cm-lp-wikilink': { color: '#7aa2f7', textDecoration: 'underline' },
+  '.cm-lp-callout': {
+    borderLeft: '3px solid #7aa2f7',
+    paddingLeft: '1em',
+    background: 'rgba(122,162,247,0.08)',
+  },
   '.cm-lp-bullet': { color: '#9aa0aa' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
   '.cm-lp-quote': {
