@@ -3,6 +3,7 @@ import { Tree, NodeRendererProps } from 'react-arborist'
 import { readDir, exists, watch, type UnwatchFn } from '@tauri-apps/plugin-fs'
 import { useAppStore } from '../../store/appStore'
 import { openVaultDialog } from '../../lib/vault'
+import { createFile, createFolder, renameEntry, deleteEntry } from '../../lib/fileOps'
 
 interface FileNode {
   id: string
@@ -60,10 +61,9 @@ function setNodeChildren(nodes: FileNode[], id: string, children: FileNode[]): F
   })
 }
 
-// Rilegge dal filesystem i figli di `path`, preservando lo stato (childrenLoaded
-// + sottoalberi) delle cartelle ancora aperte. Usata dal watcher per il refresh:
-// gli elementi nuovi compaiono, quelli eliminati spariscono, le cartelle aperte
-// restano aperte e aggiornate.
+// Rilegge dal filesystem i figli di `path`, preservando lo stato delle cartelle
+// ancora aperte. Usata dal watcher per il refresh: i nuovi elementi compaiono,
+// quelli eliminati spariscono, le cartelle aperte restano aperte e aggiornate.
 async function reloadChildren(path: string, oldChildren: FileNode[]): Promise<FileNode[]> {
   const fresh = await loadDirectory(path)
   const oldById = new Map(oldChildren.map((c) => [c.id, c]))
@@ -82,20 +82,20 @@ async function reloadChildren(path: string, oldChildren: FileNode[]): Promise<Fi
   )
 }
 
-// Il renderer riceve solo NodeRendererProps: usiamo un context per passargli le
-// azioni (lazy-load delle cartelle e selezione del file) con l'oggetto dati del nodo.
 interface TreeActions {
   requestLoad: (node: FileNode) => void
   selectFile: (path: string) => void
+  openMenu: (node: FileNode, x: number, y: number) => void
 }
 const TreeActionsContext = createContext<TreeActions>({
   requestLoad: () => {},
   selectFile: () => {},
+  openMenu: () => {},
 })
 
 function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   const { data } = node
-  const { requestLoad, selectFile } = useContext(TreeActionsContext)
+  const { requestLoad, selectFile, openMenu } = useContext(TreeActionsContext)
   const icon = data.isFolder ? (node.isOpen ? '📂' : '📁') : '📄'
 
   return (
@@ -113,6 +113,12 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
           selectFile(data.path)
         }
       }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        node.select()
+        openMenu(data, e.clientX, e.clientY)
+      }}
     >
       <span className="text-xs select-none">{icon}</span>
       <span className="text-sm text-zinc-200 truncate flex-1">{data.name}</span>
@@ -120,12 +126,145 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   )
 }
 
-export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => void }) {
+function MenuItem({
+  onClick,
+  danger,
+  children,
+}: {
+  onClick: () => void
+  danger?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-3 py-1.5 hover:bg-zinc-700 ${
+        danger ? 'text-red-400' : 'text-zinc-200'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function NameModal({
+  title,
+  initial,
+  busy,
+  error,
+  onConfirm,
+  onCancel,
+}: {
+  title: string
+  initial: string
+  busy: boolean
+  error: string | null
+  onConfirm: (name: string) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(initial)
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onCancel}
+    >
+      <div
+        className="w-80 bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && name.trim()) onConfirm(name.trim())
+            if (e.key === 'Escape') onCancel()
+          }}
+          className="px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+        />
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 rounded disabled:opacity-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={() => onConfirm(name.trim())}
+            disabled={busy || !name.trim()}
+            className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-50"
+          >
+            Conferma
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmModal({
+  message,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onCancel}
+    >
+      <div
+        className="w-80 bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm text-zinc-200">{message}</p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 rounded disabled:opacity-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded font-medium hover:bg-red-500 disabled:opacity-50"
+          >
+            Elimina
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function FileTree() {
   const vaultPath = useAppStore((s) => s.vaultPath)
   const setVaultPath = useAppStore((s) => s.setVaultPath)
   const clearVault = useAppStore((s) => s.clearVault)
+  const setSelectedFile = useAppStore((s) => s.setSelectedFile)
   const [treeData, setTreeData] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
+
+  const [menu, setMenu] = useState<{ node: FileNode; x: number; y: number } | null>(null)
+  const [nameModal, setNameModal] = useState<{
+    title: string
+    initial: string
+    run: (name: string) => Promise<void>
+  } | null>(null)
+  const [modalBusy, setModalBusy] = useState(false)
+  const [modalError, setModalError] = useState<string | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<FileNode | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   // Specchio sincrono di treeData, per leggerlo dentro il callback del watcher.
   const treeDataRef = useRef<FileNode[]>([])
@@ -133,8 +272,7 @@ export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => voi
     treeDataRef.current = treeData
   }, [treeData])
 
-  // Misura il contenitore per far riempire l'albero allo spazio disponibile
-  // (react-arborist vuole width/height numerici espliciti).
+  // Misura il contenitore per far riempire l'albero allo spazio disponibile.
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
@@ -166,8 +304,7 @@ export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => voi
     }
   }, [vaultPath])
 
-  // Watcher filesystem: tiene l'albero allineato ai cambiamenti esterni.
-  // Se la root del vault sparisce torna alla Welcome; altrimenti aggiorna l'albero.
+  // Watcher filesystem: tiene l'albero allineato ai cambiamenti (esterni e interni).
   useEffect(() => {
     if (!vaultPath) return
     let unwatch: UnwatchFn | undefined
@@ -213,19 +350,119 @@ export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => voi
   }, [setVaultPath])
 
   const treeActions = useMemo<TreeActions>(
-    () => ({ requestLoad, selectFile: onSelectFile }),
-    [requestLoad, onSelectFile],
+    () => ({
+      requestLoad,
+      selectFile: setSelectedFile,
+      openMenu: (node, x, y) => setMenu({ node, x, y }),
+    }),
+    [requestLoad, setSelectedFile],
   )
+
+  // --- Operazioni su file/cartelle (le modifiche al disco le riflette il watcher) ---
+
+  function openNewFile(dir: string) {
+    setMenu(null)
+    setModalError(null)
+    setNameModal({
+      title: 'Nuovo file',
+      initial: 'nuovo.md',
+      run: async (name) => {
+        const p = await createFile(dir, name)
+        setSelectedFile(p)
+      },
+    })
+  }
+
+  function openNewFolder(dir: string) {
+    setMenu(null)
+    setModalError(null)
+    setNameModal({
+      title: 'Nuova cartella',
+      initial: 'nuova-cartella',
+      run: async (name) => {
+        await createFolder(dir, name)
+      },
+    })
+  }
+
+  function openRename(node: FileNode) {
+    setMenu(null)
+    setModalError(null)
+    setNameModal({
+      title: 'Rinomina',
+      initial: node.name,
+      run: async (name) => {
+        const np = await renameEntry(node.path, name)
+        // Aggiorna il file aperto se era questo (o se è dentro la cartella rinominata).
+        const sel = useAppStore.getState().selectedFile
+        if (sel === node.path) setSelectedFile(np)
+        else if (sel && sel.startsWith(node.path + '\\')) {
+          setSelectedFile(np + sel.slice(node.path.length))
+        }
+      },
+    })
+  }
+
+  function openDelete(node: FileNode) {
+    setMenu(null)
+    setConfirmTarget(node)
+  }
+
+  async function handleNameConfirm(name: string) {
+    if (!nameModal) return
+    setModalBusy(true)
+    setModalError(null)
+    try {
+      await nameModal.run(name)
+      setNameModal(null)
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setModalBusy(false)
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!confirmTarget) return
+    setConfirmBusy(true)
+    try {
+      await deleteEntry(confirmTarget.path, confirmTarget.isFolder)
+      const sel = useAppStore.getState().selectedFile
+      if (sel === confirmTarget.path || (sel && sel.startsWith(confirmTarget.path + '\\'))) {
+        setSelectedFile(null)
+      }
+      setConfirmTarget(null)
+    } catch (err) {
+      console.error('Errore eliminazione:', err)
+      setConfirmTarget(null)
+    } finally {
+      setConfirmBusy(false)
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-zinc-800">
+      <div className="px-3 py-2 border-b border-zinc-800 space-y-2">
         <button
           onClick={handleChangeVault}
           className="w-full px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
         >
           Cambia vault
         </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => vaultPath && openNewFile(vaultPath)}
+            className="flex-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          >
+            + File
+          </button>
+          <button
+            onClick={() => vaultPath && openNewFolder(vaultPath)}
+            className="flex-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          >
+            + Cartella
+          </button>
+        </div>
       </div>
 
       <div ref={containerRef} className="flex-1 overflow-hidden">
@@ -249,6 +486,59 @@ export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => voi
           </TreeActionsContext.Provider>
         )}
       </div>
+
+      {menu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu(null)
+            }}
+          />
+          <div
+            className="fixed z-50 w-44 bg-zinc-800 border border-zinc-700 rounded shadow-lg py-1 text-sm"
+            style={{ top: menu.y, left: menu.x }}
+          >
+            {menu.node.isFolder && (
+              <>
+                <MenuItem onClick={() => openNewFile(menu.node.path)}>Nuovo file</MenuItem>
+                <MenuItem onClick={() => openNewFolder(menu.node.path)}>Nuova cartella</MenuItem>
+              </>
+            )}
+            <MenuItem onClick={() => openRename(menu.node)}>Rinomina</MenuItem>
+            <MenuItem danger onClick={() => openDelete(menu.node)}>
+              Elimina
+            </MenuItem>
+          </div>
+        </>
+      )}
+
+      {nameModal && (
+        <NameModal
+          title={nameModal.title}
+          initial={nameModal.initial}
+          busy={modalBusy}
+          error={modalError}
+          onConfirm={handleNameConfirm}
+          onCancel={() => {
+            setNameModal(null)
+            setModalError(null)
+          }}
+        />
+      )}
+
+      {confirmTarget && (
+        <ConfirmModal
+          message={`Eliminare "${confirmTarget.name}"${
+            confirmTarget.isFolder ? ' e tutto il suo contenuto' : ''
+          }?`}
+          busy={confirmBusy}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   )
 }

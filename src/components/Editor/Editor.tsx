@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { useAppStore } from '../../store/appStore'
 
 type ViewMode = 'source' | 'reading'
 
@@ -9,7 +11,8 @@ function isMarkdown(path: string): boolean {
   return p.endsWith('.md') || p.endsWith('.markdown')
 }
 
-export function Editor({ filePath }: { filePath: string | null }) {
+export function Editor() {
+  const filePath = useAppStore((s) => s.selectedFile)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -145,7 +148,9 @@ export function Editor({ filePath }: { filePath: string | null }) {
         <div className="flex-1 overflow-y-auto p-6">
           <div
             className="prose prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(marked.parse(content) as string),
+            }}
           />
         </div>
       ) : (

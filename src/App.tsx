@@ -13,7 +13,6 @@ function App() {
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
   const [booting, setBooting] = useState(true)
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
   // ri-concesso al vault salvato; se la cartella non esiste più, lo dimentichiamo.
@@ -73,7 +72,7 @@ function App() {
         <div className="p-4 border-b border-zinc-800">
           <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Explorer</h3>
         </div>
-        <FileTree onSelectFile={setSelectedFile} />
+        <FileTree />
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -90,7 +89,7 @@ function App() {
           </button>
         </header>
 
-        <Editor filePath={selectedFile} />
+        <Editor />
       </main>
     </div>
   )

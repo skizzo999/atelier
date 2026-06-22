@@ -17,6 +17,7 @@
     "@tiptap/pm": "^3.26.0",
     "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.26.0",
+    "dompurify": "^3.4.11",
     "marked": "^18.0.5",
     "react": "^19.1.0",
     "react-arborist": "^3.10.1",
