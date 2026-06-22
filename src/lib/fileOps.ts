@@ -52,3 +52,21 @@ export async function writeFileBinaryAtomic(path: string, data: Uint8Array): Pro
   await writeFile(tmp, data)
   await rename(tmp, path)
 }
+
+// Genera un path libero accanto all'originale, aggiungendo un suffisso (e un
+// contatore se necessario). Es: foto.png -> foto-ritaglio.png / foto-ritaglio-1.png
+export async function uniquePathWithSuffix(originalPath: string, suffix: string): Promise<string> {
+  const dir = parentDir(originalPath)
+  const file = originalPath.slice(dir.length + 1)
+  const dot = file.lastIndexOf('.')
+  const base = dot >= 0 ? file.slice(0, dot) : file
+  const ext = dot >= 0 ? file.slice(dot) : '' // include il punto
+
+  let candidate = joinPath(dir, `${base}-${suffix}${ext}`)
+  let n = 1
+  while (await exists(candidate)) {
+    candidate = joinPath(dir, `${base}-${suffix}-${n}${ext}`)
+    n++
+  }
+  return candidate
+}

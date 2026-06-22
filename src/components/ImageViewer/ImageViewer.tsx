@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
-import { writeFileBinaryAtomic } from '../../lib/fileOps'
+import { writeFileBinaryAtomic, uniquePathWithSuffix } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
 
 const MIME: Record<string, string> = {
@@ -96,6 +96,7 @@ function EditableImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
   const setImageBuffer = useAppStore((s) => s.setImageBuffer)
   const clearImageBuffer = useAppStore((s) => s.clearImageBuffer)
+  const setSelectedFile = useAppStore((s) => s.setSelectedFile)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
@@ -251,21 +252,57 @@ function EditableImage({ filePath }: { filePath: string }) {
   function onCropUp() {
     dragging.current = false
   }
-  function applyCrop() {
+  // Converte il rettangolo di selezione (coord display) in coord pixel sull'immagine.
+  function cropRegion(): { sx: number; sy: number; sw: number; sh: number } | null {
     const cv = canvasRef.current
-    if (!cv || !cropRect || cropRect.w < 2 || cropRect.h < 2) {
-      cancelCrop()
-      return
-    }
+    if (!cv || !cropRect || cropRect.w < 2 || cropRect.h < 2) return null
     const r = cv.getBoundingClientRect()
     const scaleX = cv.width / r.width
     const scaleY = cv.height / r.height
-    const sx = Math.round(cropRect.x * scaleX)
-    const sy = Math.round(cropRect.y * scaleY)
-    const sw = Math.round(cropRect.w * scaleX)
-    const sh = Math.round(cropRect.h * scaleY)
-    applyTransform((src) => cropCanvas(src, sx, sy, sw, sh))
+    return {
+      sx: Math.round(cropRect.x * scaleX),
+      sy: Math.round(cropRect.y * scaleY),
+      sw: Math.round(cropRect.w * scaleX),
+      sh: Math.round(cropRect.h * scaleY),
+    }
+  }
+
+  // "Applica": ritaglia l'immagine corrente (modifica la foto scelta).
+  function applyCrop() {
+    const reg = cropRegion()
+    if (!reg) {
+      cancelCrop()
+      return
+    }
+    applyTransform((src) => cropCanvas(src, reg.sx, reg.sy, reg.sw, reg.sh))
     cancelCrop()
+  }
+
+  // "Crea nuova foto": salva il ritaglio come nuovo file, senza toccare l'originale.
+  function createCropAsNew() {
+    const cv = canvasRef.current
+    const reg = cropRegion()
+    if (!cv || !reg) {
+      cancelCrop()
+      return
+    }
+    const cropped = cropCanvas(cv, reg.sx, reg.sy, reg.sw, reg.sh)
+    cropped.toBlob(
+      async (blob) => {
+        try {
+          if (!blob) throw new Error('Encoding fallito')
+          const buf = new Uint8Array(await blob.arrayBuffer())
+          const newPath = await uniquePathWithSuffix(filePath, 'ritaglio')
+          await writeFileBinaryAtomic(newPath, buf)
+          cancelCrop()
+          setSelectedFile(newPath) // apre la nuova foto
+        } catch (err) {
+          console.error('Errore creazione nuova foto:', err)
+        }
+      },
+      MIME[ext] ?? 'image/png',
+      0.92,
+    )
   }
 
   // Offset del canvas dentro il contenitore, per posizionare il rettangolo di selezione.
@@ -301,11 +338,19 @@ function EditableImage({ filePath }: { filePath: string }) {
             Annulla
           </button>
           <button
+            onClick={createCropAsNew}
+            disabled={!cropRect || cropRect.w < 2 || cropRect.h < 2}
+            className={toolBtn}
+          >
+            Crea nuova foto
+          </button>
+          <button
             onClick={applyCrop}
             disabled={!cropRect || cropRect.w < 2 || cropRect.h < 2}
             className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+            title="Modifica la foto corrente"
           >
-            Applica ritaglio
+            Applica
           </button>
         </div>
       ) : (
