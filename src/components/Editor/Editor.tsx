@@ -16,6 +16,8 @@ export function Editor() {
   const filePath = useAppStore((s) => s.selectedFile)
   const setBuffer = useAppStore((s) => s.setBuffer)
   const clearBuffer = useAppStore((s) => s.clearBuffer)
+  const pendingHighlight = useAppStore((s) => s.pendingHighlight)
+  const setPendingHighlight = useAppStore((s) => s.setPendingHighlight)
   // "dirty" derivato dallo store: c'è un buffer non salvato per questo file.
   const dirty = useAppStore((s) => filePath !== null && s.dirtyBuffers[filePath] !== undefined)
 
@@ -23,6 +25,8 @@ export function Editor() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [view, setView] = useState<ViewMode>('source')
+  // Path di cui `content` è effettivamente caricato (per sapere quando è pronto).
+  const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Carica il contenuto quando cambia il file: dal buffer se ci sono modifiche
@@ -30,6 +34,7 @@ export function Editor() {
   useEffect(() => {
     if (!filePath) {
       setContent('')
+      setLoadedFilePath(null)
       return
     }
 
@@ -38,6 +43,7 @@ export function Editor() {
     if (buffered !== undefined) {
       setContent(buffered)
       setLoading(false)
+      setLoadedFilePath(filePath)
       return
     }
 
@@ -48,12 +54,14 @@ export function Editor() {
         if (cancelled) return
         setContent(text)
         setLoading(false)
+        setLoadedFilePath(filePath)
       })
       .catch((err) => {
         console.error('Errore lettura file:', err)
         if (cancelled) return
         setContent('')
         setLoading(false)
+        setLoadedFilePath(filePath)
       })
     return () => {
       cancelled = true
@@ -100,25 +108,27 @@ export function Editor() {
   }, [filePath, dirty])
 
   // Highlight one-shot del termine cercato (apertura da ricerca nel contenuto):
-  // seleziona la prima occorrenza nella textarea e scrolla alla sua riga.
+  // scatta solo quando il contenuto del file corrente è effettivamente caricato,
+  // poi seleziona la prima occorrenza nella textarea e scrolla alla sua riga.
   useEffect(() => {
-    if (loading || !filePath) return
-    const term = useAppStore.getState().pendingHighlight
-    if (!term) return
-    const ta = textareaRef.current
-    if (ta && view === 'source') {
-      const idx = content.toLowerCase().indexOf(term.toLowerCase())
-      if (idx >= 0) {
-        ta.focus()
-        ta.setSelectionRange(idx, idx + term.length)
-        const line = content.slice(0, idx).split('\n').length - 1
-        const totalLines = content.split('\n').length || 1
-        const lineHeight = ta.scrollHeight / totalLines
-        ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2)
+    if (loadedFilePath !== filePath) return // contenuto non ancora del file corrente
+    if (!pendingHighlight) return
+    if (view === 'source') {
+      const ta = textareaRef.current
+      if (ta) {
+        const idx = content.toLowerCase().indexOf(pendingHighlight.toLowerCase())
+        if (idx >= 0) {
+          ta.focus()
+          ta.setSelectionRange(idx, idx + pendingHighlight.length)
+          const line = content.slice(0, idx).split('\n').length - 1
+          const totalLines = content.split('\n').length || 1
+          const lineHeight = ta.scrollHeight / totalLines
+          ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2)
+        }
       }
     }
-    useAppStore.getState().setPendingHighlight(null)
-  }, [content, loading, view, filePath])
+    setPendingHighlight(null)
+  }, [pendingHighlight, loadedFilePath, filePath, view, content, setPendingHighlight])
 
   if (!filePath) {
     return (
