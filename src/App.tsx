@@ -6,6 +6,7 @@ import { grantVaultAccess } from './lib/vault'
 import { FileTree } from './components/FileTree/FileTree'
 import { Editor } from './components/Editor/Editor'
 import { Welcome } from './components/Welcome/Welcome'
+import { SearchPalette } from './components/SearchPalette/SearchPalette'
 
 function App() {
   const vaultPath = useAppStore((s) => s.vaultPath)
@@ -13,6 +14,7 @@ function App() {
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
   const [booting, setBooting] = useState(true)
+  const [palette, setPalette] = useState<'files' | 'content' | null>(null)
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
   // ri-concesso al vault salvato; se la cartella non esiste più, lo dimentichiamo.
@@ -37,6 +39,24 @@ function App() {
       cancelled = true
     }
   }, [clearVault])
+
+  // Scorciatoie globali per la ricerca (solo con un vault aperto):
+  // Ctrl/Cmd+P = quick-open per nome, Ctrl/Cmd+Shift+F = ricerca nel contenuto.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!useAppStore.getState().vaultPath) return
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setPalette('files')
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setPalette('content')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Rete di sicurezza: quando la finestra torna in primo piano, verifica che il
   // vault esista ancora (nel caso il watcher non avesse intercettato la rimozione).
@@ -91,6 +111,8 @@ function App() {
 
         <Editor />
       </main>
+
+      {palette && <SearchPalette initialMode={palette} onClose={() => setPalette(null)} />}
     </div>
   )
 }

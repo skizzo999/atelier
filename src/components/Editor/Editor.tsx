@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -23,6 +23,7 @@ export function Editor() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [view, setView] = useState<ViewMode>('source')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Carica il contenuto quando cambia il file: dal buffer se ci sono modifiche
   // non salvate, altrimenti dal disco.
@@ -98,6 +99,27 @@ export function Editor() {
     return () => window.removeEventListener('focus', onFocus)
   }, [filePath, dirty])
 
+  // Highlight one-shot del termine cercato (apertura da ricerca nel contenuto):
+  // seleziona la prima occorrenza nella textarea e scrolla alla sua riga.
+  useEffect(() => {
+    if (loading || !filePath) return
+    const term = useAppStore.getState().pendingHighlight
+    if (!term) return
+    const ta = textareaRef.current
+    if (ta && view === 'source') {
+      const idx = content.toLowerCase().indexOf(term.toLowerCase())
+      if (idx >= 0) {
+        ta.focus()
+        ta.setSelectionRange(idx, idx + term.length)
+        const line = content.slice(0, idx).split('\n').length - 1
+        const totalLines = content.split('\n').length || 1
+        const lineHeight = ta.scrollHeight / totalLines
+        ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2)
+      }
+    }
+    useAppStore.getState().setPendingHighlight(null)
+  }, [content, loading, view, filePath])
+
   if (!filePath) {
     return (
       <div className="flex-1 flex items-center justify-center text-zinc-500">
@@ -166,6 +188,7 @@ export function Editor() {
         </div>
       ) : (
         <textarea
+          ref={textareaRef}
           value={content}
           onChange={(e) => {
             const value = e.target.value

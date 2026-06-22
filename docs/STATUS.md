@@ -20,13 +20,14 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - [x] **Indicatore non-salvato** (pallino arancio) nel tree e nell'editor
 - [x] **Markdown**: toggle Codice (sorgente) / Lettura (renderizzato con marked + typography), HTML sanitizzato (DOMPurify)
 - [x] **Gestione file**: crea/rinomina/elimina file e cartelle (menu tasto destro su elemento o area vuota)
+- [x] **Ricerca**: quick-open per nome (Ctrl+P, tutti i tipi di file) + ricerca contenuto (Ctrl+Shift+F, file testuali) con highlight del termine
 
 ## Prossimi step (in ordine di priorità)
-1. **Editor Ibrido / live preview** (terza vista stile Obsidian) → motore tipo CodeMirror 6
-2. Ricerca / quick-open (file e contenuto)
+1. **Routing viewer per tipo di file** (cuore del multi-formato): md/txt edit, DOCX (Mammoth), PDF (PDF.js), immagini png/jpeg/svg, poi pptx/xlsx. Oggi tutto aperto come testo.
+2. **Editor Ibrido / live preview** (terza vista stile Obsidian) → CodeMirror 6
 3. Avviso "modifiche non salvate" alla chiusura dell'app
 4. Gestione conflitti editor (buffer + modifiche esterne)
-5. Comportamento reale della modalità developer
+5. Modalità developer (comportamento reale + file di codice)
 6. (opzionale) Migrazione persistenza a `tauri-plugin-store`; CI GitHub Actions
 
 ## Note tecniche
@@ -47,4 +48,5 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 Aprire nuova chat AI e incollare:
 1. Contenuto di docs/STATUS.md (questo file)
 2. Contenuto di docs/sessions/2026-06-22_save-model-ux.md
-3. Dire: "Continuiamo da dove abbiamo lasciato. Primo step: editor Ibrido / live preview (CodeMirror)."
+2b. Contenuto di docs/sessions/2026-06-22_ricerca-quickopen.md
+3. Dire: "Continuiamo da dove abbiamo lasciato. Primo step da decidere: routing viewer per tipo file oppure editor Ibrido."

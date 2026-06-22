@@ -13,6 +13,15 @@
 
 ## Cosa fare (in ordine)
 
+### 0. Routing viewer per tipo di file (cuore del multi-formato)
+- Oggi l'editor apre QUALSIASI file come testo. Va instradato per tipo:
+  - md/txt → editor testo (attuale)
+  - docx → Mammoth.js (view/edit)
+  - pdf → PDF.js (view-only)
+  - immagini png/jpeg/svg → viewer immagine
+  - poi pptx, xlsx (SheetJS) e altri
+- File di codice → legati alla modalità developer (più avanti)
+
 ### 1. Editor Ibrido / live preview (la terza vista Obsidian)
 - Le viste Codice e Lettura ci sono; manca l'Ibrida (markdown che si renderizza inline
   mentre scrivi, stile Obsidian Live Preview).
@@ -20,9 +29,10 @@
   supporta syntax highlight del sorgente + decorazioni per il live preview).
 - Sostituirà/affiancherà la textarea attuale nella vista Codice.
 
-### 2. Ricerca / quick-open
-- Cercare file per nome (quick-open) e cercare nel contenuto del vault
-- Appena il vault ha tanti file diventa essenziale per navigarlo
+### 2. (fatto) Ricerca / quick-open
+- Ctrl+P quick-open per nome (tutti i tipi), Ctrl+Shift+F ricerca contenuto
+  (file testuali), highlight del termine all'apertura
+- Da migliorare: indice mantenuto dal watcher; ricerca contenuto nei binari (coi viewer)
 
 ### 3. Avviso modifiche non salvate alla chiusura
 - I buffer non salvati sono in memoria: intercettare la chiusura della finestra

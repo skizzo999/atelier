@@ -13,12 +13,16 @@ interface AppState {
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
   // Condiviso così l'explorer può mostrare l'indicatore "non salvato" sui file.
   dirtyBuffers: Record<string, string>
+  // Termine da evidenziare nell'editor al prossimo caricamento file (one-shot,
+  // impostato quando si apre un file da una ricerca nel contenuto). Non persistito.
+  pendingHighlight: string | null
 
   setVaultPath: (path: string) => void
   clearVault: () => void
   setMode: (mode: AppMode) => void
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
+  setPendingHighlight: (term: string | null) => void
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
   clearBuffersUnder: (prefix: string) => void
@@ -34,12 +38,14 @@ export const useAppStore = create<AppState>()(
       mode: 'standard',
       selectedFile: null,
       dirtyBuffers: {},
+      pendingHighlight: null,
       setVaultPath: (path) => set({ vaultPath: path }),
       clearVault: () => set({ vaultPath: null, selectedFile: null, dirtyBuffers: {} }),
       setMode: (mode) => set({ mode }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
       setSelectedFile: (path) => set({ selectedFile: path }),
+      setPendingHighlight: (term) => set({ pendingHighlight: term }),
       setBuffer: (path, content) =>
         set((state) => ({ dirtyBuffers: { ...state.dirtyBuffers, [path]: content } })),
       clearBuffer: (path) =>
