@@ -4,7 +4,7 @@ import { exists } from '@tauri-apps/plugin-fs'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess } from './lib/vault'
 import { FileTree } from './components/FileTree/FileTree'
-import { Editor } from './components/Editor/Editor'
+import { FileView } from './components/FileView/FileView'
 import { Welcome } from './components/Welcome/Welcome'
 import { SearchPalette } from './components/SearchPalette/SearchPalette'
 
@@ -109,7 +109,7 @@ function App() {
           </button>
         </header>
 
-        <Editor />
+        <FileView />
       </main>
 
       {palette && <SearchPalette initialMode={palette} onClose={() => setPalette(null)} />}

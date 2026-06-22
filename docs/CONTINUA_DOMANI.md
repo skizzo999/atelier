@@ -13,14 +13,19 @@
 
 ## Cosa fare (in ordine)
 
-### 0. Routing viewer per tipo di file (cuore del multi-formato)
-- Oggi l'editor apre QUALSIASI file come testo. Va instradato per tipo:
-  - md/txt → editor testo (attuale)
+### 0. Routing viewer per tipo di file (cuore del multi-formato) — IN CORSO
+- FileView instrada per tipo. Fatto: immagini → ImageViewer. Da fare:
   - docx → Mammoth.js (view/edit)
   - pdf → PDF.js (view-only)
-  - immagini png/jpeg/svg → viewer immagine
   - poi pptx, xlsx (SheetJS) e altri
 - File di codice → legati alla modalità developer (più avanti)
+
+### 0b. Editing immagini (concordato)
+- Fase 1: trasformazioni (ruota/capovolgi/ritaglia/ridimensiona) → pipeline
+  canvas → ri-encode → scrittura atomica
+- Fase 2: annotazioni/markup (penna, frecce, riquadri, testo) → overlay canvas,
+  flatten al salvataggio. Distruttive in V1.
+- Serve un modello dirty/salva per i binari (l'attuale è solo per il testo).
 
 ### 1. Editor Ibrido / live preview (la terza vista Obsidian)
 - Le viste Codice e Lettura ci sono; manca l'Ibrida (markdown che si renderizza inline
