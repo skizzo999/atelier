@@ -4,7 +4,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { oneDark, oneDarkTheme } from '@codemirror/theme-one-dark'
+import { oneDark } from '@codemirror/theme-one-dark'
 import { livePreview } from './livePreview'
 
 // Tema di base: riempie l'altezza, font monospazio, niente outline di focus.
@@ -48,14 +48,14 @@ export function CodeMirrorEditor({
     const host = hostRef.current
     if (!host) return
 
-    // In Ibrida usiamo solo il tema base (senza i colori della sintassi): il
-    // markdown deve apparire renderizzato, non come codice colorato.
+    // In Ibrida NON usiamo oneDark: il tema "documento" di livePreview controlla
+    // sfondo/colori. In Codice usiamo oneDark pieno (sfondo + syntax highlight).
     const liveMode = markdownMode && livePreviewMode
     const extensions = [
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.lineWrapping,
-      liveMode ? oneDarkTheme : oneDark,
+      liveMode ? [] : oneDark,
       baseTheme,
       EditorView.updateListener.of((u) => {
         if (u.docChanged && !settingExternally.current) {

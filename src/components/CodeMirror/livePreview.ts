@@ -268,7 +268,9 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
   '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
   '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
-})
+  '.cm-cursor': { borderLeftColor: '#e4e4e7' },
+  '.cm-gutters': { display: 'none' },
+}, { dark: true })
 
 export function livePreview(): Extension {
   return [
