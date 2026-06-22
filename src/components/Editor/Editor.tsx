@@ -7,7 +7,7 @@ import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 
-type ViewMode = 'source' | 'reading'
+type ViewMode = 'source' | 'live' | 'reading'
 
 function isMarkdown(path: string): boolean {
   const p = path.toLowerCase()
@@ -115,7 +115,7 @@ export function Editor() {
   useEffect(() => {
     if (loadedFilePath !== filePath) return // contenuto non ancora del file corrente
     if (!pendingHighlight) return
-    if (view === 'source') {
+    if (view !== 'reading') {
       const v = editorViewRef.current
       if (v) {
         const idx = content.toLowerCase().indexOf(pendingHighlight.toLowerCase())
@@ -167,8 +167,16 @@ export function Editor() {
                 Codice
               </button>
               <button
+                onClick={() => setView('live')}
+                className={`px-2 py-1 border-l border-zinc-700 ${
+                  view === 'live' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'
+                }`}
+              >
+                Ibrida
+              </button>
+              <button
                 onClick={() => setView('reading')}
-                className={`px-2 py-1 ${
+                className={`px-2 py-1 border-l border-zinc-700 ${
                   view === 'reading' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'
                 }`}
               >
@@ -201,6 +209,7 @@ export function Editor() {
         <CodeMirrorEditor
           value={content}
           markdownMode={markdown}
+          livePreviewMode={markdown && view === 'live'}
           viewRef={editorViewRef}
           onChange={(v) => {
             setContent(v)

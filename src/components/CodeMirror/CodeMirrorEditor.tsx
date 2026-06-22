@@ -4,6 +4,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { livePreview } from './livePreview'
 
 // Tema di base: riempie l'altezza, font monospazio, niente outline di focus.
 const baseTheme = EditorView.theme({
@@ -26,11 +27,13 @@ export function CodeMirrorEditor({
   value,
   onChange,
   markdownMode,
+  livePreviewMode = false,
   viewRef,
 }: {
   value: string
   onChange: (v: string) => void
   markdownMode: boolean
+  livePreviewMode?: boolean
   viewRef?: React.MutableRefObject<EditorView | null>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -57,6 +60,7 @@ export function CodeMirrorEditor({
       }),
     ]
     if (markdownMode) extensions.push(markdown())
+    if (markdownMode && livePreviewMode) extensions.push(livePreview())
 
     const v = new EditorView({
       state: EditorState.create({ doc: value, extensions }),
@@ -71,9 +75,10 @@ export function CodeMirrorEditor({
       if (viewRef) viewRef.current = null
     }
     // `value` volutamente escluso: il valore iniziale basta alla creazione,
-    // gli aggiornamenti successivi sono gestiti dall'effetto sotto.
+    // gli aggiornamenti successivi sono gestiti dall'effetto sotto. L'editor si
+    // ricrea quando cambia la modalità (markdown/plain o live preview on/off).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markdownMode])
+  }, [markdownMode, livePreviewMode])
 
   // Applica i cambi esterni di `value` (es. caricamento di un nuovo file).
   useEffect(() => {

@@ -31,11 +31,13 @@
   flatten al salvataggio. Distruttive in V1.
 
 ### 1. Editor Ibrido / live preview (la terza vista Obsidian)
-- [x] Base CodeMirror 6: la vista "Codice" usa CM6 con highlight markdown
-  (CodeMirrorEditor.tsx, sostituita la textarea).
-- [ ] Manca l'**Ibrida**: decorazioni inline su CM6 che rendono il markdown mentre
-  scrivi (titoli, grassetto, link…), con sintassi grezza solo sulla riga attiva.
-  È il layer successivo, costruito sopra l'editor CM6 già integrato.
+- [x] Base CodeMirror 6 (vista "Codice", highlight markdown).
+- [x] Vista **Ibrida** (livePreview.ts): decorazioni inline che nascondono i
+  marcatori e formattano titoli/grassetto/corsivo/inline-code/link; la sintassi
+  grezza appare sulla riga attiva. Toggle "Ibrida" nell'header.
+- [ ] Estendere a: liste, citazioni (blockquote), immagini, blocchi di codice fenced.
+- [ ] Valutare default "Ibrida" per i .md (ora default "Codice" per sicurezza).
+- [ ] Eventuale code-split di CM6 (bundle > 500kB).
 
 ### 2. (fatto) Ricerca / quick-open
 - Ctrl+P quick-open per nome (tutti i tipi), Ctrl+Shift+F ricerca contenuto

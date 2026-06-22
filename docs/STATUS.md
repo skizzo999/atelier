@@ -24,9 +24,10 @@ Prossimo grande pezzo: la modalità Ibrida (live preview) dell'editor.
 - [x] **Viewer immagini + routing per tipo**: FileView instrada per tipo; immagini con zoom/adatta; resto → editor testo
 - [x] **Editing immagini**: ruota/capovolgi/ridimensiona/**ritaglio**, buffer (no perdita cambiando file), salvataggio binario atomico (png/jpg/webp)
 - [x] **Editor sorgente CodeMirror 6**: vista "Codice" con highlight markdown (sostituisce la textarea)
+- [x] **Vista Ibrida / live preview** (CM6): titoli/grassetto/corsivo/code/link renderizzati inline, sintassi grezza sulla riga attiva (terzo toggle "Ibrida")
 
 ## Prossimi step (in ordine di priorità)
-1. **Vista Ibrida / live preview** (terza vista stile Obsidian) → decorazioni inline su CodeMirror 6
+1. **Ibrida — estendere**: liste, citazioni, immagini, blocchi di codice; eventuale default Ibrida per i .md
 2. **Editing immagini fase 2**: annotazioni/markup (penna, frecce, riquadri, testo)
 3. **Altri viewer**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
 4. Avviso "modifiche non salvate" alla chiusura dell'app
