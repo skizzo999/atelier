@@ -4,6 +4,7 @@ import { exists } from '@tauri-apps/plugin-fs'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess } from './lib/vault'
 import { FileTree } from './components/FileTree/FileTree'
+import { Editor } from './components/Editor/Editor'
 import { Welcome } from './components/Welcome/Welcome'
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
   const [booting, setBooting] = useState(true)
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
   // ri-concesso al vault salvato; se la cartella non esiste più, lo dimentichiamo.
@@ -37,6 +39,22 @@ function App() {
     }
   }, [clearVault])
 
+  // Rete di sicurezza: quando la finestra torna in primo piano, verifica che il
+  // vault esista ancora (nel caso il watcher non avesse intercettato la rimozione).
+  useEffect(() => {
+    function onFocus() {
+      const saved = useAppStore.getState().vaultPath
+      if (!saved) return
+      exists(saved)
+        .then((ok) => {
+          if (!ok) clearVault()
+        })
+        .catch(() => {})
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [clearVault])
+
   if (booting) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-zinc-500">
@@ -55,7 +73,7 @@ function App() {
         <div className="p-4 border-b border-zinc-800">
           <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Explorer</h3>
         </div>
-        <FileTree />
+        <FileTree onSelectFile={setSelectedFile} />
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -72,10 +90,7 @@ function App() {
           </button>
         </header>
 
-        <div className="flex-1 p-8 overflow-y-auto">
-          <h1 className="text-3xl font-bold mb-4">Editor Area</h1>
-          <p className="text-zinc-500">Seleziona un file dalla sidebar per iniziare.</p>
-        </div>
+        <Editor filePath={selectedFile} />
       </main>
     </div>
   )

@@ -1,38 +1,36 @@
 # Prossimi step - Continuità
 
 ## Dove siamo arrivati
-- FileTree con espansione lazy delle cartelle funzionante (bug react-arborist risolto)
-- Scope permessi risolto (comando Rust `allow_path`, accesso ricorsivo alla cartella scelta)
-- Sistema vault completo: store Zustand persistito, Welcome (Apri/Nuovo vault),
-  auto-apertura dell'ultimo vault all'avvio, validazione esistenza al boot
-- Toggle modalità standard/developer persistito (per ora solo stato, nessun comportamento)
+- FileTree con espansione lazy + watcher filesystem (albero allineato al disco in tempo reale)
+- Vault eliminato/spostato mentre l'app è aperta → torna alla Welcome
+- Sistema vault persistente con auto-apertura dell'ultimo vault all'avvio
+- Editor file: lettura, modifica, salvataggio (Ctrl+S), indicatore "non salvato",
+  risync al focus finestra
+- Markdown: toggle Codice (sorgente) / Lettura (renderizzato)
 
 ## Cosa fare (in ordine)
 
-### 1. Gestione modifiche filesystem a runtime (URGENTE)
-Problema: se il vault viene eliminato/spostato mentre l'app è aperta, l'app continua a mostrarlo.
-- **Soluzione completa**: fs watcher (tauri-plugin-fs `watch`, feature Cargo `watch` + permesso
-  `fs:allow-watch`) sul vault → su rimozione della root torna a Welcome; su cambi dei figli
-  refresh dell'albero (stile Obsidian).
-- **Quick win interim**: ri-validare `exists(vaultPath)` sul focus della finestra + gestire
-  gli errori di `readDir` (se la cartella è sparita → torna a Welcome con messaggio).
+### 1. Editor Ibrido / live preview (la terza vista Obsidian)
+- Le viste Codice e Lettura ci sono; manca l'Ibrida (markdown che si renderizza inline
+  mentre scrivi, stile Obsidian Live Preview).
+- Richiede un motore dedicato: valutare **CodeMirror 6** (è quello che usa Obsidian,
+  supporta syntax highlight del sorgente + decorazioni per il live preview).
+- Sostituirà/affiancherà la textarea attuale nella vista Codice.
 
-### 2. Apertura file .md (1 ora)
-- onClick su file (già loggato in console) → `readTextFile` → stato contenuto → componente Editor
+### 2. Hardening editor
+- Salvataggio atomico: scrivere su file tmp + rename (evita corruzione su crash)
+- Sanitizzazione dell'HTML in vista Lettura (es. DOMPurify) prima di dangerouslySetInnerHTML
 
-### 3. Editor Markdown con TipTap (2 ore)
-- Creare src/components/Editor/Editor.tsx con StarterKit
-- Mostrare il contenuto del file caricato e abilitare la modifica
+### 3. Gestione conflitti editor
+- Se ci sono modifiche locali non salvate E il file cambia da fuori → scelta
+  "tieni le mie / ricarica dal disco"
 
-### 4. Salvataggio (1 ora)
-- Pulsante "Salva", salvataggio atomico (tmp file + rename), stato modificato/salvato
+### 4. Modalità developer (comportamento reale)
+- Oggi il toggle cambia solo lo stato: definire cosa mostra/abilita in developer
 
-### 5. Migrazione persistenza (opzionale)
-- Da `zustand/persist` (localStorage) a `tauri-plugin-store` quando servono più impostazioni
-  (cartella di default, tema, ecc.) — si fa una volta sola con un motivo concreto
-
-### 6. CI e process (opzionale)
-- GitHub Actions workflow, branch protection
+### 5. Opzionali
+- Migrazione persistenza a `tauri-plugin-store`
+- CI GitHub Actions + branch protection
 
 ## Comandi utili
 pnpm tauri dev          # Avvia sviluppo
@@ -40,13 +38,15 @@ git add . && git commit # Commit cambiamenti
 git push                # Push su GitHub
 
 ## File principali
-- src/store/appStore.ts        (store globale: vaultPath + mode)
-- src/lib/vault.ts             (apertura/creazione vault, scope)
-- src/components/FileTree/FileTree.tsx
-- src/components/Welcome/Welcome.tsx
-- src/components/Editor/Editor.tsx   (da creare)
-- src-tauri/src/lib.rs         (comando allow_path; qui andrà il watcher)
+- src/store/appStore.ts                  (store: vaultPath + mode)
+- src/lib/vault.ts                       (apertura/creazione vault, scope)
+- src/components/FileTree/FileTree.tsx   (albero + watcher + selezione file)
+- src/components/Editor/Editor.tsx       (lettura/modifica/salvataggio + viste md)
+- src/components/Welcome/Welcome.tsx     (schermata iniziale)
+- src/App.tsx                            (boot, layout, stato file selezionato)
+- src-tauri/src/lib.rs                   (comando allow_path)
 
 ## Problemi noti
-- Modifiche al filesystem esterne all'app non rilevate a runtime (vedi step 1)
-- Il toggle Developer cambia solo lo stato, non ancora il comportamento
+- Markdown in Lettura non sanitizzato (vedi step 2)
+- Salvataggio non atomico (vedi step 2)
+- Risync editor solo al focus finestra (non real-time)

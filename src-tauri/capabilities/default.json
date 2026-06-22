@@ -10,6 +10,8 @@
     "fs:allow-read-dir",
     "fs:allow-mkdir",
     "fs:allow-exists",
+    "fs:allow-watch",
+    "fs:allow-unwatch",
     "dialog:allow-open",
     "dialog:allow-save"
   ]

@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { createContext, useContext, useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { Tree, NodeRendererProps } from 'react-arborist'
-import { readDir } from '@tauri-apps/plugin-fs'
+import { readDir, exists, watch, type UnwatchFn } from '@tauri-apps/plugin-fs'
 import { useAppStore } from '../../store/appStore'
 import { openVaultDialog } from '../../lib/vault'
 
@@ -60,13 +60,42 @@ function setNodeChildren(nodes: FileNode[], id: string, children: FileNode[]): F
   })
 }
 
-// Il renderer riceve solo NodeRendererProps: usiamo un context per fargli
-// chiedere il lazy-load passando direttamente l'oggetto dati del nodo cliccato.
-const RequestLoadContext = createContext<(node: FileNode) => void>(() => {})
+// Rilegge dal filesystem i figli di `path`, preservando lo stato (childrenLoaded
+// + sottoalberi) delle cartelle ancora aperte. Usata dal watcher per il refresh:
+// gli elementi nuovi compaiono, quelli eliminati spariscono, le cartelle aperte
+// restano aperte e aggiornate.
+async function reloadChildren(path: string, oldChildren: FileNode[]): Promise<FileNode[]> {
+  const fresh = await loadDirectory(path)
+  const oldById = new Map(oldChildren.map((c) => [c.id, c]))
+  return Promise.all(
+    fresh.map(async (child) => {
+      const old = oldById.get(child.id)
+      if (child.isFolder && old?.isFolder && old.childrenLoaded && old.children) {
+        return {
+          ...child,
+          children: await reloadChildren(child.path, old.children),
+          childrenLoaded: true,
+        }
+      }
+      return child
+    }),
+  )
+}
+
+// Il renderer riceve solo NodeRendererProps: usiamo un context per passargli le
+// azioni (lazy-load delle cartelle e selezione del file) con l'oggetto dati del nodo.
+interface TreeActions {
+  requestLoad: (node: FileNode) => void
+  selectFile: (path: string) => void
+}
+const TreeActionsContext = createContext<TreeActions>({
+  requestLoad: () => {},
+  selectFile: () => {},
+})
 
 function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   const { data } = node
-  const requestLoad = useContext(RequestLoadContext)
+  const { requestLoad, selectFile } = useContext(TreeActionsContext)
   const icon = data.isFolder ? (node.isOpen ? '📂' : '📁') : '📄'
 
   return (
@@ -81,7 +110,7 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
           if (!data.childrenLoaded) requestLoad(data)
         } else {
           node.select()
-          console.log('File selezionato:', data.path)
+          selectFile(data.path)
         }
       }}
     >
@@ -91,11 +120,18 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   )
 }
 
-export function FileTree() {
+export function FileTree({ onSelectFile }: { onSelectFile: (path: string) => void }) {
   const vaultPath = useAppStore((s) => s.vaultPath)
   const setVaultPath = useAppStore((s) => s.setVaultPath)
+  const clearVault = useAppStore((s) => s.clearVault)
   const [treeData, setTreeData] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
+
+  // Specchio sincrono di treeData, per leggerlo dentro il callback del watcher.
+  const treeDataRef = useRef<FileNode[]>([])
+  useEffect(() => {
+    treeDataRef.current = treeData
+  }, [treeData])
 
   // Misura il contenitore per far riempire l'albero allo spazio disponibile
   // (react-arborist vuole width/height numerici espliciti).
@@ -130,6 +166,40 @@ export function FileTree() {
     }
   }, [vaultPath])
 
+  // Watcher filesystem: tiene l'albero allineato ai cambiamenti esterni.
+  // Se la root del vault sparisce torna alla Welcome; altrimenti aggiorna l'albero.
+  useEffect(() => {
+    if (!vaultPath) return
+    let unwatch: UnwatchFn | undefined
+    let disposed = false
+
+    async function onChange() {
+      try {
+        const stillThere = await exists(vaultPath!)
+        if (!stillThere) {
+          clearVault()
+          return
+        }
+        const refreshed = await reloadChildren(vaultPath!, treeDataRef.current)
+        if (!disposed) setTreeData(refreshed)
+      } catch (err) {
+        console.error('Errore aggiornamento albero (watcher):', err)
+      }
+    }
+
+    watch(vaultPath, () => onChange(), { recursive: true, delayMs: 300 })
+      .then((fn) => {
+        if (disposed) fn()
+        else unwatch = fn
+      })
+      .catch((err) => console.error('Errore avvio watcher:', err))
+
+    return () => {
+      disposed = true
+      unwatch?.()
+    }
+  }, [vaultPath, clearVault])
+
   // Lazy loading: carica i figli la prima volta che una cartella viene aperta.
   const requestLoad = useCallback(async (node: FileNode) => {
     if (node.childrenLoaded) return
@@ -141,6 +211,11 @@ export function FileTree() {
     const path = await openVaultDialog()
     if (path) setVaultPath(path)
   }, [setVaultPath])
+
+  const treeActions = useMemo<TreeActions>(
+    () => ({ requestLoad, selectFile: onSelectFile }),
+    [requestLoad, onSelectFile],
+  )
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -157,7 +232,7 @@ export function FileTree() {
         {loading ? (
           <div className="text-sm text-zinc-500 p-2">Caricamento...</div>
         ) : (
-          <RequestLoadContext.Provider value={requestLoad}>
+          <TreeActionsContext.Provider value={treeActions}>
             <Tree
               data={treeData}
               openByDefault={false}
@@ -171,7 +246,7 @@ export function FileTree() {
             >
               {FileNodeComponent}
             </Tree>
-          </RequestLoadContext.Provider>
+          </TreeActionsContext.Provider>
         )}
       </div>
     </div>
