@@ -152,34 +152,54 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-// In Ibrida l'highlight di oneDark è disattivato: qui si dà solo la formattazione.
+// In Ibrida l'highlight di oneDark è disattivato: aspetto "documento" (come la
+// vista Lettura) — font proporzionale, sfondo dell'app, dimensioni da prose.
 const HEAD = '#e4e4e7'
+const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  '.cm-lp-h1': { fontSize: '1.7em', fontWeight: '700', color: HEAD },
-  '.cm-lp-h2': { fontSize: '1.45em', fontWeight: '700', color: HEAD },
+  // Usa lo sfondo dell'app (zinc-900) invece di quello di oneDark.
+  '&': { backgroundColor: 'transparent' },
+  '.cm-content': {
+    fontFamily: PROSE_FONT,
+    fontSize: '16px',
+    lineHeight: '1.7',
+    padding: '24px',
+    caretColor: '#e4e4e7',
+    color: '#d4d4d8',
+  },
+  '.cm-lp-h1': { fontSize: '2em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '700', color: HEAD },
   '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
-  '.cm-lp-h4': { fontSize: '1.1em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h4': { fontSize: '1.05em', fontWeight: '700', color: HEAD },
   '.cm-lp-h5': { fontWeight: '700', color: HEAD },
   '.cm-lp-h6': { fontWeight: '700', color: HEAD },
-  '.cm-lp-strong': { fontWeight: '700' },
+  '.cm-lp-strong': { fontWeight: '700', color: HEAD },
   '.cm-lp-em': { fontStyle: 'italic' },
   '.cm-lp-code': {
-    fontFamily: 'ui-monospace, monospace',
+    fontFamily: MONO,
+    fontSize: '0.875em',
     background: 'rgba(255,255,255,0.08)',
-    padding: '0.05em 0.3em',
-    borderRadius: '3px',
+    padding: '0.1em 0.35em',
+    borderRadius: '4px',
   },
   '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
   '.cm-lp-bullet': { color: '#9aa0aa' },
   '.cm-lp-quote': {
-    borderLeft: '3px solid #4b5563',
-    paddingLeft: '0.8em',
-    color: '#9aa0aa',
+    borderLeft: '3px solid #52525b',
+    paddingLeft: '1em',
+    color: '#a1a1aa',
+    fontStyle: 'italic',
   },
-  '.cm-lp-codeblock': { background: 'rgba(255,255,255,0.05)' },
-  '.cm-lp-table': { background: 'rgba(255,255,255,0.03)' },
-  '.cm-lp-hr': { borderBottom: '1px solid #4b5563' },
+  '.cm-lp-codeblock': {
+    fontFamily: MONO,
+    fontSize: '0.875em',
+    background: 'rgba(255,255,255,0.05)',
+  },
+  // Le tabelle restano monospazio per allineare le colonne (boxate = step successivo).
+  '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
+  '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
 })
 
 export function livePreview(): Extension {
