@@ -8,3 +8,40 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Allinea la vista Lettura (Tailwind prose) allo stile pulito dell'Ibrida */
+.prose {
+  color: #dcddde;
+}
+.prose a {
+  color: #7aa2f7;
+  font-weight: 400;
+}
+.prose blockquote {
+  font-weight: 400;
+  font-style: italic;
+  color: #a1a1aa;
+  border-left-color: #52525b;
+}
+/* rimuove le virgolette ricciute che prose aggiunge alle citazioni */
+.prose blockquote p:first-of-type::before,
+.prose blockquote p:last-of-type::after {
+  content: none;
+}
+/* inline code: niente backtick automatici, stesso stile dell'Ibrida */
+.prose :where(code):not(:where(pre code))::before,
+.prose :where(code):not(:where(pre code))::after {
+  content: none;
+}
+.prose :where(code):not(:where(pre code)) {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-weight: 400;
+}
+.prose mark {
+  background-color: rgba(250, 204, 21, 0.25);
+  color: inherit;
+  padding: 0 0.1em;
+  border-radius: 3px;
+}
