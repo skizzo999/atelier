@@ -1,11 +1,25 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js/lib/common'
+import 'highlight.js/styles/atom-one-dark.css'
 import DOMPurify from 'dompurify'
 import type { EditorView } from '@codemirror/view'
 import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
+
+// Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
+marked.use(
+  markedHighlight({
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext'
+      return hljs.highlight(code, { language }).value
+    },
+  }),
+)
 
 // Estensione marked per ==evidenziato== (così la Lettura combacia con l'Ibrida).
 marked.use({

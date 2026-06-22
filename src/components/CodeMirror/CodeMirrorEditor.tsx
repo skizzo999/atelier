@@ -2,10 +2,27 @@ import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { markdown } from '@codemirror/lang-markdown'
+import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
+import { tags as t } from '@lezer/highlight'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { livePreview } from './livePreview'
+
+// Stile per il SOLO codice (dentro i blocchi ```): colora i token di programmazione
+// ma NON i tag markdown (titoli/grassetto restano neutri in Ibrida).
+const codeHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: '#c678dd' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#61afef' },
+  { tag: [t.constant(t.name), t.standard(t.name), t.bool, t.atom], color: '#d19a66' },
+  { tag: [t.typeName, t.className, t.number, t.annotation, t.self], color: '#e5c07b' },
+  { tag: [t.operator, t.operatorKeyword], color: '#56b6c2' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#98c379' },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: '#7d8799', fontStyle: 'italic' },
+  { tag: [t.propertyName], color: '#e06c75' },
+  { tag: [t.meta, t.punctuation], color: '#abb2bf' },
+])
 
 // Tema di base: riempie l'altezza, font monospazio, niente outline di focus.
 const baseTheme = EditorView.theme({
@@ -56,6 +73,8 @@ export function CodeMirrorEditor({
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.lineWrapping,
       liveMode ? [] : oneDark,
+      // In Ibrida: evidenzia solo il codice nei blocchi, non il markdown.
+      liveMode ? syntaxHighlighting(codeHighlightStyle) : [],
       baseTheme,
       EditorView.updateListener.of((u) => {
         if (u.docChanged && !settingExternally.current) {
@@ -63,7 +82,7 @@ export function CodeMirrorEditor({
         }
       }),
     ]
-    if (markdownMode) extensions.push(markdown({ extensions: GFM }))
+    if (markdownMode) extensions.push(markdown({ extensions: GFM, codeLanguages: languages }))
     if (liveMode) extensions.push(livePreview())
 
     const v = new EditorView({
