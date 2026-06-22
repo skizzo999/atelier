@@ -1,10 +1,10 @@
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
-import { Range, Extension } from '@codemirror/state'
+import { Range, Extension, Text } from '@codemirror/state'
 
 // Live preview stile Obsidian: nasconde i marcatori markdown e formatta il
-// contenuto inline, ma mostra la sintassi grezza sulla riga dove c'è il cursore
-// (così la puoi modificare). Costruito sopra l'albero sintattico di CodeMirror.
+// contenuto inline, mostrando la sintassi grezza sulla riga col cursore (per
+// poterla modificare). Costruito sull'albero sintattico di CodeMirror.
 
 // Sostituisce il marcatore di lista (-, *, +) con un punto elenco.
 class BulletWidget extends WidgetType {
@@ -35,6 +35,18 @@ const headings = [
   Decoration.mark({ class: 'cm-lp-h6' }),
 ]
 
+// Decorazioni di riga (blocchi multi-riga).
+const quoteLine = Decoration.line({ class: 'cm-lp-quote' })
+const codeBlockLine = Decoration.line({ class: 'cm-lp-codeblock' })
+const tableLine = Decoration.line({ class: 'cm-lp-table' })
+const hrLine = Decoration.line({ class: 'cm-lp-hr' })
+
+function eachLine(doc: Text, from: number, to: number, fn: (lineFrom: number) => void) {
+  const first = doc.lineAt(from).number
+  const last = doc.lineAt(Math.min(to, doc.length)).number
+  for (let n = first; n <= last; n++) fn(doc.line(n).from)
+}
+
 function buildDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   try {
@@ -54,8 +66,24 @@ function buildDecorations(view: EditorView): DecorationSet {
         from,
         to,
         enter: (node) => {
-          if (active.has(doc.lineAt(node.from).number)) return
           const name = node.name
+
+          // --- Blocchi multi-riga (decorazione per-riga, sempre attiva) ---
+          if (name === 'Blockquote') {
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(quoteLine.range(lf)))
+            return // continua nei figli (QuoteMark, contenuto)
+          }
+          if (name === 'FencedCode' || name === 'CodeBlock') {
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(codeBlockLine.range(lf)))
+            return false // non processare l'interno del codice
+          }
+          if (name === 'Table') {
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
+            return false
+          }
+
+          // --- Nodi su singola riga: grezzo sulla riga attiva ---
+          if (active.has(doc.lineAt(node.from).number)) return
 
           const hm = name.match(/^ATXHeading(\d)$/)
           if (hm) {
@@ -85,11 +113,21 @@ function buildDecorations(view: EditorView): DecorationSet {
           }
 
           if (name === 'ListMark') {
-            // Solo liste puntate (non numerate): sostituisci -/*/+ con •.
             const list = node.node.parent?.parent
             if (list && list.name === 'BulletList') {
               ranges.push(bullet.range(node.from, node.to))
             }
+            return
+          }
+
+          if (name === 'QuoteMark') {
+            ranges.push(hide.range(node.from, node.to))
+            return
+          }
+
+          if (name === 'HorizontalRule') {
+            ranges.push(hrLine.range(doc.lineAt(node.from).from))
+            ranges.push(hide.range(node.from, node.to))
             return
           }
 
@@ -114,8 +152,7 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-// In Ibrida l'highlight di oneDark è disattivato, quindi non serve combattere
-// i colori della sintassi: il testo è già neutro, qui si dà solo la formattazione.
+// In Ibrida l'highlight di oneDark è disattivato: qui si dà solo la formattazione.
 const HEAD = '#e4e4e7'
 
 const livePreviewTheme = EditorView.theme({
@@ -135,6 +172,14 @@ const livePreviewTheme = EditorView.theme({
   },
   '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
   '.cm-lp-bullet': { color: '#9aa0aa' },
+  '.cm-lp-quote': {
+    borderLeft: '3px solid #4b5563',
+    paddingLeft: '0.8em',
+    color: '#9aa0aa',
+  },
+  '.cm-lp-codeblock': { background: 'rgba(255,255,255,0.05)' },
+  '.cm-lp-table': { background: 'rgba(255,255,255,0.03)' },
+  '.cm-lp-hr': { borderBottom: '1px solid #4b5563' },
 })
 
 export function livePreview(): Extension {

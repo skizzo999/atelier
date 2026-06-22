@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
+import { GFM } from '@lezer/markdown'
 import { oneDark, oneDarkTheme } from '@codemirror/theme-one-dark'
 import { livePreview } from './livePreview'
 
@@ -62,7 +63,7 @@ export function CodeMirrorEditor({
         }
       }),
     ]
-    if (markdownMode) extensions.push(markdown())
+    if (markdownMode) extensions.push(markdown({ extensions: GFM }))
     if (liveMode) extensions.push(livePreview())
 
     const v = new EditorView({
