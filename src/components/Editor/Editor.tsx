@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { readTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useAppStore } from '../../store/appStore'
+import { writeFileAtomic } from '../../lib/fileOps'
 
 type ViewMode = 'source' | 'reading'
 
@@ -13,27 +14,38 @@ function isMarkdown(path: string): boolean {
 
 export function Editor() {
   const filePath = useAppStore((s) => s.selectedFile)
+  const setBuffer = useAppStore((s) => s.setBuffer)
+  const clearBuffer = useAppStore((s) => s.clearBuffer)
+  // "dirty" derivato dallo store: c'è un buffer non salvato per questo file.
+  const dirty = useAppStore((s) => filePath !== null && s.dirtyBuffers[filePath] !== undefined)
+
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
-  const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [view, setView] = useState<ViewMode>('source')
 
-  // Carica il contenuto quando cambia il file selezionato.
+  // Carica il contenuto quando cambia il file: dal buffer se ci sono modifiche
+  // non salvate, altrimenti dal disco.
   useEffect(() => {
     if (!filePath) {
       setContent('')
-      setDirty(false)
       return
     }
+
+    setView('source')
+    const buffered = useAppStore.getState().dirtyBuffers[filePath]
+    if (buffered !== undefined) {
+      setContent(buffered)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
-    setView('source')
     readTextFile(filePath)
       .then((text) => {
         if (cancelled) return
         setContent(text)
-        setDirty(false)
         setLoading(false)
       })
       .catch((err) => {
@@ -51,14 +63,14 @@ export function Editor() {
     if (!filePath || saving) return
     setSaving(true)
     try {
-      await writeTextFile(filePath, content)
-      setDirty(false)
+      await writeFileAtomic(filePath, content)
+      clearBuffer(filePath)
     } catch (err) {
       console.error('Errore salvataggio file:', err)
     } finally {
       setSaving(false)
     }
-  }, [filePath, content, saving])
+  }, [filePath, content, saving, clearBuffer])
 
   // Ctrl/Cmd+S per salvare.
   useEffect(() => {
@@ -72,9 +84,8 @@ export function Editor() {
     return () => window.removeEventListener('keydown', onKey)
   }, [handleSave])
 
-  // Risincronizza con il disco quando la finestra torna in focus: se il file è
-  // stato modificato da fuori lo ricarica, ma solo se non ci sono modifiche locali
-  // non salvate (per non sovrascriverle).
+  // Risincronizza con il disco quando la finestra torna in focus, solo se non
+  // ci sono modifiche locali non salvate (per non sovrascriverle).
   useEffect(() => {
     if (!filePath) return
     function onFocus() {
@@ -157,8 +168,9 @@ export function Editor() {
         <textarea
           value={content}
           onChange={(e) => {
-            setContent(e.target.value)
-            setDirty(true)
+            const value = e.target.value
+            setContent(value)
+            setBuffer(filePath, value)
           }}
           spellCheck={false}
           className="flex-1 w-full bg-zinc-900 text-zinc-100 p-6 resize-none outline-none font-mono text-sm leading-relaxed"

@@ -36,3 +36,12 @@ export async function renameEntry(oldPath: string, newName: string): Promise<str
 export async function deleteEntry(path: string, isFolder: boolean): Promise<void> {
   await remove(path, { recursive: isFolder })
 }
+
+// Salvataggio atomico: scrive su file temporaneo e poi rinomina sul file finale.
+// `std::fs::rename` su Windows sostituisce il file esistente, quindi la sostituzione
+// è atomica: in caso di crash a metà scrittura, l'originale resta intatto.
+export async function writeFileAtomic(path: string, content: string): Promise<void> {
+  const tmp = `${path}.tmp`
+  await writeTextFile(tmp, content)
+  await rename(tmp, path)
+}

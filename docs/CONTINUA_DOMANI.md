@@ -7,7 +7,9 @@
 - Editor file: lettura, modifica, salvataggio (Ctrl+S), indicatore "non salvato",
   risync al focus finestra
 - Markdown: toggle Codice (sorgente) / Lettura (renderizzato + sanitizzato DOMPurify)
-- Gestione file: crea/rinomina/elimina file e cartelle (menu tasto destro + pulsanti root)
+- Gestione file: crea/rinomina/elimina (menu tasto destro su elemento o area vuota)
+- Salvataggio atomico (tmp+rename); modifiche non salvate stile VS Code (buffer in
+  memoria, nessuna perdita cambiando file); pallino "non salvato" nel tree
 
 ## Cosa fare (in ordine)
 
@@ -18,18 +20,22 @@
   supporta syntax highlight del sorgente + decorazioni per il live preview).
 - Sostituirà/affiancherà la textarea attuale nella vista Codice.
 
-### 2. Hardening editor
-- Salvataggio atomico: scrivere su file tmp + rename (evita corruzione su crash)
-- (fatto) Sanitizzazione dell'HTML in vista Lettura con DOMPurify
+### 2. Ricerca / quick-open
+- Cercare file per nome (quick-open) e cercare nel contenuto del vault
+- Appena il vault ha tanti file diventa essenziale per navigarlo
 
-### 3. Gestione conflitti editor
-- Se ci sono modifiche locali non salvate E il file cambia da fuori → scelta
+### 3. Avviso modifiche non salvate alla chiusura
+- I buffer non salvati sono in memoria: intercettare la chiusura della finestra
+  Tauri e avvisare/salvare
+
+### 4. Gestione conflitti editor
+- Se ci sono modifiche non salvate (buffer) E il file cambia da fuori → scelta
   "tieni le mie / ricarica dal disco"
 
-### 4. Modalità developer (comportamento reale)
+### 5. Modalità developer (comportamento reale)
 - Oggi il toggle cambia solo lo stato: definire cosa mostra/abilita in developer
 
-### 5. Opzionali
+### 6. Opzionali
 - Migrazione persistenza a `tauri-plugin-store`
 - CI GitHub Actions + branch protection
 

@@ -23,6 +23,7 @@ async function loadDirectory(path: string): Promise<FileNode[]> {
     for (const entry of entries) {
       if (!entry.name) continue
       if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+      if (entry.name.endsWith('.tmp')) continue // file temporanei del salvataggio atomico
 
       const fullPath = `${path}\\${entry.name}`
       nodes.push({
@@ -96,6 +97,7 @@ const TreeActionsContext = createContext<TreeActions>({
 function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
   const { data } = node
   const { requestLoad, selectFile, openMenu } = useContext(TreeActionsContext)
+  const isDirty = useAppStore((s) => !data.isFolder && s.dirtyBuffers[data.path] !== undefined)
   const icon = data.isFolder ? (node.isOpen ? '📂' : '📁') : '📄'
 
   return (
@@ -122,6 +124,12 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
     >
       <span className="text-xs select-none">{icon}</span>
       <span className="text-sm text-zinc-200 truncate flex-1">{data.name}</span>
+      {isDirty && (
+        <span
+          className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+          title="Modifiche non salvate"
+        />
+      )}
     </div>
   )
 }
@@ -255,7 +263,8 @@ export function FileTree() {
   const [treeData, setTreeData] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
 
-  const [menu, setMenu] = useState<{ node: FileNode; x: number; y: number } | null>(null)
+  // target null = area vuota dell'explorer → azioni sulla radice del vault.
+  const [menu, setMenu] = useState<{ target: FileNode | null; x: number; y: number } | null>(null)
   const [nameModal, setNameModal] = useState<{
     title: string
     initial: string
@@ -353,7 +362,7 @@ export function FileTree() {
     () => ({
       requestLoad,
       selectFile: setSelectedFile,
-      openMenu: (node, x, y) => setMenu({ node, x, y }),
+      openMenu: (node, x, y) => setMenu({ target: node, x, y }),
     }),
     [requestLoad, setSelectedFile],
   )
@@ -393,6 +402,8 @@ export function FileTree() {
       initial: node.name,
       run: async (name) => {
         const np = await renameEntry(node.path, name)
+        // Sposta l'eventuale buffer non salvato sul nuovo path (file rinominato).
+        useAppStore.getState().moveBuffer(node.path, np)
         // Aggiorna il file aperto se era questo (o se è dentro la cartella rinominata).
         const sel = useAppStore.getState().selectedFile
         if (sel === node.path) setSelectedFile(np)
@@ -427,6 +438,8 @@ export function FileTree() {
     setConfirmBusy(true)
     try {
       await deleteEntry(confirmTarget.path, confirmTarget.isFolder)
+      // Scarta eventuali buffer non salvati del file/cartella eliminati.
+      useAppStore.getState().clearBuffersUnder(confirmTarget.path)
       const sel = useAppStore.getState().selectedFile
       if (sel === confirmTarget.path || (sel && sel.startsWith(confirmTarget.path + '\\'))) {
         setSelectedFile(null)
@@ -442,30 +455,23 @@ export function FileTree() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-zinc-800 space-y-2">
+      <div className="px-3 py-2 border-b border-zinc-800">
         <button
           onClick={handleChangeVault}
           className="w-full px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
         >
           Cambia vault
         </button>
-        <div className="flex gap-2">
-          <button
-            onClick={() => vaultPath && openNewFile(vaultPath)}
-            className="flex-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
-          >
-            + File
-          </button>
-          <button
-            onClick={() => vaultPath && openNewFolder(vaultPath)}
-            className="flex-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
-          >
-            + Cartella
-          </button>
-        </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-hidden"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ target: null, x: e.clientX, y: e.clientY })
+        }}
+      >
         {loading ? (
           <div className="text-sm text-zinc-500 p-2">Caricamento...</div>
         ) : (
@@ -501,16 +507,29 @@ export function FileTree() {
             className="fixed z-50 w-44 bg-zinc-800 border border-zinc-700 rounded shadow-lg py-1 text-sm"
             style={{ top: menu.y, left: menu.x }}
           >
-            {menu.node.isFolder && (
+            {menu.target === null ? (
               <>
-                <MenuItem onClick={() => openNewFile(menu.node.path)}>Nuovo file</MenuItem>
-                <MenuItem onClick={() => openNewFolder(menu.node.path)}>Nuova cartella</MenuItem>
+                <MenuItem onClick={() => vaultPath && openNewFile(vaultPath)}>Nuovo file</MenuItem>
+                <MenuItem onClick={() => vaultPath && openNewFolder(vaultPath)}>
+                  Nuova cartella
+                </MenuItem>
+              </>
+            ) : (
+              <>
+                {menu.target.isFolder && (
+                  <>
+                    <MenuItem onClick={() => openNewFile(menu.target!.path)}>Nuovo file</MenuItem>
+                    <MenuItem onClick={() => openNewFolder(menu.target!.path)}>
+                      Nuova cartella
+                    </MenuItem>
+                  </>
+                )}
+                <MenuItem onClick={() => openRename(menu.target!)}>Rinomina</MenuItem>
+                <MenuItem danger onClick={() => openDelete(menu.target!)}>
+                  Elimina
+                </MenuItem>
               </>
             )}
-            <MenuItem onClick={() => openRename(menu.node)}>Rinomina</MenuItem>
-            <MenuItem danger onClick={() => openDelete(menu.node)}>
-              Elimina
-            </MenuItem>
           </div>
         </>
       )}
