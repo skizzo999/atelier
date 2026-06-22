@@ -22,6 +22,10 @@ function extOf(path: string): string {
   return path.split('.').pop()?.toLowerCase() ?? ''
 }
 
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v))
+}
+
 export function ImageViewer({ filePath }: { filePath: string }) {
   return EDITABLE.has(extOf(filePath)) ? (
     <EditableImage filePath={filePath} />
@@ -64,14 +68,36 @@ function resizeCanvas(src: HTMLCanvasElement, w: number, h: number): HTMLCanvasE
   return c
 }
 
+function cropCanvas(
+  src: HTMLCanvasElement,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+): HTMLCanvasElement {
+  const c = document.createElement('canvas')
+  c.width = sw
+  c.height = sh
+  c.getContext('2d')!.drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh)
+  return c
+}
+
 const toolBtn =
   'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+
+interface CropRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
 
 function EditableImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
   const setImageBuffer = useAppStore((s) => s.setImageBuffer)
   const clearImageBuffer = useAppStore((s) => s.clearImageBuffer)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -81,6 +107,10 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [fit, setFit] = useState(true)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [resizeOpen, setResizeOpen] = useState(false)
+  const [cropMode, setCropMode] = useState(false)
+  const [cropRect, setCropRect] = useState<CropRect | null>(null)
+  const dragStart = useRef<{ x: number; y: number } | null>(null)
+  const dragging = useRef(false)
 
   // Carica dal buffer (modifiche non salvate) se presente, altrimenti dal disco.
   useEffect(() => {
@@ -89,6 +119,8 @@ function EditableImage({ filePath }: { filePath: string }) {
     setError(false)
     setZoom(1)
     setFit(true)
+    setCropMode(false)
+    setCropRect(null)
     const buffered = useAppStore.getState().imageBuffers[filePath]
     ;(async () => {
       let blob: Blob
@@ -179,7 +211,75 @@ function EditableImage({ filePath }: { filePath: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // --- Crop interattivo ---
+  function startCrop() {
+    setFit(true)
+    setZoom(1)
+    setCropRect(null)
+    setCropMode(true)
+  }
+  function cancelCrop() {
+    setCropMode(false)
+    setCropRect(null)
+    dragging.current = false
+  }
+  function onCropDown(e: React.MouseEvent) {
+    const cv = canvasRef.current
+    if (!cv) return
+    const r = cv.getBoundingClientRect()
+    const x = clamp(e.clientX - r.left, 0, r.width)
+    const y = clamp(e.clientY - r.top, 0, r.height)
+    dragStart.current = { x, y }
+    dragging.current = true
+    setCropRect({ x, y, w: 0, h: 0 })
+  }
+  function onCropMove(e: React.MouseEvent) {
+    if (!dragging.current) return
+    const cv = canvasRef.current
+    const s = dragStart.current
+    if (!cv || !s) return
+    const r = cv.getBoundingClientRect()
+    const x2 = clamp(e.clientX - r.left, 0, r.width)
+    const y2 = clamp(e.clientY - r.top, 0, r.height)
+    setCropRect({
+      x: Math.min(s.x, x2),
+      y: Math.min(s.y, y2),
+      w: Math.abs(x2 - s.x),
+      h: Math.abs(y2 - s.y),
+    })
+  }
+  function onCropUp() {
+    dragging.current = false
+  }
+  function applyCrop() {
+    const cv = canvasRef.current
+    if (!cv || !cropRect || cropRect.w < 2 || cropRect.h < 2) {
+      cancelCrop()
+      return
+    }
+    const r = cv.getBoundingClientRect()
+    const scaleX = cv.width / r.width
+    const scaleY = cv.height / r.height
+    const sx = Math.round(cropRect.x * scaleX)
+    const sy = Math.round(cropRect.y * scaleY)
+    const sw = Math.round(cropRect.w * scaleX)
+    const sh = Math.round(cropRect.h * scaleY)
+    applyTransform((src) => cropCanvas(src, sx, sy, sw, sh))
+    cancelCrop()
+  }
+
+  // Offset del canvas dentro il contenitore, per posizionare il rettangolo di selezione.
+  let ox = 0
+  let oy = 0
+  if (cropMode && canvasRef.current && containerRef.current) {
+    const cr = canvasRef.current.getBoundingClientRect()
+    const cor = containerRef.current.getBoundingClientRect()
+    ox = cr.left - cor.left
+    oy = cr.top - cor.top
+  }
+
   const fileName = filePath.split('\\').pop()
+  const canEdit = !loading && !error
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -193,67 +293,111 @@ function EditableImage({ filePath }: { filePath: string }) {
         </span>
       </div>
 
-      <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1 text-xs flex-wrap">
-        <button className={toolBtn} title="Ruota a sinistra" onClick={() => applyTransform((c) => rotate90(c, -1))}>
-          ⟲
-        </button>
-        <button className={toolBtn} title="Ruota a destra" onClick={() => applyTransform((c) => rotate90(c, 1))}>
-          ⟳
-        </button>
-        <button className={toolBtn} title="Capovolgi orizzontale" onClick={() => applyTransform((c) => flip(c, 'h'))}>
-          ⇋
-        </button>
-        <button className={toolBtn} title="Capovolgi verticale" onClick={() => applyTransform((c) => flip(c, 'v'))}>
-          ⇅
-        </button>
-        <button className={toolBtn} onClick={() => setResizeOpen(true)}>
-          Ridimensiona
-        </button>
+      {cropMode ? (
+        <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-2 text-xs">
+          <span className="text-zinc-500">Trascina sull'immagine per selezionare l'area.</span>
+          <div className="flex-1" />
+          <button className={toolBtn} onClick={cancelCrop}>
+            Annulla
+          </button>
+          <button
+            onClick={applyCrop}
+            disabled={!cropRect || cropRect.w < 2 || cropRect.h < 2}
+            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+          >
+            Applica ritaglio
+          </button>
+        </div>
+      ) : (
+        <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1 text-xs flex-wrap">
+          <button className={toolBtn} title="Ruota a sinistra" disabled={!canEdit} onClick={() => applyTransform((c) => rotate90(c, -1))}>
+            ⟲
+          </button>
+          <button className={toolBtn} title="Ruota a destra" disabled={!canEdit} onClick={() => applyTransform((c) => rotate90(c, 1))}>
+            ⟳
+          </button>
+          <button className={toolBtn} title="Capovolgi orizzontale" disabled={!canEdit} onClick={() => applyTransform((c) => flip(c, 'h'))}>
+            ⇋
+          </button>
+          <button className={toolBtn} title="Capovolgi verticale" disabled={!canEdit} onClick={() => applyTransform((c) => flip(c, 'v'))}>
+            ⇅
+          </button>
+          <button className={toolBtn} disabled={!canEdit} onClick={startCrop}>
+            Ritaglia
+          </button>
+          <button className={toolBtn} disabled={!canEdit} onClick={() => setResizeOpen(true)}>
+            Ridimensiona
+          </button>
 
-        <div className="flex-1" />
+          <div className="flex-1" />
 
-        <button className={toolBtn} title="Riduci" onClick={() => { setFit(false); setZoom((z) => Math.max(0.1, +(z - 0.25).toFixed(2))) }}>
-          −
-        </button>
-        <span className="w-12 text-center text-zinc-500">{fit ? 'Fit' : `${Math.round(zoom * 100)}%`}</span>
-        <button className={toolBtn} title="Ingrandisci" onClick={() => { setFit(false); setZoom((z) => Math.min(8, +(z + 0.25).toFixed(2))) }}>
-          +
-        </button>
-        <button className={toolBtn} onClick={() => setFit(true)}>
-          Adatta
-        </button>
+          <button className={toolBtn} title="Riduci" onClick={() => { setFit(false); setZoom((z) => Math.max(0.1, +(z - 0.25).toFixed(2))) }}>
+            −
+          </button>
+          <span className="w-12 text-center text-zinc-500">{fit ? 'Fit' : `${Math.round(zoom * 100)}%`}</span>
+          <button className={toolBtn} title="Ingrandisci" onClick={() => { setFit(false); setZoom((z) => Math.min(8, +(z + 0.25).toFixed(2))) }}>
+            +
+          </button>
+          <button className={toolBtn} onClick={() => setFit(true)}>
+            Adatta
+          </button>
 
-        <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
 
-        <button
-          className={toolBtn}
-          disabled={!dirty || saving}
-          onClick={() => {
-            clearImageBuffer(filePath)
-            setReloadNonce((n) => n + 1)
-          }}
-        >
-          Annulla
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={!dirty || saving}
-          className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
-        >
-          {saving ? 'Salvataggio…' : 'Salva'}
-        </button>
-      </div>
+          <button
+            className={toolBtn}
+            disabled={!dirty || saving}
+            onClick={() => {
+              clearImageBuffer(filePath)
+              setReloadNonce((n) => n + 1)
+            }}
+          >
+            Annulla
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+          >
+            {saving ? 'Salvataggio…' : 'Salva'}
+          </button>
+        </div>
+      )}
 
-      <div className="flex-1 overflow-auto flex items-center justify-center bg-zinc-950 p-4 relative">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto flex items-center justify-center bg-zinc-950 p-4 relative"
+      >
         {error && <span className="text-zinc-500 text-sm">Impossibile caricare l'immagine.</span>}
         {loading && !error && (
           <span className="absolute text-zinc-500 text-sm">Caricamento…</span>
         )}
         <canvas
           ref={canvasRef}
-          className={fit ? 'max-w-full max-h-full object-contain' : ''}
-          style={fit ? undefined : { width: `${zoom * 100}%` }}
+          className={fit || cropMode ? 'max-w-full max-h-full object-contain block' : 'block'}
+          style={fit || cropMode ? undefined : { width: `${zoom * 100}%` }}
         />
+        {cropMode && (
+          <div
+            className="absolute inset-0 cursor-crosshair"
+            onMouseDown={onCropDown}
+            onMouseMove={onCropMove}
+            onMouseUp={onCropUp}
+            onMouseLeave={onCropUp}
+          />
+        )}
+        {cropMode && cropRect && (
+          <div
+            className="absolute border border-white pointer-events-none"
+            style={{
+              left: ox + cropRect.x,
+              top: oy + cropRect.y,
+              width: cropRect.w,
+              height: cropRect.h,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
+            }}
+          />
+        )}
       </div>
 
       {resizeOpen && (
