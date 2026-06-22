@@ -228,16 +228,17 @@ const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  '&': { backgroundColor: 'transparent' },
+  '&': { backgroundColor: '#18181b' },
+  '.cm-scroller': { fontFamily: PROSE_FONT },
   '.cm-content': {
     fontFamily: PROSE_FONT,
     fontSize: '16px',
-    lineHeight: '1.75',
-    padding: '24px',
+    lineHeight: '1.9',
+    padding: '28px 36px',
     caretColor: '#e4e4e7',
-    color: '#d4d4d8',
+    color: '#dcddde',
   },
-  '.cm-lp-blockspace': { paddingTop: '0.6em' },
+  '.cm-lp-blockspace': { paddingTop: '1em' },
   '.cm-lp-h1': { fontSize: '2em', fontWeight: '700', color: HEAD },
   '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '700', color: HEAD },
   '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
