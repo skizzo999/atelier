@@ -46,12 +46,14 @@ export function CodeMirrorEditor({
   onChange,
   markdownMode,
   livePreviewMode = false,
+  fileDir = '',
   viewRef,
 }: {
   value: string
   onChange: (v: string) => void
   markdownMode: boolean
   livePreviewMode?: boolean
+  fileDir?: string
   viewRef?: React.MutableRefObject<EditorView | null>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -83,7 +85,7 @@ export function CodeMirrorEditor({
       }),
     ]
     if (markdownMode) extensions.push(markdown({ extensions: GFM, codeLanguages: languages }))
-    if (liveMode) extensions.push(livePreview())
+    if (liveMode) extensions.push(livePreview(fileDir))
 
     const v = new EditorView({
       state: EditorState.create({ doc: value, extensions }),
@@ -99,9 +101,9 @@ export function CodeMirrorEditor({
     }
     // `value` volutamente escluso: il valore iniziale basta alla creazione,
     // gli aggiornamenti successivi sono gestiti dall'effetto sotto. L'editor si
-    // ricrea quando cambia la modalità (markdown/plain o live preview on/off).
+    // ricrea quando cambia la modalità o la cartella del file (per le immagini).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markdownMode, livePreviewMode])
+  }, [markdownMode, livePreviewMode, fileDir])
 
   // Applica i cambi esterni di `value` (es. caricamento di un nuovo file).
   useEffect(() => {

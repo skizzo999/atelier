@@ -35,14 +35,16 @@
 - [x] Vista **Ibrida** (livePreview.ts): decorazioni inline che nascondono i
   marcatori e formattano titoli/grassetto/corsivo/inline-code/link; la sintassi
   grezza appare sulla riga attiva. Toggle "Ibrida" nell'header.
-- [x] In Ibrida disattivato l'highlight di oneDark (testo neutro, no colori da codice).
-- [x] Estesa a: liste puntate (•), citazioni (blockquote), blocchi di codice,
-  righe orizzontali, tabelle (GFM abilitato via @lezer/markdown).
-- [ ] Immagini inline (serve caricare il file immagine, path relativi al vault) — step dedicato.
-- [ ] Tabelle "vere" boxate (widget) invece dell'allineamento monospazio attuale.
-- [ ] Liste numerate, task list, strikethrough.
-- [ ] Valutare default "Ibrida" per i .md (ora default "Codice" per sicurezza).
-- [ ] Eventuale code-split di CM6 (bundle > 500kB).
+- [x] Aspetto "documento" (font proporzionale, sfondo app, spaziatura); allineata anche la Lettura
+- [x] Sintassi: titoli ATX+Setext, grassetto/corsivo/barrato, evidenziato ==, liste puntate,
+  task list, citazioni, righe, tabelle, link, code inline/blocco
+- [x] Evidenziazione sintassi nei blocchi di codice (Ibrida: codeLanguages+HighlightStyle; Lettura: highlight.js)
+- [x] Wikilink [[nota]] e callout > [!tipo] (Ibrida + Lettura)
+- [x] Immagini inline (loadImage: path relativi al file → blob), in Ibrida e Lettura
+- [ ] Tabelle "vere" boxate (widget) invece dell'allineamento monospazio
+- [ ] Liste numerate stilizzate/annidate, footnote, math (KaTeX), label linguaggio nei code block
+- [ ] Nascondere i ``` nei code block dell'Ibrida; icona ↗ link esterni
+- [ ] Valutare default "Ibrida" per i .md; code-split di CM6 (bundle grande)
 
 ### 2. (fatto) Ricerca / quick-open
 - Ctrl+P quick-open per nome (tutti i tipi), Ctrl+Shift+F ricerca contenuto

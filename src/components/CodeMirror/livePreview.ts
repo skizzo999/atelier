@@ -1,6 +1,7 @@
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { Range, Extension, Text } from '@codemirror/state'
+import { loadImage } from '../../lib/images'
 
 // Live preview stile Obsidian: nasconde i marcatori markdown e formatta il
 // contenuto inline, mostrando la sintassi grezza sulla riga col cursore.
@@ -32,6 +33,29 @@ class CheckboxWidget extends WidgetType {
   }
   eq(o: CheckboxWidget) {
     return o.checked === this.checked
+  }
+}
+
+// Renderizza un'immagine ![alt](path) caricando il file (path relativo al vault).
+class ImageWidget extends WidgetType {
+  constructor(
+    readonly src: string,
+    readonly alt: string,
+    readonly fileDir: string,
+  ) {
+    super()
+  }
+  toDOM() {
+    const img = document.createElement('img')
+    img.alt = this.alt
+    img.className = 'cm-lp-image'
+    loadImage(this.src, this.fileDir).then((url) => {
+      if (url) img.src = url
+    })
+    return img
+  }
+  eq(o: ImageWidget) {
+    return o.src === this.src && o.fileDir === this.fileDir
   }
 }
 
@@ -67,7 +91,7 @@ function eachLine(doc: Text, from: number, to: number, fn: (lineFrom: number) =>
   for (let n = first; n <= last; n++) fn(doc.line(n).from)
 }
 
-function buildDecorations(view: EditorView): DecorationSet {
+function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
   const ranges: Range<Decoration>[] = []
   try {
     const { state } = view
@@ -191,6 +215,20 @@ function buildDecorations(view: EditorView): DecorationSet {
             return
           }
 
+          if (name === 'Image') {
+            const text = doc.sliceString(node.from, node.to)
+            const m = /^!\[([^\]]*)\]\(([^)\s]+)/.exec(text)
+            if (m) {
+              ranges.push(
+                Decoration.replace({ widget: new ImageWidget(m[2], m[1], fileDir) }).range(
+                  node.from,
+                  node.to,
+                ),
+              )
+            }
+            return false
+          }
+
           if (name === 'Link') {
             const marks = node.node.getChildren('LinkMark')
             if (marks.length >= 2) {
@@ -304,21 +342,22 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
   '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
   '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
+  '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
   '.cm-cursor': { borderLeftColor: '#e4e4e7' },
   '.cm-gutters': { display: 'none' },
 }, { dark: true })
 
-export function livePreview(): Extension {
+export function livePreview(fileDir: string): Extension {
   return [
     ViewPlugin.fromClass(
       class {
         decorations: DecorationSet
         constructor(view: EditorView) {
-          this.decorations = buildDecorations(view)
+          this.decorations = buildDecorations(view, fileDir)
         }
         update(u: ViewUpdate) {
           if (u.docChanged || u.selectionSet || u.viewportChanged) {
-            this.decorations = buildDecorations(u.view)
+            this.decorations = buildDecorations(u.view, fileDir)
           }
         }
       },

@@ -8,6 +8,7 @@ import DOMPurify from 'dompurify'
 import type { EditorView } from '@codemirror/view'
 import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
+import { loadImage } from '../../lib/images'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 
 // Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
@@ -95,6 +96,8 @@ export function Editor() {
   // Path di cui `content` è effettivamente caricato (per sapere quando è pronto).
   const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null)
   const editorViewRef = useRef<EditorView | null>(null)
+  const readingRef = useRef<HTMLDivElement>(null)
+  const fileDir = filePath ? filePath.slice(0, filePath.lastIndexOf('\\')) : ''
 
   // Carica il contenuto quando cambia il file: dal buffer se ci sono modifiche
   // non salvate, altrimenti dal disco.
@@ -196,6 +199,29 @@ export function Editor() {
     setPendingHighlight(null)
   }, [pendingHighlight, loadedFilePath, filePath, view, content, setPendingHighlight])
 
+  // Vista Lettura: carica le immagini locali (path relativi al file) come blob.
+  useEffect(() => {
+    if (view !== 'reading' || !filePath) return
+    const container = readingRef.current
+    if (!container) return
+    const dir = filePath.slice(0, filePath.lastIndexOf('\\'))
+    const urls: string[] = []
+    let cancelled = false
+    container.querySelectorAll('img').forEach((img) => {
+      const raw = img.getAttribute('src') || ''
+      if (!raw || /^(https?:|data:|blob:)/i.test(raw)) return
+      loadImage(raw, dir).then((url) => {
+        if (cancelled || !url) return
+        urls.push(url)
+        img.src = url
+      })
+    })
+    return () => {
+      cancelled = true
+      urls.forEach(URL.revokeObjectURL)
+    }
+  }, [view, content, filePath])
+
   if (!filePath) {
     return (
       <div className="flex-1 flex items-center justify-center text-zinc-500">
@@ -264,6 +290,7 @@ export function Editor() {
       ) : markdown && view === 'reading' ? (
         <div className="flex-1 overflow-y-auto p-6">
           <div
+            ref={readingRef}
             className="prose prose-invert max-w-none"
             dangerouslySetInnerHTML={{
               __html: DOMPurify.sanitize(renderCallouts(marked.parse(content) as string)),
@@ -275,6 +302,7 @@ export function Editor() {
           value={content}
           markdownMode={markdown}
           livePreviewMode={markdown && view === 'live'}
+          fileDir={fileDir}
           viewRef={editorViewRef}
           onChange={(v) => {
             setContent(v)
