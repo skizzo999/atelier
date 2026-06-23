@@ -3,8 +3,10 @@
 ## Stato attuale
 Editor Markdown **completo** a 3 viste (Codice / Ibrida / Lettura) con live preview
 ricco in stile Obsidian. Già pronti: sistema vault, file tree con watcher, gestione
-file, ricerca, e viewer immagini con editing. Prossimo grande blocco: annotazioni
-immagini (fase 2) e viewer per altri formati (PDF/DOCX).
+file, ricerca, viewer immagini con editing + **annotazioni** (penna/frecce/forme/
+testo) e **zoom/pan dinamico** unificato. In corso: trasformare l'annotatore in un
+piccolo editor (selezione/modifica oggetti + gomma). Prossimo grande blocco dopo:
+viewer per altri formati (PDF/DOCX).
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -16,6 +18,13 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
 - [x] Ricerca: quick-open per nome (Ctrl+P) + contenuto (Ctrl+Shift+F) con highlight
 - [x] Viewer per tipo (FileView): **immagini** con editing (ruota/capovolgi/ridimensiona/
   **ritaglio** con scelta "applica"/"crea nuova foto"), buffer, salvataggio binario atomico
+- [x] **Annotazioni immagini (fase 2)**: penna a mano libera (2 penne configurabili e
+  persistenti, slider opacità+spessore), frecce (con punta), forme (rettangolo, ellisse,
+  triangolo, linea), testo. Overlay SVG in coord immagine, "Applica" = flatten sul canvas
+  (riusa la pipeline buffer+atomica, distruttivo in V1)
+- [x] **Zoom/pan dinamico** unificato (hook `useImageViewport`): rotella verso il cursore,
+  trascina per spostare, fit auto, controlli −/%/+/Adatta. Vale per immagini editabili e
+  sola-lettura, dentro e fuori da "Annota"
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -32,11 +41,15 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Annotazioni immagini (fase 2)**: penna, frecce, riquadri, testo
-2. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-3. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
-4. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-5. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+1. **Annotatore — selezione/modifica oggetti**: selezionare un'annotazione e
+   spostarla / ridimensionarla dagli angoli / ruotarla + cambiare colore, opacità,
+   spessore. Un unico sistema di gizmo per testo E forme (copre il "testo manipolabile").
+2. **Annotatore — gomma a pixel** (raster, sul tratto della penna).
+3. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
+4. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
+5. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
+6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
+7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
 
 ## Note tecniche
 - Progetto: C:\Users\matte\Desktop\Atelier\atelier
@@ -46,8 +59,19 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
 - Permessi fs: read-text-file, write-text-file, read-file, write-file, read-dir,
   mkdir, exists, rename, remove, watch, unwatch
 - Comando Rust custom: `allow_path` → `FsExt::fs_scope().allow_directory(path, recursive)`
-- Persistenza: `zustand/persist` (vaultPath + mode + **mdView** via `partialize`);
-  selectedFile e buffer non persistiti
+- Persistenza: `zustand/persist` (vaultPath + mode + **mdView** + **penPresets** via
+  `partialize`); selectedFile e buffer non persistiti
+- Annotazioni: `src/lib/annotations.ts` (tipi `Shape`, disegno su canvas condiviso
+  preview/flatten); overlay SVG in `ImageViewer` con coord immagine (viewBox); le forme
+  sono in pixel-immagine così preview e salvato coincidono
+- Viewport immagini: hook `useImageViewport(containerRef, dims, wheelEnabled)` — un
+  "palco" con `transform: translate+scale`; coord puntatore→immagine via la bounding rect
+  trasformata dell'overlay
+- **Formati immagine editabili = png/jpg/jpeg/webp**: il limite è `canvas.toBlob`, che
+  ri-codifica solo questi. gif/svg/bmp/ico/avif sono sola-lettura (GIF perderebbe i
+  fotogrammi, SVG è vettoriale). Eventuale editing → esportazione come PNG
+- Input testo annotazione: `preventDefault` sul `mousedown` dell'SVG, altrimenti il
+  browser sposta il focus al body e l'input si chiude subito
 - Live preview: src/components/CodeMirror/livePreview.ts (decorazioni dall'albero
   sintattico + pass regex per `==`, `[[ ]]`, `![[ ]]`); tema in modalità Ibrida
   senza oneDark (aspetto "documento")
@@ -70,5 +94,6 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
 ## Per riprendere
 Aprire nuova chat AI e incollare:
 1. Contenuto di docs/STATUS.md (questo file)
-2. Contenuto di docs/sessions/2026-06-23_editor-md-completo.md
-3. Dire: "Continuiamo da dove abbiamo lasciato. Prossimo step: annotazioni immagini (fase 2)."
+2. Contenuto di docs/sessions/2026-06-23_annotazioni-e-zoom.md
+3. Dire: "Continuiamo da dove abbiamo lasciato. Prossimo step: selezione/modifica
+   degli oggetti annotati (sposta/ridimensiona/ruota + colore/opacità/spessore), poi gomma a pixel."
