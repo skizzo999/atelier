@@ -264,7 +264,28 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
       }
     }
 
+    // Embed immagine ![[file]] (stile Obsidian): renderizza l'immagine.
+    for (const { from, to } of view.visibleRanges) {
+      const first = doc.lineAt(from).number
+      const last = doc.lineAt(to).number
+      const re = /!\[\[([^\]\n]+)\]\]/g
+      for (let n = first; n <= last; n++) {
+        if (active.has(n)) continue
+        const line = doc.line(n)
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(line.text))) {
+          const s = line.from + m.index
+          const e = s + m[0].length
+          ranges.push(
+            Decoration.replace({ widget: new ImageWidget(m[1], m[1], fileDir) }).range(s, e),
+          )
+        }
+      }
+    }
+
     // Wikilink [[nota]] (stile Obsidian): mostra "nota" come link, nasconde [[ ]].
+    // Salta i match preceduti da '!' (sono embed immagine, gestiti sopra).
     for (const { from, to } of view.visibleRanges) {
       const first = doc.lineAt(from).number
       const last = doc.lineAt(to).number
@@ -275,6 +296,7 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
         re.lastIndex = 0
         let m: RegExpExecArray | null
         while ((m = re.exec(line.text))) {
+          if (m.index > 0 && line.text[m.index - 1] === '!') continue
           const s = line.from + m.index
           const e = s + m[0].length
           ranges.push(hide.range(s, s + 2))

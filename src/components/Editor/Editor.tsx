@@ -26,6 +26,24 @@ marked.use(
 marked.use({
   extensions: [
     {
+      name: 'imageEmbed',
+      level: 'inline',
+      start(src: string) {
+        return src.indexOf('![[')
+      },
+      tokenizer(src: string) {
+        const m = /^!\[\[([^\]\n]+)\]\]/.exec(src)
+        if (m) {
+          return { type: 'imageEmbed', raw: m[0], text: m[1] }
+        }
+        return undefined
+      },
+      renderer(token) {
+        const path = (token as unknown as { text: string }).text
+        return `<img src="${path}" alt="${path}">`
+      },
+    },
+    {
       name: 'highlight',
       level: 'inline',
       start(src: string) {
