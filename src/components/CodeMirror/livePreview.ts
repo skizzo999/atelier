@@ -119,6 +119,22 @@ class TableWidget extends WidgetType {
   }
 }
 
+// Titolo di un callout (es. "NOTA") al posto del marcatore [!tipo].
+class CalloutTitleWidget extends WidgetType {
+  constructor(readonly type: string) {
+    super()
+  }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-lp-callout-title'
+    s.textContent = this.type.toUpperCase()
+    return s
+  }
+  eq(o: CalloutTitleWidget) {
+    return o.type === this.type
+  }
+}
+
 const hide = Decoration.replace({})
 const strong = Decoration.mark({ class: 'cm-lp-strong' })
 const em = Decoration.mark({ class: 'cm-lp-em' })
@@ -138,8 +154,6 @@ const headings = [
 ]
 
 // Decorazioni di riga.
-const quoteLine = Decoration.line({ class: 'cm-lp-quote' })
-const calloutLine = Decoration.line({ class: 'cm-lp-callout' })
 const codeBlockLine = Decoration.line({ class: 'cm-lp-codeblock' })
 const tableLine = Decoration.line({ class: 'cm-lp-table' })
 const hrLine = Decoration.line({ class: 'cm-lp-hr' })
@@ -173,16 +187,44 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
 
           // --- Blocchi multi-riga ---
           if (name === 'Blockquote') {
-            // Callout stile Obsidian: prima riga tipo "> [!nota] Titolo".
+            // Gestiamo solo il blockquote più esterno (i figli annidati hanno
+            // parent Blockquote): la profondità la calcoliamo dai '>' di ogni riga.
+            if (node.node.parent && node.node.parent.name === 'Blockquote') return false
+
             const firstLine = doc.lineAt(node.from)
             const cm = /\[!(\w+)\]/.exec(firstLine.text)
-            const lineDeco = cm ? calloutLine : quoteLine
-            eachLine(doc, node.from, node.to, (lf) => ranges.push(lineDeco.range(lf)))
+            const cls = cm ? 'cm-lp-callout' : 'cm-lp-quote'
+            const a = doc.lineAt(node.from).number
+            const b = doc.lineAt(Math.min(node.to, doc.length)).number
+            for (let n = a; n <= b; n++) {
+              const line = doc.line(n)
+              const dm = /^(\s*>)+/.exec(line.text)
+              if (!dm) continue
+              const depth = (dm[0].match(/>/g) || []).length
+              ranges.push(
+                Decoration.line({
+                  class: cls,
+                  attributes: { style: `margin-left:${(depth - 1) * 1.4}em` },
+                }).range(line.from),
+              )
+              // nasconde i '>' iniziali (+ eventuale spazio) se la riga non è attiva
+              if (!active.has(n)) {
+                let markEnd = dm[0].length
+                if (line.text[markEnd] === ' ') markEnd += 1
+                ranges.push(hide.range(line.from, line.from + markEnd))
+              }
+            }
+            // callout: il marcatore [!tipo] diventa il titolo
             if (cm && !active.has(firstLine.number)) {
               const s = firstLine.from + cm.index
-              ranges.push(hide.range(s, s + cm[0].length))
+              ranges.push(
+                Decoration.replace({ widget: new CalloutTitleWidget(cm[1]) }).range(
+                  s,
+                  s + cm[0].length,
+                ),
+              )
             }
-            return
+            return false
           }
           if (name === 'FencedCode') {
             const firstLine = doc.lineAt(node.from)
@@ -454,6 +496,14 @@ const livePreviewTheme = EditorView.theme({
     borderLeft: '3px solid #7aa2f7',
     paddingLeft: '1em',
     background: 'rgba(122,162,247,0.08)',
+  },
+  '.cm-lp-callout-title': {
+    display: 'block',
+    fontWeight: '700',
+    color: '#7aa2f7',
+    fontSize: '0.85em',
+    letterSpacing: '0.03em',
+    marginBottom: '0.15em',
   },
   '.cm-lp-bullet': { color: '#9aa0aa' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
