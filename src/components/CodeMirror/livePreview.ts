@@ -84,41 +84,6 @@ class LangLabelWidget extends WidgetType {
   }
 }
 
-// Tabella markdown renderizzata come <table> vera.
-class TableWidget extends WidgetType {
-  constructor(readonly md: string) {
-    super()
-  }
-  toDOM() {
-    const table = document.createElement('table')
-    table.className = 'cm-lp-mdtable'
-    let inHeader = true
-    for (const row of this.md.split('\n')) {
-      if (!row.trim()) continue
-      if (/^[\s|:\-]+$/.test(row)) {
-        inHeader = false
-        continue
-      }
-      const cells = row
-        .replace(/^\s*\|/, '')
-        .replace(/\|\s*$/, '')
-        .split('|')
-        .map((c) => c.trim())
-      const tr = document.createElement('tr')
-      for (const c of cells) {
-        const el = document.createElement(inHeader ? 'th' : 'td')
-        el.textContent = c
-        tr.appendChild(el)
-      }
-      table.appendChild(tr)
-    }
-    return table
-  }
-  eq(o: TableWidget) {
-    return o.md === this.md
-  }
-}
-
 // Titolo di un callout (es. "NOTA") al posto del marcatore [!tipo].
 class CalloutTitleWidget extends WidgetType {
   constructor(readonly type: string) {
@@ -259,20 +224,9 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
             return false
           }
           if (name === 'Table') {
-            const a = doc.lineAt(node.from).number
-            const b = doc.lineAt(Math.min(node.to, doc.length)).number
-            let inside = false
-            for (let l = a; l <= b; l++) if (active.has(l)) inside = true
-            if (inside) {
-              eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
-            } else {
-              const from = doc.line(a).from
-              const to = doc.line(b).to
-              const md = doc.sliceString(from, to)
-              ranges.push(
-                Decoration.replace({ widget: new TableWidget(md), block: true }).range(from, to),
-              )
-            }
+            // Nota: le tabelle "boxate" servirebbero decorazioni a blocco, che
+            // CodeMirror non accetta da un plugin -> per ora allineamento monospazio.
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
             return false
           }
 
