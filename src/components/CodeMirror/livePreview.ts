@@ -171,22 +171,22 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
                   attributes: { style: `margin-left:${(depth - 1) * 1.4}em` },
                 }).range(line.from),
               )
-              // nasconde i '>' iniziali (+ eventuale spazio) se la riga non è attiva
-              if (!active.has(n)) {
+              if (active.has(n)) continue
+              if (cm && n === firstLine.number && line.from < line.to) {
+                // riga del titolo callout: tutta la riga -> titolo (tipo o titolo custom)
+                const after = line.text.slice(cm.index + cm[0].length).trim()
+                ranges.push(
+                  Decoration.replace({ widget: new CalloutTitleWidget(after || cm[1]) }).range(
+                    line.from,
+                    line.to,
+                  ),
+                )
+              } else {
+                // righe normali: nasconde i '>' iniziali (+ eventuale spazio)
                 let markEnd = dm[0].length
                 if (line.text[markEnd] === ' ') markEnd += 1
                 ranges.push(hide.range(line.from, line.from + markEnd))
               }
-            }
-            // callout: il marcatore [!tipo] diventa il titolo
-            if (cm && !active.has(firstLine.number)) {
-              const s = firstLine.from + cm.index
-              ranges.push(
-                Decoration.replace({ widget: new CalloutTitleWidget(cm[1]) }).range(
-                  s,
-                  s + cm[0].length,
-                ),
-              )
             }
             return false
           }
