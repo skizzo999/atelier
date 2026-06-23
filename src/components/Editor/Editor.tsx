@@ -94,8 +94,6 @@ function renderCallouts(html: string): string {
   )
 }
 
-type ViewMode = 'source' | 'live' | 'reading'
-
 function isMarkdown(path: string): boolean {
   const p = path.toLowerCase()
   return p.endsWith('.md') || p.endsWith('.markdown')
@@ -107,13 +105,16 @@ export function Editor() {
   const clearBuffer = useAppStore((s) => s.clearBuffer)
   const pendingHighlight = useAppStore((s) => s.pendingHighlight)
   const setPendingHighlight = useAppStore((s) => s.setPendingHighlight)
+  // Vista markdown persistita nello store (Codice/Ibrida/Lettura): l'app
+  // riapre con l'ultima scelta invece di tornare sempre a Codice.
+  const view = useAppStore((s) => s.mdView)
+  const setView = useAppStore((s) => s.setMdView)
   // "dirty" derivato dallo store: c'è un buffer non salvato per questo file.
   const dirty = useAppStore((s) => filePath !== null && s.dirtyBuffers[filePath] !== undefined)
 
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [view, setView] = useState<ViewMode>('source')
   // Path di cui `content` è effettivamente caricato (per sapere quando è pronto).
   const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null)
   const editorViewRef = useRef<EditorView | null>(null)
@@ -129,7 +130,6 @@ export function Editor() {
       return
     }
 
-    setView('source')
     const buffered = useAppStore.getState().dirtyBuffers[filePath]
     if (buffered !== undefined) {
       setContent(buffered)

@@ -2,12 +2,16 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type AppMode = 'standard' | 'developer'
+// Vista dell'editor markdown: Codice / Ibrida (live preview) / Lettura.
+export type MarkdownView = 'source' | 'live' | 'reading'
 
 interface AppState {
   // Cartella radice del vault attualmente aperto (null = nessun vault).
   vaultPath: string | null
   // Modalità dell'app: 'standard' (utente) o 'developer' (funzioni avanzate).
   mode: AppMode
+  // Ultima vista markdown scelta (persistita, così l'app riapre come l'hai lasciata).
+  mdView: MarkdownView
   // File attualmente aperto nell'editor (null = nessuno). Non persistito.
   selectedFile: string | null
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
@@ -23,6 +27,7 @@ interface AppState {
   setVaultPath: (path: string) => void
   clearVault: () => void
   setMode: (mode: AppMode) => void
+  setMdView: (view: MarkdownView) => void
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
   setPendingHighlight: (term: string | null) => void
@@ -43,6 +48,7 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       vaultPath: null,
       mode: 'standard',
+      mdView: 'source',
       selectedFile: null,
       dirtyBuffers: {},
       pendingHighlight: null,
@@ -51,6 +57,7 @@ export const useAppStore = create<AppState>()(
       clearVault: () =>
         set({ vaultPath: null, selectedFile: null, dirtyBuffers: {}, imageBuffers: {} }),
       setMode: (mode) => set({ mode }),
+      setMdView: (view) => set({ mdView: view }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
       setSelectedFile: (path) => set({ selectedFile: path }),
@@ -106,7 +113,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'atelier-app',
-      partialize: (state) => ({ vaultPath: state.vaultPath, mode: state.mode }),
+      partialize: (state) => ({
+        vaultPath: state.vaultPath,
+        mode: state.mode,
+        mdView: state.mdView,
+      }),
     },
   ),
 )

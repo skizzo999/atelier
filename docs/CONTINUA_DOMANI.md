@@ -9,6 +9,10 @@
     callout con titolo, code block (highlight + label + ``` nascosti), immagini
     (`![]()` e `![[]]`, ricerca per nome nel vault)
   - Lettura allineata all'Ibrida (override del prose di Tailwind)
+  - **Callout Ibrida** = identico alla Lettura (tipo come titolo + corpo); titolo
+    reso via `::before`, non come widget, per evitare lo spazio fantasma dei
+    cm-widgetBuffer di CM6
+  - **Vista ricordata** tra sessioni (`mdView` persistito nello store)
 
 ## Cosa fare (in ordine)
 

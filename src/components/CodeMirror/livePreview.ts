@@ -84,22 +84,6 @@ class LangLabelWidget extends WidgetType {
   }
 }
 
-// Titolo di un callout (es. "NOTA") al posto del marcatore [!tipo].
-class CalloutTitleWidget extends WidgetType {
-  constructor(readonly type: string) {
-    super()
-  }
-  toDOM() {
-    const s = document.createElement('span')
-    s.className = 'cm-lp-callout-title'
-    s.textContent = this.type.toUpperCase()
-    return s
-  }
-  eq(o: CalloutTitleWidget) {
-    return o.type === this.type
-  }
-}
-
 const hide = Decoration.replace({})
 const strong = Decoration.mark({ class: 'cm-lp-strong' })
 const em = Decoration.mark({ class: 'cm-lp-em' })
@@ -165,22 +149,27 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
               const dm = /^(\s*>)+/.exec(line.text)
               if (!dm) continue
               const depth = (dm[0].match(/>/g) || []).length
-              ranges.push(
-                Decoration.line({
-                  class: cls,
-                  attributes: { style: `margin-left:${(depth - 1) * 1.4}em` },
-                }).range(line.from),
-              )
+              const isHead = !!cm && n === firstLine.number && line.from < line.to
+              // Titolo callout (es. NOTA) reso come ::before della riga: niente
+              // widget -> niente cm-widgetBuffer, quindi niente line-box fantasma
+              // (spazio extra) sopra il titolo. Solo sulla riga non attiva.
+              const showTitle = isHead && !active.has(n)
+              const attrs: Record<string, string> = {
+                style: `margin-left:${(depth - 1) * 1.4}em`,
+              }
+              let lineClass = cls
+              if (showTitle) {
+                lineClass += ' cm-lp-callout-head'
+                attrs['data-callout'] = cm![1].toUpperCase()
+              }
+              ranges.push(Decoration.line({ class: lineClass, attributes: attrs }).range(line.from))
               if (active.has(n)) continue
-              if (cm && n === firstLine.number && line.from < line.to) {
-                // riga del titolo callout: tutta la riga -> titolo (tipo o titolo custom)
-                const after = line.text.slice(cm.index + cm[0].length).trim()
-                ranges.push(
-                  Decoration.replace({ widget: new CalloutTitleWidget(after || cm[1]) }).range(
-                    line.from,
-                    line.to,
-                  ),
-                )
+              if (isHead) {
+                // nasconde "> [!tipo] " (marker + tipo + eventuale spazio); il
+                // testo dopo resta visibile come corpo, come nella Lettura.
+                let end = cm!.index + cm![0].length
+                if (line.text[end] === ' ') end += 1
+                ranges.push(hide.range(line.from, line.from + end))
               } else {
                 // righe normali: nasconde i '>' iniziali (+ eventuale spazio)
                 let markEnd = dm[0].length
@@ -456,13 +445,18 @@ const livePreviewTheme = EditorView.theme({
     paddingLeft: '1em',
     background: 'rgba(122,162,247,0.08)',
   },
-  '.cm-lp-callout-title': {
+  // Titolo del callout (es. NOTA) come pseudo-elemento: nessun widget, quindi
+  // nessuno spazio fantasma sopra. line-height piccola = niente leading sopra;
+  // lo spazio sotto (titolo->corpo) lo dà il margin-bottom.
+  '.cm-lp-callout-head::before': {
+    content: 'attr(data-callout)',
     display: 'block',
+    lineHeight: '1.2',
     fontWeight: '700',
     color: '#7aa2f7',
     fontSize: '0.85em',
     letterSpacing: '0.03em',
-    marginBottom: '0.15em',
+    marginBottom: '0.25em',
   },
   '.cm-lp-bullet': { color: '#9aa0aa' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },

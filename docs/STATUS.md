@@ -21,9 +21,12 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
   - **Ibrida** (live preview, CM6): titoli ATX+Setext, grassetto/corsivo/barrato,
     evidenziato `==`, liste puntate/task ☑, citazioni (annidate), righe, tabelle
-    (monospazio), link, **wikilink navigabile**, **callout** con titolo, blocchi di
-    codice (**syntax highlight** + label linguaggio + ``` nascosti), **immagini**
-    (`![alt](path)` e `![[file]]`, cercate per nome in tutto il vault)
+    (monospazio), link, **wikilink navigabile**, **callout** (titolo = tipo + corpo,
+    reso come `::before`, allineato alla Lettura), blocchi di codice (**syntax
+    highlight** + label linguaggio + ``` nascosti), **immagini** (`![alt](path)` e
+    `![[file]]`, cercate per nome in tutto il vault)
+  - **Vista ricordata**: l'ultima scelta (Codice/Ibrida/Lettura) è persistita nello
+    store (`mdView`), l'app riapre come l'hai lasciata invece di tornare a Codice
 - [x] Salvataggio atomico (tmp+rename); `Ctrl+S`; indicatore "non salvato" (tree + editor);
   risync col disco al focus finestra
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
@@ -43,12 +46,19 @@ immagini (fase 2) e viewer per altri formati (PDF/DOCX).
 - Permessi fs: read-text-file, write-text-file, read-file, write-file, read-dir,
   mkdir, exists, rename, remove, watch, unwatch
 - Comando Rust custom: `allow_path` → `FsExt::fs_scope().allow_directory(path, recursive)`
-- Persistenza: `zustand/persist` (solo vaultPath+mode via `partialize`); selectedFile e buffer non persistiti
+- Persistenza: `zustand/persist` (vaultPath + mode + **mdView** via `partialize`);
+  selectedFile e buffer non persistiti
 - Live preview: src/components/CodeMirror/livePreview.ts (decorazioni dall'albero
   sintattico + pass regex per `==`, `[[ ]]`, `![[ ]]`); tema in modalità Ibrida
   senza oneDark (aspetto "documento")
 - **IMPORTANTE**: i ViewPlugin di CM6 **non** possono fornire decorazioni a blocco
   (block widget/replace multi-riga) → causano crash. Per le tabelle boxate serve uno StateField.
+- **IMPORTANTE (widget buffer)**: ogni `Decoration.replace` con widget viene avvolto da
+  CM6 in `cm-widgetBuffer` (span inline invisibili). Su un widget `display:block`
+  questi buffer creano un line-box alto quanto la `line-height` della riga → spazio
+  "fantasma" sopra/sotto, non eliminabile via line-height. Soluzione usata per il
+  titolo callout: niente widget, hide del marker + pseudo-elemento `::before`
+  (`content: attr(data-callout)`). Vale come regola generale per i "titoli a blocco".
 - Indici del vault (nome→path) per immagini (lib/images) e note (lib/notes), costruiti in App
 
 ## Problemi aperti
