@@ -40,11 +40,14 @@
   task list, citazioni, righe, tabelle, link, code inline/blocco
 - [x] Evidenziazione sintassi nei blocchi di codice (Ibrida: codeLanguages+HighlightStyle; Lettura: highlight.js)
 - [x] Wikilink [[nota]] e callout > [!tipo] (Ibrida + Lettura)
-- [x] Immagini inline (loadImage: path relativi al file → blob), in Ibrida e Lettura
-- [ ] Tabelle "vere" boxate (widget) invece dell'allineamento monospazio
-- [ ] Liste numerate stilizzate/annidate, footnote, math (KaTeX), label linguaggio nei code block
-- [ ] Nascondere i ``` nei code block dell'Ibrida; icona ↗ link esterni
+- [x] Immagini inline: `![alt](path)` e `![[file]]` (embed), risolte per nome in
+  tutto il vault (indice in App), con placeholder "non trovata"
+- [x] Code block: nascosti i ``` + etichetta linguaggio; tabelle boxate (widget)
+- [ ] Liste numerate stilizzate/annidate, footnote, math (KaTeX)
+- [ ] Icona ↗ link esterni; risoluzione immagini in sottocartelle già coperta dall'indice
 - [ ] Valutare default "Ibrida" per i .md; code-split di CM6 (bundle grande)
+
+## .md CHIUSO — domani: annotazioni immagini (fase 2), viewer PDF/DOCX
 
 ### 2. (fatto) Ricerca / quick-open
 - Ctrl+P quick-open per nome (tutti i tipi), Ctrl+Shift+F ricerca contenuto

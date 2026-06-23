@@ -12,6 +12,13 @@ const MIME: Record<string, string> = {
   avif: 'image/avif',
 }
 
+// Indice immagini del vault: basename (minuscolo) -> path completo. Permette di
+// trovare un'immagine per nome ovunque nel vault (come Obsidian).
+let vaultImageIndex = new Map<string, string>()
+export function setVaultImageIndex(index: Map<string, string>) {
+  vaultImageIndex = index
+}
+
 function isRemote(src: string): boolean {
   return /^(https?:|data:)/i.test(src)
 }
@@ -20,8 +27,6 @@ function isAbsoluteWin(src: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(src)
 }
 
-// Risolve un percorso relativo (rispetto alla cartella del file) in assoluto,
-// gestendo ./ e ../
 function resolvePath(fileDir: string, rel: string): string {
   const combined = `${fileDir}\\${rel.replace(/\//g, '\\')}`
   const out: string[] = []
@@ -33,17 +38,34 @@ function resolvePath(fileDir: string, rel: string): string {
   return out.join('\\')
 }
 
-// Carica un'immagine (locale o remota) e ritorna un URL utilizzabile in <img src>.
-// Per le immagini locali legge i byte e crea un object URL.
+async function readAsObjectUrl(abs: string): Promise<string> {
+  const bytes = await readFile(abs)
+  const ext = abs.split('.').pop()?.toLowerCase() ?? ''
+  return URL.createObjectURL(new Blob([bytes], { type: MIME[ext] ?? 'application/octet-stream' }))
+}
+
+// Carica un'immagine provando piu strade: remota, assoluta, relativa al file,
+// e per nome in tutto il vault. Ritorna un object URL o null se non trovata.
 export async function loadImage(src: string, fileDir: string): Promise<string | null> {
-  try {
-    if (isRemote(src)) return src
-    const abs = isAbsoluteWin(src) ? src.replace(/\//g, '\\') : resolvePath(fileDir, decodeURI(src))
-    const bytes = await readFile(abs)
-    const ext = abs.split('.').pop()?.toLowerCase() ?? ''
-    return URL.createObjectURL(new Blob([bytes], { type: MIME[ext] ?? 'application/octet-stream' }))
-  } catch (err) {
-    console.error('Errore caricamento immagine:', err)
-    return null
+  if (isRemote(src)) return src
+
+  const clean = decodeURI(src.trim())
+  const candidates: string[] = []
+  if (isAbsoluteWin(clean)) {
+    candidates.push(clean.replace(/\//g, '\\'))
+  } else {
+    candidates.push(resolvePath(fileDir, clean))
+    const base = clean.split(/[\\/]/).pop()?.toLowerCase()
+    if (base && vaultImageIndex.has(base)) candidates.push(vaultImageIndex.get(base)!)
   }
+
+  for (const abs of candidates) {
+    try {
+      return await readAsObjectUrl(abs)
+    } catch {
+      // prova il prossimo candidato
+    }
+  }
+  console.error('Immagine non trovata:', src, 'provati:', candidates)
+  return null
 }

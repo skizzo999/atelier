@@ -3,6 +3,10 @@ import './App.css'
 import { exists } from '@tauri-apps/plugin-fs'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess } from './lib/vault'
+import { walkFiles } from './lib/search'
+import { setVaultImageIndex } from './lib/images'
+
+const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 import { FileTree } from './components/FileTree/FileTree'
 import { FileView } from './components/FileView/FileView'
 import { Welcome } from './components/Welcome/Welcome'
@@ -39,6 +43,27 @@ function App() {
       cancelled = true
     }
   }, [clearVault])
+
+  // Indice immagini del vault (nome -> path), per risolvere ![[img]] ovunque.
+  useEffect(() => {
+    if (!vaultPath) {
+      setVaultImageIndex(new Map())
+      return
+    }
+    let cancelled = false
+    walkFiles(vaultPath).then((files) => {
+      if (cancelled) return
+      const map = new Map<string, string>()
+      for (const f of files) {
+        const ext = f.name.split('.').pop()?.toLowerCase()
+        if (ext && IMG_EXT.has(ext)) map.set(f.name.toLowerCase(), f.path)
+      }
+      setVaultImageIndex(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [vaultPath])
 
   // Scorciatoie globali per la ricerca (solo con un vault aperto):
   // Ctrl/Cmd+P = quick-open per nome, Ctrl/Cmd+Shift+F = ricerca nel contenuto.

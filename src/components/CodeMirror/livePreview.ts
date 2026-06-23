@@ -46,16 +46,76 @@ class ImageWidget extends WidgetType {
     super()
   }
   toDOM() {
+    const wrap = document.createElement('span')
     const img = document.createElement('img')
     img.alt = this.alt
     img.className = 'cm-lp-image'
+    wrap.appendChild(img)
     loadImage(this.src, this.fileDir).then((url) => {
-      if (url) img.src = url
+      if (url) {
+        img.src = url
+      } else {
+        const ph = document.createElement('span')
+        ph.className = 'cm-lp-imagemissing'
+        ph.textContent = `⚠ "${this.src}" non trovata`
+        wrap.replaceChildren(ph)
+      }
     })
-    return img
+    return wrap
   }
   eq(o: ImageWidget) {
     return o.src === this.src && o.fileDir === this.fileDir
+  }
+}
+
+// Etichetta del linguaggio sopra un blocco di codice.
+class LangLabelWidget extends WidgetType {
+  constructor(readonly lang: string) {
+    super()
+  }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-lp-langlabel'
+    s.textContent = this.lang
+    return s
+  }
+  eq(o: LangLabelWidget) {
+    return o.lang === this.lang
+  }
+}
+
+// Tabella markdown renderizzata come <table> vera.
+class TableWidget extends WidgetType {
+  constructor(readonly md: string) {
+    super()
+  }
+  toDOM() {
+    const table = document.createElement('table')
+    table.className = 'cm-lp-mdtable'
+    let inHeader = true
+    for (const row of this.md.split('\n')) {
+      if (!row.trim()) continue
+      if (/^[\s|:\-]+$/.test(row)) {
+        inHeader = false
+        continue
+      }
+      const cells = row
+        .replace(/^\s*\|/, '')
+        .replace(/\|\s*$/, '')
+        .split('|')
+        .map((c) => c.trim())
+      const tr = document.createElement('tr')
+      for (const c of cells) {
+        const el = document.createElement(inHeader ? 'th' : 'td')
+        el.textContent = c
+        tr.appendChild(el)
+      }
+      table.appendChild(tr)
+    }
+    return table
+  }
+  eq(o: TableWidget) {
+    return o.md === this.md
   }
 }
 
@@ -124,12 +184,54 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
             }
             return
           }
-          if (name === 'FencedCode' || name === 'CodeBlock') {
+          if (name === 'FencedCode') {
+            const firstLine = doc.lineAt(node.from)
+            const lastLine = doc.lineAt(Math.min(node.to, doc.length))
+            eachLine(doc, node.from, node.to, (lf) => ranges.push(codeBlockLine.range(lf)))
+            // riga di apertura ```lang -> etichetta linguaggio (o nascosta)
+            if (!active.has(firstLine.number)) {
+              const info = node.node.getChild('CodeInfo')
+              const lang = info ? doc.sliceString(info.from, info.to) : ''
+              if (lang) {
+                ranges.push(
+                  Decoration.replace({ widget: new LangLabelWidget(lang) }).range(
+                    firstLine.from,
+                    firstLine.to,
+                  ),
+                )
+              } else if (firstLine.from < firstLine.to) {
+                ranges.push(hide.range(firstLine.from, firstLine.to))
+              }
+            }
+            // riga di chiusura ``` -> nascosta
+            if (
+              lastLine.number !== firstLine.number &&
+              !active.has(lastLine.number) &&
+              lastLine.from < lastLine.to
+            ) {
+              ranges.push(hide.range(lastLine.from, lastLine.to))
+            }
+            return false
+          }
+          if (name === 'CodeBlock') {
             eachLine(doc, node.from, node.to, (lf) => ranges.push(codeBlockLine.range(lf)))
             return false
           }
           if (name === 'Table') {
-            eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
+            const a = doc.lineAt(node.from).number
+            const b = doc.lineAt(Math.min(node.to, doc.length)).number
+            let inside = false
+            for (let l = a; l <= b; l++) if (active.has(l)) inside = true
+            if (inside) {
+              eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
+            } else {
+              const from = doc.line(a).from
+              const to = doc.line(b).to
+              const md = doc.sliceString(from, to)
+              ranges.push(
+                Decoration.replace({ widget: new TableWidget(md), block: true }).range(from, to),
+              )
+            }
             return false
           }
 
@@ -365,6 +467,31 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
   '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
   '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
+  '.cm-lp-imagemissing': {
+    display: 'inline-block',
+    color: '#a1a1aa',
+    fontSize: '0.85em',
+    background: 'rgba(255,255,255,0.05)',
+    padding: '0.3em 0.6em',
+    borderRadius: '6px',
+  },
+  '.cm-lp-langlabel': {
+    color: '#7d8799',
+    fontSize: '0.75em',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  '.cm-lp-mdtable': {
+    borderCollapse: 'collapse',
+    margin: '0.5em 0',
+    fontSize: '0.95em',
+  },
+  '.cm-lp-mdtable th, .cm-lp-mdtable td': {
+    border: '1px solid #3f3f46',
+    padding: '0.35em 0.7em',
+    textAlign: 'left',
+  },
+  '.cm-lp-mdtable th': { background: 'rgba(255,255,255,0.05)', fontWeight: '700' },
   '.cm-cursor': { borderLeftColor: '#e4e4e7' },
   '.cm-gutters': { display: 'none' },
 }, { dark: true })
