@@ -2,7 +2,7 @@
 // Le coordinate sono sempre in pixel dell'immagine (spazio "nativo"), così la
 // preview SVG (con viewBox = dimensioni native) e il flatten su canvas coincidono.
 
-export type AnnotTool = 'pen1' | 'pen2' | 'arrow' | 'shape' | 'text'
+export type AnnotTool = 'pen1' | 'pen2' | 'arrow' | 'shape' | 'text' | 'pan'
 export type ShapeKind = 'rect' | 'ellipse' | 'triangle' | 'line'
 
 export interface Point {

@@ -113,6 +113,87 @@ function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   return c
 }
 
+interface ViewState {
+  scale: number
+  tx: number
+  ty: number
+}
+
+// Viewport condiviso (zoom verso il cursore + pan trascinando) per i viewer
+// immagine. Il contenuto va messo in un "palco" con
+// transform: translate(tx,ty) scale(scale) e transformOrigin 0 0.
+function useImageViewport(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  dims: { w: number; h: number },
+  wheelEnabled: boolean,
+) {
+  const [view, setView] = useState<ViewState>({ scale: 1, tx: 0, ty: 0 })
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const panning = useRef(false)
+  const panStart = useRef<{ cx: number; cy: number; tx: number; ty: number } | null>(null)
+
+  function fitView(w: number = dims.w, h: number = dims.h) {
+    const cont = containerRef.current
+    if (!cont || !w || !h) return
+    const cr = cont.getBoundingClientRect()
+    const pad = 24
+    const scale = Math.min((cr.width - pad) / w, (cr.height - pad) / h)
+    setView({ scale, tx: (cr.width - w * scale) / 2, ty: (cr.height - h * scale) / 2 })
+  }
+  // Zoom mantenendo fermo il punto sotto le coordinate (cx,cy) nel contenitore.
+  function zoomAt(cx: number, cy: number, factor: number) {
+    const v = viewRef.current
+    const scale = Math.min(32, Math.max(0.05, v.scale * factor))
+    const k = scale / v.scale
+    setView({ scale, tx: cx - (cx - v.tx) * k, ty: cy - (cy - v.ty) * k })
+  }
+  function zoomBy(factor: number) {
+    const cont = containerRef.current
+    if (!cont) return
+    const cr = cont.getBoundingClientRect()
+    zoomAt(cr.width / 2, cr.height / 2, factor)
+  }
+  function onViewDown(e: React.PointerEvent) {
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    panning.current = true
+    const v = viewRef.current
+    panStart.current = { cx: e.clientX, cy: e.clientY, tx: v.tx, ty: v.ty }
+  }
+  function onViewMove(e: React.PointerEvent) {
+    if (!panning.current || !panStart.current) return
+    const s = panStart.current
+    setView((v) => ({ ...v, tx: s.tx + (e.clientX - s.cx), ty: s.ty + (e.clientY - s.cy) }))
+  }
+  function onViewUp() {
+    panning.current = false
+    panStart.current = null
+  }
+
+  // Riadatta quando cambiano le dimensioni del contenuto.
+  useLayoutEffect(() => {
+    fitView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dims.w, dims.h])
+
+  // Zoom con la rotella verso il cursore (listener nativo per poter preventDefault).
+  useEffect(() => {
+    if (!wheelEnabled) return
+    const cont = containerRef.current
+    if (!cont) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      const cr = cont!.getBoundingClientRect()
+      zoomAt(e.clientX - cr.left, e.clientY - cr.top, e.deltaY < 0 ? 1.1 : 1 / 1.1)
+    }
+    cont.addEventListener('wheel', onWheel, { passive: false })
+    return () => cont.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wheelEnabled])
+
+  return { view, setView, viewRef, panning, panStart, fitView, zoomBy, onViewDown, onViewMove, onViewUp }
+}
+
 function EditableImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
   const setImageBuffer = useAppStore((s) => s.setImageBuffer)
@@ -127,8 +208,6 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dims, setDims] = useState({ w: 0, h: 0 })
-  const [zoom, setZoom] = useState(1)
-  const [fit, setFit] = useState(true)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [resizeOpen, setResizeOpen] = useState(false)
   const [cropMode, setCropMode] = useState(false)
@@ -150,21 +229,19 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [textDraft, setTextDraft] = useState<
     { x: number; y: number; size: number; color: string; value: string } | null
   >(null)
-  // Rettangolo (display, relativo al contenitore) occupato dal canvas: serve a
-  // posizionare l'overlay SVG e l'input di testo. Misurato e aggiornato a runtime.
-  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(
-    null,
-  )
+  const spaceHeld = useRef(false)
   const cancelText = useRef(false)
   const textInputRef = useRef<HTMLInputElement>(null)
+
+  // Viewport zoom/pan condiviso (rotella disabilitata durante il ritaglio).
+  const { view, setView, viewRef, panning, panStart, fitView, zoomBy, onViewDown, onViewMove, onViewUp } =
+    useImageViewport(containerRef, dims, !cropMode)
 
   // Carica dal buffer (modifiche non salvate) se presente, altrimenti dal disco.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(false)
-    setZoom(1)
-    setFit(true)
     setCropMode(false)
     setCropRect(null)
     setAnnotMode(false)
@@ -191,6 +268,7 @@ function EditableImage({ filePath }: { filePath: string }) {
         cv.height = bmp.height
         cv.getContext('2d')!.drawImage(bmp, 0, 0)
         setDims({ w: bmp.width, h: bmp.height })
+        fitView(bmp.width, bmp.height) // adatta la nuova immagine al contenitore
       }
       bmp.close()
       setDirty(!!buffered)
@@ -263,8 +341,7 @@ function EditableImage({ filePath }: { filePath: string }) {
 
   // --- Crop interattivo ---
   function startCrop() {
-    setFit(true)
-    setZoom(1)
+    fitView() // ritaglio su vista adattata
     setCropRect(null)
     setCropMode(true)
   }
@@ -354,31 +431,24 @@ function EditableImage({ filePath }: { filePath: string }) {
     )
   }
 
-  // --- Annotazioni ---
-  // Misura il rettangolo display del canvas (per overlay SVG e input testo).
-  useLayoutEffect(() => {
-    if (!annotMode) {
-      setBox(null)
-      return
+  // Barra spaziatrice = pan temporaneo (come negli editor grafici).
+  useEffect(() => {
+    if (!annotMode) return
+    function down(e: KeyboardEvent) {
+      if (e.code === 'Space' && !(e.target as HTMLElement)?.matches?.('input,textarea')) {
+        spaceHeld.current = true
+      }
     }
-    const measure = () => {
-      const cv = canvasRef.current
-      const cont = containerRef.current
-      if (!cv || !cont) return
-      const r = cv.getBoundingClientRect()
-      const cr = cont.getBoundingClientRect()
-      setBox({ left: r.left - cr.left, top: r.top - cr.top, width: r.width, height: r.height })
+    function up(e: KeyboardEvent) {
+      if (e.code === 'Space') spaceHeld.current = false
     }
-    measure()
-    const ro = new ResizeObserver(measure)
-    if (canvasRef.current) ro.observe(canvasRef.current)
-    if (containerRef.current) ro.observe(containerRef.current)
-    window.addEventListener('resize', measure)
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
     return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
     }
-  }, [annotMode, dims.w, dims.h])
+  }, [annotMode])
 
   // Focus esplicito sull'input testo appena compare (autoFocus non sempre scatta);
   // dipende solo dalla comparsa, non dal valore, così non ruba il focus mentre scrivi.
@@ -409,12 +479,10 @@ function EditableImage({ filePath }: { filePath: string }) {
   }
 
   function startAnnot() {
-    setFit(true)
-    setZoom(1)
     setDraft(null)
     setTextDraft(null)
     setShapes([])
-    setAnnotMode(true)
+    setAnnotMode(true) // il fit del viewport avviene nel layout effect
   }
   function cancelAnnot() {
     setAnnotMode(false)
@@ -427,6 +495,14 @@ function EditableImage({ filePath }: { filePath: string }) {
   }
 
   function onAnnotDown(e: React.PointerEvent) {
+    // Pan: strumento mano, barra spaziatrice o tasto centrale del mouse.
+    if (tool === 'pan' || spaceHeld.current || e.button === 1) {
+      ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+      panning.current = true
+      const v = viewRef.current
+      panStart.current = { cx: e.clientX, cy: e.clientY, tx: v.tx, ty: v.ty }
+      return
+    }
     if (textDraft) return // c'è un input testo aperto: lascia gestire al blur
     const p = toNative(e)
     if (tool === 'text') {
@@ -454,6 +530,11 @@ function EditableImage({ filePath }: { filePath: string }) {
     setDraft(d)
   }
   function onAnnotMove(e: React.PointerEvent) {
+    if (panning.current && panStart.current) {
+      const s = panStart.current
+      setView((v) => ({ ...v, tx: s.tx + (e.clientX - s.cx), ty: s.ty + (e.clientY - s.cy) }))
+      return
+    }
     if (!dragging.current) return
     const d = draftRef.current
     if (!d) return
@@ -469,6 +550,11 @@ function EditableImage({ filePath }: { filePath: string }) {
     setDraft(nd)
   }
   function onAnnotUp() {
+    if (panning.current) {
+      panning.current = false
+      panStart.current = null
+      return
+    }
     if (!dragging.current) return
     dragging.current = false
     const d = draftRef.current
@@ -685,9 +771,15 @@ function EditableImage({ filePath }: { filePath: string }) {
               ['arrow', '↗ Freccia'],
               ['shape', '▭ Forme'],
               ['text', 'T Testo'],
+              ['pan', '✋'],
             ] as [AnnotTool, string][]
           ).map(([t, label]) => (
-            <button key={t} onClick={() => setTool(t)} className={tool === t ? activeChip : toolBtn}>
+            <button
+              key={t}
+              onClick={() => setTool(t)}
+              title={t === 'pan' ? 'Sposta (anche con barra spazio o tasto centrale)' : undefined}
+              className={tool === t ? activeChip : toolBtn}
+            >
               {label}
             </button>
           ))}
@@ -779,6 +871,20 @@ function EditableImage({ filePath }: { filePath: string }) {
 
           <div className="flex-1" />
 
+          {/* Zoom: rotella verso il cursore, oppure questi controlli */}
+          <button className={toolBtn} title="Riduci" onClick={() => zoomBy(1 / 1.25)}>
+            −
+          </button>
+          <span className="w-10 text-center text-zinc-500">{Math.round(view.scale * 100)}%</span>
+          <button className={toolBtn} title="Ingrandisci" onClick={() => zoomBy(1.25)}>
+            +
+          </button>
+          <button className={toolBtn} onClick={() => fitView()}>
+            Adatta
+          </button>
+
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+
           <button className={toolBtn} onClick={undoShape} disabled={shapes.length === 0}>
             Annulla ultima
           </button>
@@ -820,14 +926,14 @@ function EditableImage({ filePath }: { filePath: string }) {
 
           <div className="flex-1" />
 
-          <button className={toolBtn} title="Riduci" onClick={() => { setFit(false); setZoom((z) => Math.max(0.1, +(z - 0.25).toFixed(2))) }}>
+          <button className={toolBtn} title="Riduci" onClick={() => zoomBy(1 / 1.25)}>
             −
           </button>
-          <span className="w-12 text-center text-zinc-500">{fit ? 'Fit' : `${Math.round(zoom * 100)}%`}</span>
-          <button className={toolBtn} title="Ingrandisci" onClick={() => { setFit(false); setZoom((z) => Math.min(8, +(z + 0.25).toFixed(2))) }}>
+          <span className="w-10 text-center text-zinc-500">{Math.round(view.scale * 100)}%</span>
+          <button className={toolBtn} title="Ingrandisci" onClick={() => zoomBy(1.25)}>
             +
           </button>
-          <button className={toolBtn} onClick={() => setFit(true)}>
+          <button className={toolBtn} onClick={() => fitView()}>
             Adatta
           </button>
 
@@ -855,20 +961,60 @@ function EditableImage({ filePath }: { filePath: string }) {
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto flex items-center justify-center bg-zinc-950 p-4 relative"
+        className={`flex-1 overflow-hidden bg-zinc-950 relative select-none ${
+          !annotMode && !cropMode ? 'cursor-grab active:cursor-grabbing' : ''
+        }`}
+        // In modalità normale (no annota, no crop) il trascinamento sposta la vista.
+        onPointerDown={!annotMode && !cropMode ? onViewDown : undefined}
+        onPointerMove={!annotMode && !cropMode ? onViewMove : undefined}
+        onPointerUp={!annotMode && !cropMode ? onViewUp : undefined}
       >
-        {error && <span className="text-zinc-500 text-sm">Impossibile caricare l'immagine.</span>}
-        {loading && !error && (
-          <span className="absolute text-zinc-500 text-sm">Caricamento…</span>
+        {error && (
+          <span className="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+            Impossibile caricare l'immagine.
+          </span>
         )}
-        <canvas
-          ref={canvasRef}
-          className={
-            fit || cropMode || annotMode ? 'max-w-full max-h-full object-contain block' : 'block'
-          }
-          style={fit || cropMode || annotMode ? undefined : { width: `${zoom * 100}%` }}
-        />
-        {cropMode && (
+        {loading && !error && (
+          <span className="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+            Caricamento…
+          </span>
+        )}
+
+        {/* Palco: canvas + overlay traslati/scalati insieme dal viewport. */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transformOrigin: '0 0',
+            transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
+          }}
+        >
+          <canvas ref={canvasRef} className="block" />
+          {annotMode && (
+            <svg
+              className={
+                tool === 'pan' ? 'absolute cursor-grab' : tool === 'text' ? 'absolute cursor-text' : 'absolute cursor-crosshair'
+              }
+              style={{ left: 0, top: 0, touchAction: 'none' }}
+              width={dims.w}
+              height={dims.h}
+              viewBox={`0 0 ${dims.w} ${dims.h}`}
+              preserveAspectRatio="none"
+              // Evita che il browser sposti il focus al body al mousedown (e la
+              // selezione testo): altrimenti l'input testo perde subito il focus.
+              onMouseDown={(e) => e.preventDefault()}
+              onPointerDown={onAnnotDown}
+              onPointerMove={onAnnotMove}
+              onPointerUp={onAnnotUp}
+            >
+              {shapes.map((s, i) => shapeSvg(s, i))}
+              {draft && shapeSvg(draft, 'draft')}
+            </svg>
+          )}
+        </div>
+
+        {!annotMode && cropMode && (
           <div
             className="absolute inset-0 cursor-crosshair"
             onMouseDown={onCropDown}
@@ -877,7 +1023,7 @@ function EditableImage({ filePath }: { filePath: string }) {
             onMouseLeave={onCropUp}
           />
         )}
-        {cropMode && cropRect && (
+        {!annotMode && cropMode && cropRect && (
           <div
             className="absolute border border-white pointer-events-none"
             style={{
@@ -890,30 +1036,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           />
         )}
 
-        {annotMode && box && (
-          <svg
-            className={tool === 'text' ? 'absolute cursor-text' : 'absolute cursor-crosshair'}
-            style={{
-              left: box.left,
-              top: box.top,
-              width: box.width,
-              height: box.height,
-              touchAction: 'none',
-            }}
-            viewBox={`0 0 ${dims.w} ${dims.h}`}
-            preserveAspectRatio="none"
-            // Evita che il browser sposti il focus al body al mousedown (e la
-            // selezione testo): altrimenti l'input testo perde subito il focus.
-            onMouseDown={(e) => e.preventDefault()}
-            onPointerDown={onAnnotDown}
-            onPointerMove={onAnnotMove}
-            onPointerUp={onAnnotUp}
-          >
-            {shapes.map((s, i) => shapeSvg(s, i))}
-            {draft && shapeSvg(draft, 'draft')}
-          </svg>
-        )}
-        {annotMode && box && textDraft && (
+        {annotMode && textDraft && (
           <input
             ref={textInputRef}
             autoFocus
@@ -932,10 +1055,10 @@ function EditableImage({ filePath }: { filePath: string }) {
             onBlur={commitText}
             className="absolute outline-none border border-dashed border-white/70 leading-none"
             style={{
-              left: box.left + textDraft.x * (box.width / dims.w),
-              top: box.top + textDraft.y * (box.height / dims.h),
+              left: view.tx + textDraft.x * view.scale,
+              top: view.ty + textDraft.y * view.scale,
               color: textDraft.color,
-              fontSize: textDraft.size * (box.height / dims.h),
+              fontSize: textDraft.size * view.scale,
               fontFamily: 'sans-serif',
               background: 'rgba(0,0,0,0.45)',
               padding: '1px 2px',
@@ -1035,16 +1158,20 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
-  const [zoom, setZoom] = useState(1)
-  const [fit, setFit] = useState(true)
+  const [dims, setDims] = useState({ w: 0, h: 0 })
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { view, fitView, zoomBy, onViewDown, onViewMove, onViewUp } = useImageViewport(
+    containerRef,
+    dims,
+    true,
+  )
 
   useEffect(() => {
     let cancelled = false
     let objectUrl: string | null = null
     setError(false)
     setUrl(null)
-    setZoom(1)
-    setFit(true)
+    setDims({ w: 0, h: 0 })
     readFile(filePath)
       .then((bytes) => {
         if (cancelled) return
@@ -1068,31 +1195,61 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3">
         <span className="text-sm text-zinc-400 truncate">{fileName}</span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
-          <button className={toolBtn} onClick={() => { setFit(false); setZoom((z) => Math.max(0.1, +(z - 0.25).toFixed(2))) }}>
+          <button className={toolBtn} title="Riduci" onClick={() => zoomBy(1 / 1.25)}>
             −
           </button>
-          <span className="w-12 text-center text-zinc-500">{fit ? 'Fit' : `${Math.round(zoom * 100)}%`}</span>
-          <button className={toolBtn} onClick={() => { setFit(false); setZoom((z) => Math.min(8, +(z + 0.25).toFixed(2))) }}>
+          <span className="w-10 text-center text-zinc-500">{Math.round(view.scale * 100)}%</span>
+          <button className={toolBtn} title="Ingrandisci" onClick={() => zoomBy(1.25)}>
             +
           </button>
-          <button className={toolBtn} onClick={() => setFit(true)}>
+          <button className={toolBtn} onClick={() => fitView()}>
             Adatta
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto flex items-center justify-center bg-zinc-950 p-4">
-        {error ? (
-          <span className="text-zinc-500 text-sm">Impossibile caricare l'immagine.</span>
-        ) : url ? (
-          <img
-            src={url}
-            alt={fileName}
-            className={fit ? 'max-w-full max-h-full object-contain' : ''}
-            style={fit ? undefined : { width: `${zoom * 100}%` }}
-          />
-        ) : (
-          <span className="text-zinc-500 text-sm">Caricamento…</span>
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-hidden bg-zinc-950 relative select-none cursor-grab active:cursor-grabbing"
+        onPointerDown={onViewDown}
+        onPointerMove={onViewMove}
+        onPointerUp={onViewUp}
+      >
+        {error && (
+          <span className="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+            Impossibile caricare l'immagine.
+          </span>
+        )}
+        {!error && !url && (
+          <span className="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+            Caricamento…
+          </span>
+        )}
+        {url && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transformOrigin: '0 0',
+              transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
+            }}
+          >
+            <img
+              src={url}
+              alt={fileName}
+              draggable={false}
+              width={dims.w || undefined}
+              height={dims.h || undefined}
+              className="block max-w-none"
+              onLoad={(e) =>
+                setDims({
+                  w: e.currentTarget.naturalWidth || 300,
+                  h: e.currentTarget.naturalHeight || 300,
+                })
+              }
+            />
+          </div>
         )}
       </div>
     </div>
