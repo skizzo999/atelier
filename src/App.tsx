@@ -5,6 +5,7 @@ import { useAppStore } from './store/appStore'
 import { grantVaultAccess } from './lib/vault'
 import { walkFiles } from './lib/search'
 import { setVaultImageIndex } from './lib/images'
+import { setNoteIndex } from './lib/notes'
 
 const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 import { FileTree } from './components/FileTree/FileTree'
@@ -53,12 +54,16 @@ function App() {
     let cancelled = false
     walkFiles(vaultPath).then((files) => {
       if (cancelled) return
-      const map = new Map<string, string>()
+      const imgMap = new Map<string, string>()
+      const noteMap = new Map<string, string>()
       for (const f of files) {
-        const ext = f.name.split('.').pop()?.toLowerCase()
-        if (ext && IMG_EXT.has(ext)) map.set(f.name.toLowerCase(), f.path)
+        const lower = f.name.toLowerCase()
+        const ext = lower.split('.').pop()
+        if (ext && IMG_EXT.has(ext)) imgMap.set(lower, f.path)
+        if (lower.endsWith('.md')) noteMap.set(lower.replace(/\.md$/, ''), f.path)
       }
-      setVaultImageIndex(map)
+      setVaultImageIndex(imgMap)
+      setNoteIndex(noteMap)
     })
     return () => {
       cancelled = true

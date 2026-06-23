@@ -47,6 +47,7 @@ export function CodeMirrorEditor({
   markdownMode,
   livePreviewMode = false,
   fileDir = '',
+  onWikilink,
   viewRef,
 }: {
   value: string
@@ -54,6 +55,7 @@ export function CodeMirrorEditor({
   markdownMode: boolean
   livePreviewMode?: boolean
   fileDir?: string
+  onWikilink?: (name: string) => void
   viewRef?: React.MutableRefObject<EditorView | null>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -61,6 +63,8 @@ export function CodeMirrorEditor({
   const settingExternally = useRef(false)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const onWikilinkRef = useRef(onWikilink)
+  onWikilinkRef.current = onWikilink
 
   // Crea l'editor (ricreato solo se cambia la modalità markdown/plain).
   useEffect(() => {
@@ -85,7 +89,7 @@ export function CodeMirrorEditor({
       }),
     ]
     if (markdownMode) extensions.push(markdown({ extensions: GFM, codeLanguages: languages }))
-    if (liveMode) extensions.push(livePreview(fileDir))
+    if (liveMode) extensions.push(livePreview(fileDir, (name) => onWikilinkRef.current?.(name)))
 
     const v = new EditorView({
       state: EditorState.create({ doc: value, extensions }),

@@ -142,7 +142,6 @@ const strike = Decoration.mark({ class: 'cm-lp-strike' })
 const code = Decoration.mark({ class: 'cm-lp-code' })
 const link = Decoration.mark({ class: 'cm-lp-link' })
 const highlight = Decoration.mark({ class: 'cm-lp-highlight' })
-const wikilink = Decoration.mark({ class: 'cm-lp-wikilink' })
 const headings = [
   null,
   Decoration.mark({ class: 'cm-lp-h1' }),
@@ -443,8 +442,14 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
           if (m.index > 0 && line.text[m.index - 1] === '!') continue
           const s = line.from + m.index
           const e = s + m[0].length
+          const name = m[1].split('|')[0]
           ranges.push(hide.range(s, s + 2))
-          ranges.push(wikilink.range(s + 2, e - 2))
+          ranges.push(
+            Decoration.mark({
+              class: 'cm-lp-wikilink',
+              attributes: { 'data-wikilink': name },
+            }).range(s + 2, e - 2),
+          )
           ranges.push(hide.range(e - 2, e))
         }
       }
@@ -546,7 +551,7 @@ const livePreviewTheme = EditorView.theme({
   '.cm-gutters': { display: 'none' },
 }, { dark: true })
 
-export function livePreview(fileDir: string): Extension {
+export function livePreview(fileDir: string, onWikilink: (name: string) => void): Extension {
   return [
     ViewPlugin.fromClass(
       class {
@@ -563,5 +568,18 @@ export function livePreview(fileDir: string): Extension {
       { decorations: (v) => v.decorations },
     ),
     livePreviewTheme,
+    // Click su un wikilink -> apre/crea la nota.
+    EditorView.domEventHandlers({
+      mousedown(e) {
+        const el = (e.target as HTMLElement).closest('.cm-lp-wikilink') as HTMLElement | null
+        if (el) {
+          const name = el.getAttribute('data-wikilink')
+          if (name) {
+            e.preventDefault()
+            onWikilink(name)
+          }
+        }
+      },
+    }),
   ]
 }

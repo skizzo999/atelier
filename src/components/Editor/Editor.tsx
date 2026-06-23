@@ -9,6 +9,7 @@ import type { EditorView } from '@codemirror/view'
 import { useAppStore } from '../../store/appStore'
 import { writeFileAtomic } from '../../lib/fileOps'
 import { loadImage } from '../../lib/images'
+import { resolveOrCreateNote } from '../../lib/notes'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 
 // Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
@@ -71,12 +72,14 @@ marked.use({
         if (m) {
           const inner = m[1]
           const text = inner.includes('|') ? inner.split('|')[1] : inner
-          return { type: 'wikilink', raw: m[0], text }
+          const target = inner.split('|')[0]
+          return { type: 'wikilink', raw: m[0], text, target }
         }
         return undefined
       },
       renderer(token) {
-        return `<a class="wikilink">${(token as unknown as { text: string }).text}</a>`
+        const t = token as unknown as { text: string; target: string }
+        return `<a class="wikilink" data-wikilink="${t.target}">${t.text}</a>`
       },
     },
   ],
@@ -168,6 +171,15 @@ export function Editor() {
       setSaving(false)
     }
   }, [filePath, content, saving, clearBuffer])
+
+  // Click su un wikilink [[nota]]: apre la nota (o la crea se non esiste).
+  const handleWikilink = useCallback(async (name: string) => {
+    const st = useAppStore.getState()
+    const fp = st.selectedFile
+    const dir = fp ? fp.slice(0, fp.lastIndexOf('\\')) : (st.vaultPath ?? '')
+    const path = await resolveOrCreateNote(name, dir)
+    if (path) st.setSelectedFile(path)
+  }, [])
 
   // Ctrl/Cmd+S per salvare.
   useEffect(() => {
@@ -310,6 +322,13 @@ export function Editor() {
           <div
             ref={readingRef}
             className="prose prose-invert max-w-none"
+            onClick={(e) => {
+              const a = (e.target as HTMLElement).closest('a.wikilink') as HTMLElement | null
+              if (a) {
+                e.preventDefault()
+                handleWikilink(a.getAttribute('data-wikilink') || a.textContent || '')
+              }
+            }}
             dangerouslySetInnerHTML={{
               __html: DOMPurify.sanitize(renderCallouts(marked.parse(content) as string)),
             }}
@@ -321,6 +340,7 @@ export function Editor() {
           markdownMode={markdown}
           livePreviewMode={markdown && view === 'live'}
           fileDir={fileDir}
+          onWikilink={handleWikilink}
           viewRef={editorViewRef}
           onChange={(v) => {
             setContent(v)
