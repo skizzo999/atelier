@@ -5,6 +5,13 @@ export type AppMode = 'standard' | 'developer'
 // Vista dell'editor markdown: Codice / Ibrida (live preview) / Lettura.
 export type MarkdownView = 'source' | 'live' | 'reading'
 
+// Preset di una penna delle annotazioni (configurabile e persistente).
+export interface PenPreset {
+  color: string
+  width: number // spessore in pixel dell'immagine
+  opacity: number // 0..1
+}
+
 interface AppState {
   // Cartella radice del vault attualmente aperto (null = nessun vault).
   vaultPath: string | null
@@ -12,6 +19,8 @@ interface AppState {
   mode: AppMode
   // Ultima vista markdown scelta (persistita, così l'app riapre come l'hai lasciata).
   mdView: MarkdownView
+  // Due penne configurabili per le annotazioni (persistite).
+  penPresets: [PenPreset, PenPreset]
   // File attualmente aperto nell'editor (null = nessuno). Non persistito.
   selectedFile: string | null
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
@@ -28,6 +37,7 @@ interface AppState {
   clearVault: () => void
   setMode: (mode: AppMode) => void
   setMdView: (view: MarkdownView) => void
+  setPenPreset: (index: 0 | 1, patch: Partial<PenPreset>) => void
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
   setPendingHighlight: (term: string | null) => void
@@ -49,6 +59,11 @@ export const useAppStore = create<AppState>()(
       vaultPath: null,
       mode: 'standard',
       mdView: 'source',
+      // Penna 1: tratto pieno rosso; Penna 2: evidenziatore giallo semitrasparente.
+      penPresets: [
+        { color: '#ef4444', width: 6, opacity: 1 },
+        { color: '#facc15', width: 22, opacity: 0.4 },
+      ],
       selectedFile: null,
       dirtyBuffers: {},
       pendingHighlight: null,
@@ -58,6 +73,12 @@ export const useAppStore = create<AppState>()(
         set({ vaultPath: null, selectedFile: null, dirtyBuffers: {}, imageBuffers: {} }),
       setMode: (mode) => set({ mode }),
       setMdView: (view) => set({ mdView: view }),
+      setPenPreset: (index, patch) =>
+        set((state) => {
+          const next: [PenPreset, PenPreset] = [{ ...state.penPresets[0] }, { ...state.penPresets[1] }]
+          next[index] = { ...next[index], ...patch }
+          return { penPresets: next }
+        }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
       setSelectedFile: (path) => set({ selectedFile: path }),
@@ -117,6 +138,7 @@ export const useAppStore = create<AppState>()(
         vaultPath: state.vaultPath,
         mode: state.mode,
         mdView: state.mdView,
+        penPresets: state.penPresets,
       }),
     },
   ),

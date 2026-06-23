@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { writeFileBinaryAtomic, uniquePathWithSuffix } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
+import {
+  arrowGeometry,
+  drawShapesToCtx,
+  type AnnotTool,
+  type Shape,
+  type ShapeKind,
+} from '../../lib/annotations'
 
 const MIME: Record<string, string> = {
   png: 'image/png',
@@ -84,6 +91,7 @@ function cropCanvas(
 
 const toolBtn =
   'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+const activeChip = 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded font-medium'
 
 interface CropRect {
   x: number
@@ -92,11 +100,26 @@ interface CropRect {
   h: number
 }
 
+// Palette per le annotazioni.
+const ANNOT_COLORS = ['#ef4444', '#f59e0b', '#facc15', '#22c55e', '#3b82f6', '#ffffff', '#000000']
+type Thickness = 'S' | 'M' | 'L'
+
+// Copia un canvas (per disegnarci sopra senza toccare l'originale).
+function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const c = document.createElement('canvas')
+  c.width = src.width
+  c.height = src.height
+  c.getContext('2d')!.drawImage(src, 0, 0)
+  return c
+}
+
 function EditableImage({ filePath }: { filePath: string }) {
   const ext = extOf(filePath)
   const setImageBuffer = useAppStore((s) => s.setImageBuffer)
   const clearImageBuffer = useAppStore((s) => s.clearImageBuffer)
   const setSelectedFile = useAppStore((s) => s.setSelectedFile)
+  const penPresets = useAppStore((s) => s.penPresets)
+  const setPenPreset = useAppStore((s) => s.setPenPreset)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
@@ -113,6 +136,28 @@ function EditableImage({ filePath }: { filePath: string }) {
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)
 
+  // --- Annotazioni ---
+  const [annotMode, setAnnotMode] = useState(false)
+  const [tool, setTool] = useState<AnnotTool>('pen1')
+  const [shapeKind, setShapeKind] = useState<ShapeKind>('rect')
+  const [color, setColor] = useState(ANNOT_COLORS[0])
+  const [thickness, setThickness] = useState<Thickness>('M')
+  const [shapes, setShapes] = useState<Shape[]>([])
+  const [draft, setDraft] = useState<Shape | null>(null)
+  // Valore autoritativo del draft (sincrono): evita closure stale e doppie
+  // aggiunte da StrictMode (niente effetti dentro gli updater di setState).
+  const draftRef = useRef<Shape | null>(null)
+  const [textDraft, setTextDraft] = useState<
+    { x: number; y: number; size: number; color: string; value: string } | null
+  >(null)
+  // Rettangolo (display, relativo al contenitore) occupato dal canvas: serve a
+  // posizionare l'overlay SVG e l'input di testo. Misurato e aggiornato a runtime.
+  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(
+    null,
+  )
+  const cancelText = useRef(false)
+  const textInputRef = useRef<HTMLInputElement>(null)
+
   // Carica dal buffer (modifiche non salvate) se presente, altrimenti dal disco.
   useEffect(() => {
     let cancelled = false
@@ -122,6 +167,10 @@ function EditableImage({ filePath }: { filePath: string }) {
     setFit(true)
     setCropMode(false)
     setCropRect(null)
+    setAnnotMode(false)
+    setShapes([])
+    setDraft(null)
+    setTextDraft(null)
     const buffered = useAppStore.getState().imageBuffers[filePath]
     ;(async () => {
       let blob: Blob
@@ -305,6 +354,278 @@ function EditableImage({ filePath }: { filePath: string }) {
     )
   }
 
+  // --- Annotazioni ---
+  // Misura il rettangolo display del canvas (per overlay SVG e input testo).
+  useLayoutEffect(() => {
+    if (!annotMode) {
+      setBox(null)
+      return
+    }
+    const measure = () => {
+      const cv = canvasRef.current
+      const cont = containerRef.current
+      if (!cv || !cont) return
+      const r = cv.getBoundingClientRect()
+      const cr = cont.getBoundingClientRect()
+      setBox({ left: r.left - cr.left, top: r.top - cr.top, width: r.width, height: r.height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (canvasRef.current) ro.observe(canvasRef.current)
+    if (containerRef.current) ro.observe(containerRef.current)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [annotMode, dims.w, dims.h])
+
+  // Focus esplicito sull'input testo appena compare (autoFocus non sempre scatta);
+  // dipende solo dalla comparsa, non dal valore, così non ruba il focus mentre scrivi.
+  const hasTextDraft = textDraft !== null
+  useEffect(() => {
+    if (hasTextDraft) textInputRef.current?.focus()
+  }, [hasTextDraft])
+
+  // Spessore tratto e dimensione testo proporzionali all'immagine.
+  function strokeFor(t: Thickness): number {
+    const d = Math.hypot(dims.w, dims.h) || 1000
+    const base = d * 0.004
+    return Math.max(2, Math.round(base * (t === 'S' ? 1 : t === 'M' ? 2 : 3.5)))
+  }
+  function fontFor(t: Thickness): number {
+    const d = Math.hypot(dims.w, dims.h) || 1000
+    const base = d * 0.02
+    return Math.max(12, Math.round(base * (t === 'S' ? 1 : t === 'M' ? 1.6 : 2.4)))
+  }
+
+  // Coordinate del puntatore -> pixel immagine (l'SVG ha viewBox = dims native).
+  function toNative(e: React.PointerEvent): { x: number; y: number } {
+    const r = (e.currentTarget as Element).getBoundingClientRect()
+    return {
+      x: clamp(((e.clientX - r.left) / r.width) * dims.w, 0, dims.w),
+      y: clamp(((e.clientY - r.top) / r.height) * dims.h, 0, dims.h),
+    }
+  }
+
+  function startAnnot() {
+    setFit(true)
+    setZoom(1)
+    setDraft(null)
+    setTextDraft(null)
+    setShapes([])
+    setAnnotMode(true)
+  }
+  function cancelAnnot() {
+    setAnnotMode(false)
+    setShapes([])
+    setDraft(null)
+    setTextDraft(null)
+  }
+  function undoShape() {
+    setShapes((s) => s.slice(0, -1))
+  }
+
+  function onAnnotDown(e: React.PointerEvent) {
+    if (textDraft) return // c'è un input testo aperto: lascia gestire al blur
+    const p = toNative(e)
+    if (tool === 'text') {
+      setTextDraft({ x: p.x, y: p.y, size: fontFor(thickness), color, value: '' })
+      return
+    }
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    dragging.current = true
+    dragStart.current = p
+    let d: Shape
+    if (tool === 'pen1' || tool === 'pen2') {
+      const pen = penPresets[tool === 'pen1' ? 0 : 1]
+      d = { type: 'pen', color: pen.color, width: pen.width, opacity: pen.opacity, points: [p] }
+    } else if (tool === 'arrow') {
+      d = { type: 'arrow', color, width: strokeFor(thickness), x1: p.x, y1: p.y, x2: p.x, y2: p.y }
+    } else {
+      // tool === 'shape'
+      const w = strokeFor(thickness)
+      if (shapeKind === 'line') d = { type: 'line', color, width: w, x1: p.x, y1: p.y, x2: p.x, y2: p.y }
+      else if (shapeKind === 'ellipse') d = { type: 'ellipse', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
+      else if (shapeKind === 'triangle') d = { type: 'triangle', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
+      else d = { type: 'rect', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
+    }
+    draftRef.current = d
+    setDraft(d)
+  }
+  function onAnnotMove(e: React.PointerEvent) {
+    if (!dragging.current) return
+    const d = draftRef.current
+    if (!d) return
+    const p = toNative(e)
+    let nd: Shape
+    if (d.type === 'pen') nd = { ...d, points: [...d.points, p] }
+    else if (d.type === 'arrow' || d.type === 'line') nd = { ...d, x2: p.x, y2: p.y }
+    else if (d.type === 'rect' || d.type === 'ellipse' || d.type === 'triangle') {
+      const s = dragStart.current!
+      nd = { ...d, x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) }
+    } else return
+    draftRef.current = nd
+    setDraft(nd)
+  }
+  function onAnnotUp() {
+    if (!dragging.current) return
+    dragging.current = false
+    const d = draftRef.current
+    draftRef.current = null
+    setDraft(null)
+    if (!d) return
+    // Scarta forme degeneri (linee/forme troppo piccole).
+    if ((d.type === 'arrow' || d.type === 'line') && Math.hypot(d.x2 - d.x1, d.y2 - d.y1) < 3) return
+    if ((d.type === 'rect' || d.type === 'ellipse' || d.type === 'triangle') && (d.w < 3 || d.h < 3)) return
+    if (d.type === 'pen' && d.points.length === 0) return
+    setShapes((prev) => [...prev, d])
+  }
+
+  function commitText() {
+    if (cancelText.current) {
+      cancelText.current = false
+      setTextDraft(null)
+      return
+    }
+    const td = textDraft
+    if (td && td.value.trim()) {
+      setShapes((prev) => [
+        ...prev,
+        { type: 'text', color: td.color, size: td.size, x: td.x, y: td.y, text: td.value },
+      ])
+    }
+    setTextDraft(null)
+  }
+
+  // "Applica": riversa le annotazioni sull'immagine (distruttivo, come da V1).
+  function applyAnnotations() {
+    if (shapes.length === 0) {
+      setAnnotMode(false)
+      return
+    }
+    applyTransform((src) => {
+      const c = cloneCanvas(src)
+      drawShapesToCtx(c.getContext('2d')!, shapes)
+      return c
+    })
+    cancelAnnot()
+  }
+
+  // Forma -> elemento SVG (preview live; stessa geometria del flatten su canvas).
+  function shapeSvg(s: Shape, key: number | string) {
+    if (s.type === 'pen') {
+      if (s.points.length === 1)
+        return (
+          <circle
+            key={key}
+            cx={s.points[0].x}
+            cy={s.points[0].y}
+            r={s.width / 2}
+            fill={s.color}
+            fillOpacity={s.opacity}
+          />
+        )
+      const d = s.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ')
+      return (
+        <path
+          key={key}
+          d={d}
+          fill="none"
+          stroke={s.color}
+          strokeWidth={s.width}
+          strokeOpacity={s.opacity}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )
+    }
+    if (s.type === 'arrow') {
+      const g = arrowGeometry(s.x1, s.y1, s.x2, s.y2, s.width)
+      return (
+        <g key={key}>
+          <line
+            x1={s.x1}
+            y1={s.y1}
+            x2={g.base.x}
+            y2={g.base.y}
+            stroke={s.color}
+            strokeWidth={s.width}
+            strokeLinecap="round"
+          />
+          <polygon
+            points={`${g.tip.x},${g.tip.y} ${g.left.x},${g.left.y} ${g.right.x},${g.right.y}`}
+            fill={s.color}
+          />
+        </g>
+      )
+    }
+    if (s.type === 'line')
+      return (
+        <line
+          key={key}
+          x1={s.x1}
+          y1={s.y1}
+          x2={s.x2}
+          y2={s.y2}
+          stroke={s.color}
+          strokeWidth={s.width}
+          strokeLinecap="round"
+        />
+      )
+    if (s.type === 'rect')
+      return (
+        <rect
+          key={key}
+          x={s.x}
+          y={s.y}
+          width={s.w}
+          height={s.h}
+          fill="none"
+          stroke={s.color}
+          strokeWidth={s.width}
+        />
+      )
+    if (s.type === 'ellipse')
+      return (
+        <ellipse
+          key={key}
+          cx={s.x + s.w / 2}
+          cy={s.y + s.h / 2}
+          rx={s.w / 2}
+          ry={s.h / 2}
+          fill="none"
+          stroke={s.color}
+          strokeWidth={s.width}
+        />
+      )
+    if (s.type === 'triangle')
+      return (
+        <polygon
+          key={key}
+          points={`${s.x + s.w / 2},${s.y} ${s.x},${s.y + s.h} ${s.x + s.w},${s.y + s.h}`}
+          fill="none"
+          stroke={s.color}
+          strokeWidth={s.width}
+          strokeLinejoin="round"
+        />
+      )
+    return (
+      <text
+        key={key}
+        x={s.x}
+        y={s.y}
+        fontSize={s.size}
+        fill={s.color}
+        fontFamily="sans-serif"
+        dominantBaseline="text-before-edge"
+        style={{ whiteSpace: 'pre' }}
+      >
+        {s.text}
+      </text>
+    )
+  }
+
   // Offset del canvas dentro il contenitore, per posizionare il rettangolo di selezione.
   let ox = 0
   let oy = 0
@@ -317,6 +638,8 @@ function EditableImage({ filePath }: { filePath: string }) {
 
   const fileName = filePath.split('\\').pop()
   const canEdit = !loading && !error
+  // Indice della penna attiva (0/1) o null se lo strumento non è una penna.
+  const penIdx = tool === 'pen1' ? 0 : tool === 'pen2' ? 1 : null
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -353,6 +676,124 @@ function EditableImage({ filePath }: { filePath: string }) {
             Applica
           </button>
         </div>
+      ) : annotMode ? (
+        <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1.5 text-xs flex-wrap">
+          {(
+            [
+              ['pen1', '✏︎ Penna 1'],
+              ['pen2', '✏︎ Penna 2'],
+              ['arrow', '↗ Freccia'],
+              ['shape', '▭ Forme'],
+              ['text', 'T Testo'],
+            ] as [AnnotTool, string][]
+          ).map(([t, label]) => (
+            <button key={t} onClick={() => setTool(t)} className={tool === t ? activeChip : toolBtn}>
+              {label}
+            </button>
+          ))}
+
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+
+          {/* Sotto-scelta della forma */}
+          {tool === 'shape' &&
+            (
+              [
+                ['rect', '▭'],
+                ['ellipse', '◯'],
+                ['triangle', '△'],
+                ['line', '╱'],
+              ] as [ShapeKind, string][]
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                title={k}
+                onClick={() => setShapeKind(k)}
+                className={shapeKind === k ? activeChip : toolBtn}
+              >
+                {label}
+              </button>
+            ))}
+          {tool === 'shape' && <div className="w-px h-5 bg-zinc-700 mx-1" />}
+
+          {/* Colori: per le penne è il colore della penna, altrimenti quello condiviso */}
+          {ANNOT_COLORS.map((c) => {
+            const current = penIdx !== null ? penPresets[penIdx].color : color
+            return (
+              <button
+                key={c}
+                title={c}
+                onClick={() => (penIdx !== null ? setPenPreset(penIdx, { color: c }) : setColor(c))}
+                className={`w-5 h-5 rounded-full border ${
+                  current === c
+                    ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
+                    : 'border-zinc-600'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            )
+          })}
+
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+
+          {/* Penna: slider opacità + spessore (persistiti). Altri tool: spessore S/M/L */}
+          {penIdx !== null ? (
+            <>
+              <label className="flex items-center gap-1 text-zinc-400">
+                Opacità
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  value={Math.round(penPresets[penIdx].opacity * 100)}
+                  onChange={(e) => setPenPreset(penIdx, { opacity: +e.target.value / 100 })}
+                  className="w-20"
+                />
+                <span className="w-9 text-right text-zinc-500">
+                  {Math.round(penPresets[penIdx].opacity * 100)}%
+                </span>
+              </label>
+              <label className="flex items-center gap-1 text-zinc-400">
+                Spessore
+                <input
+                  type="range"
+                  min={1}
+                  max={60}
+                  value={penPresets[penIdx].width}
+                  onChange={(e) => setPenPreset(penIdx, { width: +e.target.value })}
+                  className="w-20"
+                />
+                <span className="w-6 text-right text-zinc-500">{penPresets[penIdx].width}</span>
+              </label>
+            </>
+          ) : (
+            (['S', 'M', 'L'] as Thickness[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setThickness(t)}
+                className={thickness === t ? activeChip : toolBtn}
+              >
+                {t}
+              </button>
+            ))
+          )}
+
+          <div className="flex-1" />
+
+          <button className={toolBtn} onClick={undoShape} disabled={shapes.length === 0}>
+            Annulla ultima
+          </button>
+          <button className={toolBtn} onClick={cancelAnnot}>
+            Annulla
+          </button>
+          <button
+            onClick={applyAnnotations}
+            disabled={shapes.length === 0}
+            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+            title="Applica le annotazioni alla foto"
+          >
+            Applica
+          </button>
+        </div>
       ) : (
         <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1 text-xs flex-wrap">
           <button className={toolBtn} title="Ruota a sinistra" disabled={!canEdit} onClick={() => applyTransform((c) => rotate90(c, -1))}>
@@ -372,6 +813,9 @@ function EditableImage({ filePath }: { filePath: string }) {
           </button>
           <button className={toolBtn} disabled={!canEdit} onClick={() => setResizeOpen(true)}>
             Ridimensiona
+          </button>
+          <button className={toolBtn} disabled={!canEdit} onClick={startAnnot}>
+            Annota
           </button>
 
           <div className="flex-1" />
@@ -419,8 +863,10 @@ function EditableImage({ filePath }: { filePath: string }) {
         )}
         <canvas
           ref={canvasRef}
-          className={fit || cropMode ? 'max-w-full max-h-full object-contain block' : 'block'}
-          style={fit || cropMode ? undefined : { width: `${zoom * 100}%` }}
+          className={
+            fit || cropMode || annotMode ? 'max-w-full max-h-full object-contain block' : 'block'
+          }
+          style={fit || cropMode || annotMode ? undefined : { width: `${zoom * 100}%` }}
         />
         {cropMode && (
           <div
@@ -440,6 +886,60 @@ function EditableImage({ filePath }: { filePath: string }) {
               width: cropRect.w,
               height: cropRect.h,
               boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
+            }}
+          />
+        )}
+
+        {annotMode && box && (
+          <svg
+            className={tool === 'text' ? 'absolute cursor-text' : 'absolute cursor-crosshair'}
+            style={{
+              left: box.left,
+              top: box.top,
+              width: box.width,
+              height: box.height,
+              touchAction: 'none',
+            }}
+            viewBox={`0 0 ${dims.w} ${dims.h}`}
+            preserveAspectRatio="none"
+            // Evita che il browser sposti il focus al body al mousedown (e la
+            // selezione testo): altrimenti l'input testo perde subito il focus.
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={onAnnotDown}
+            onPointerMove={onAnnotMove}
+            onPointerUp={onAnnotUp}
+          >
+            {shapes.map((s, i) => shapeSvg(s, i))}
+            {draft && shapeSvg(draft, 'draft')}
+          </svg>
+        )}
+        {annotMode && box && textDraft && (
+          <input
+            ref={textInputRef}
+            autoFocus
+            placeholder="Testo…"
+            value={textDraft.value}
+            onChange={(e) => setTextDraft({ ...textDraft, value: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              } else if (e.key === 'Escape') {
+                cancelText.current = true
+                e.currentTarget.blur()
+              }
+            }}
+            onBlur={commitText}
+            className="absolute outline-none border border-dashed border-white/70 leading-none"
+            style={{
+              left: box.left + textDraft.x * (box.width / dims.w),
+              top: box.top + textDraft.y * (box.height / dims.h),
+              color: textDraft.color,
+              fontSize: textDraft.size * (box.height / dims.h),
+              fontFamily: 'sans-serif',
+              background: 'rgba(0,0,0,0.45)',
+              padding: '1px 2px',
+              minWidth: '3ch',
             }}
           />
         )}
