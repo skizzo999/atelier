@@ -52,8 +52,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__
-          releaseName: 'Atelier v__VERSION__'
+          # Da tag (es. v0.2.0) usa quel tag; da run manuale usa la versione di tauri.conf.
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'app-v__VERSION__' }}
+          releaseName: ${{ github.ref_type == 'tag' && format('Atelier {0}', github.ref_name) || 'Atelier v__VERSION__' }}
           releaseBody: 'Installer automatici. Windows: .exe/.msi — macOS: .dmg (app non firmata: vedi note).'
           releaseDraft: false
           prerelease: false
