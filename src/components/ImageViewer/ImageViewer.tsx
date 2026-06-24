@@ -3,9 +3,19 @@ import { readFile } from '@tauri-apps/plugin-fs'
 import { writeFileBinaryAtomic, uniquePathWithSuffix } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
 import {
-  arrowGeometry,
+  arrowParts,
+  boundsOf,
+  centerOf,
+  controlPoints,
   drawShapesToCtx,
+  moveControl,
+  newId,
+  quadControl,
+  scaleShape,
+  translateShape,
   type AnnotTool,
+  type Bounds,
+  type Point,
   type Shape,
   type ShapeKind,
 } from '../../lib/annotations'
@@ -103,6 +113,85 @@ interface CropRect {
 // Palette per le annotazioni.
 const ANNOT_COLORS = ['#ef4444', '#f59e0b', '#facc15', '#22c55e', '#3b82f6', '#ffffff', '#000000']
 type Thickness = 'S' | 'M' | 'L'
+
+// Le 8 maniglie di ridimensionamento (angoli + lati).
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
+type Handle = (typeof HANDLES)[number]
+
+function handlePos(b: Bounds, h: Handle): { x: number; y: number } {
+  const cx = b.x + b.w / 2
+  const cy = b.y + b.h / 2
+  const r = b.x + b.w
+  const btm = b.y + b.h
+  switch (h) {
+    case 'nw': return { x: b.x, y: b.y }
+    case 'n': return { x: cx, y: b.y }
+    case 'ne': return { x: r, y: b.y }
+    case 'e': return { x: r, y: cy }
+    case 'se': return { x: r, y: btm }
+    case 's': return { x: cx, y: btm }
+    case 'sw': return { x: b.x, y: btm }
+    case 'w': return { x: b.x, y: cy }
+  }
+}
+
+// Maniglia sotto il punto p (sizeImg = mezzo lato della maniglia in px immagine).
+function hitHandle(b: Bounds, p: { x: number; y: number }, sizeImg: number): Handle | null {
+  for (const h of HANDLES) {
+    const pos = handlePos(b, h)
+    if (Math.abs(p.x - pos.x) <= sizeImg && Math.abs(p.y - pos.y) <= sizeImg) return h
+  }
+  return null
+}
+
+// Dato il box originale, la maniglia e il punto corrente, ricava ancora e fattori.
+function computeResize(b: Bounds, h: Handle, p: { x: number; y: number }) {
+  let sx = 1
+  let sy = 1
+  let ax = b.x
+  let ay = b.y
+  const r = b.x + b.w
+  const btm = b.y + b.h
+  const minS = 4
+  if (h.includes('e') && b.w > 0) {
+    ax = b.x
+    sx = (p.x - b.x) / b.w
+  } else if (h.includes('w') && b.w > 0) {
+    ax = r
+    sx = (r - p.x) / b.w
+  }
+  if (h.includes('s') && b.h > 0) {
+    ay = b.y
+    sy = (p.y - b.y) / b.h
+  } else if (h.includes('n') && b.h > 0) {
+    ay = btm
+    sy = (btm - p.y) / b.h
+  }
+  if (b.w > 0 && b.w * sx < minS) sx = minS / b.w
+  if (b.h > 0 && b.h * sy < minS) sy = minS / b.h
+  return { ax, ay, sx, sy }
+}
+
+// Ruota il punto p attorno al centro c di `ang` radianti.
+function rotatePt(p: Point, c: Point, ang: number): Point {
+  const cos = Math.cos(ang)
+  const sin = Math.sin(ang)
+  const dx = p.x - c.x
+  const dy = p.y - c.y
+  return { x: c.x + dx * cos - dy * sin, y: c.y + dx * sin + dy * cos }
+}
+// Porta p nel sistema "locale" della forma (annulla la sua rotazione).
+function toLocal(s: Shape, p: Point): Point {
+  if (!s.rot) return p
+  return rotatePt(p, centerOf(s), -s.rot)
+}
+
+// La forma è "colpita" dal punto p? (test sul bounding box locale con tolleranza).
+function hitShape(s: Shape, p: { x: number; y: number }, tol: number): boolean {
+  const lp = toLocal(s, p)
+  const b = boundsOf(s)
+  return lp.x >= b.x - tol && lp.x <= b.x + b.w + tol && lp.y >= b.y - tol && lp.y <= b.y + b.h + tol
+}
 
 // Copia un canvas (per disegnarci sopra senza toccare l'originale).
 function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
@@ -232,6 +321,15 @@ function EditableImage({ filePath }: { filePath: string }) {
   const spaceHeld = useRef(false)
   const cancelText = useRef(false)
   const textInputRef = useRef<HTMLInputElement>(null)
+  // Selezione/modifica oggetti.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selOp = useRef<
+    | { kind: 'move'; orig: Shape; start: Point }
+    | { kind: 'resize'; orig: Shape; bounds: Bounds; handle: Handle } // box 8 maniglie
+    | { kind: 'warp'; orig: Shape; index: number } // forme (punti di controllo)
+    | { kind: 'rotate'; orig: Shape; center: Point; startAngle: number } // testo
+    | null
+  >(null)
 
   // Viewport zoom/pan condiviso (rotella disabilitata durante il ritaglio).
   const { view, setView, viewRef, panning, panStart, fitView, zoomBy, onViewDown, onViewMove, onViewUp } =
@@ -248,6 +346,7 @@ function EditableImage({ filePath }: { filePath: string }) {
     setShapes([])
     setDraft(null)
     setTextDraft(null)
+    setSelectedId(null)
     const buffered = useAppStore.getState().imageBuffers[filePath]
     ;(async () => {
       let blob: Blob
@@ -457,6 +556,23 @@ function EditableImage({ filePath }: { filePath: string }) {
     if (hasTextDraft) textInputRef.current?.focus()
   }, [hasTextDraft])
 
+  // Canc/Backspace elimina la forma selezionata (se non si sta scrivendo).
+  useEffect(() => {
+    if (!annotMode || !selectedId) return
+    function onKey(e: KeyboardEvent) {
+      if (
+        (e.key === 'Delete' || e.key === 'Backspace') &&
+        !(e.target as HTMLElement)?.matches?.('input,textarea')
+      ) {
+        e.preventDefault()
+        deleteSelected()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotMode, selectedId])
+
   // Spessore tratto e dimensione testo proporzionali all'immagine.
   function strokeFor(t: Thickness): number {
     const d = Math.hypot(dims.w, dims.h) || 1000
@@ -482,6 +598,7 @@ function EditableImage({ filePath }: { filePath: string }) {
     setDraft(null)
     setTextDraft(null)
     setShapes([])
+    setSelectedId(null)
     setAnnotMode(true) // il fit del viewport avviene nel layout effect
   }
   function cancelAnnot() {
@@ -489,9 +606,22 @@ function EditableImage({ filePath }: { filePath: string }) {
     setShapes([])
     setDraft(null)
     setTextDraft(null)
+    setSelectedId(null)
   }
   function undoShape() {
     setShapes((s) => s.slice(0, -1))
+  }
+  // Aggiorna i campi della forma selezionata (colore/opacità/spessore/dimensione).
+  function patchSelected(patch: Partial<Shape>) {
+    if (!selectedId) return
+    setShapes((prev) =>
+      prev.map((s) => (s.id === selectedId ? ({ ...s, ...patch } as Shape) : s)),
+    )
+  }
+  function deleteSelected() {
+    if (!selectedId) return
+    setShapes((prev) => prev.filter((s) => s.id !== selectedId))
+    setSelectedId(null)
   }
 
   function onAnnotDown(e: React.PointerEvent) {
@@ -503,8 +633,55 @@ function EditableImage({ filePath }: { filePath: string }) {
       panStart.current = { cx: e.clientX, cy: e.clientY, tx: v.tx, ty: v.ty }
       return
     }
-    if (textDraft) return // c'è un input testo aperto: lascia gestire al blur
     const p = toNative(e)
+    // Selezione/modifica: maniglia/punto della forma selezionata, oppure
+    // selezione di una forma (la più in alto), oppure deseleziona.
+    if (tool === 'select') {
+      ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+      const sel = shapes.find((s) => s.id === selectedId)
+      const r = 8 / viewRef.current.scale
+      if (sel) {
+        const box = sel.type === 'text' || sel.type === 'pen' || sel.type === 'rect' || sel.type === 'ellipse'
+        if (box) {
+          const b = boundsOf(sel)
+          const lp = toLocal(sel, p) // punto nel sistema locale (annulla rotazione)
+          // Maniglia di rotazione (solo testo): sopra il centro-alto del box.
+          if (sel.type === 'text') {
+            const rc = { x: b.x + b.w / 2, y: b.y - 26 / viewRef.current.scale }
+            if (Math.abs(lp.x - rc.x) <= r && Math.abs(lp.y - rc.y) <= r) {
+              const c = centerOf(sel)
+              selOp.current = { kind: 'rotate', orig: sel, center: c, startAngle: Math.atan2(p.y - c.y, p.x - c.x) }
+              return
+            }
+          }
+          // Box con 8 maniglie (ridimensiona tutto il tratto/figura).
+          const h = hitHandle(b, lp, r)
+          if (h) {
+            selOp.current = { kind: 'resize', orig: sel, bounds: b, handle: h }
+            return
+          }
+        } else {
+          // Freccia/linea/triangolo: warp sui punti di controllo del tratto.
+          const cps = controlPoints(sel)
+          const idx = cps.findIndex((cp) => Math.abs(cp.x - p.x) <= r && Math.abs(cp.y - p.y) <= r)
+          if (idx >= 0) {
+            selOp.current = { kind: 'warp', orig: sel, index: idx }
+            return
+          }
+        }
+      }
+      const tol = 6 / viewRef.current.scale
+      const hit = [...shapes].reverse().find((s) => hitShape(s, p, tol))
+      if (hit) {
+        setSelectedId(hit.id)
+        selOp.current = { kind: 'move', orig: hit, start: p }
+      } else {
+        setSelectedId(null)
+        selOp.current = null
+      }
+      return
+    }
+    if (textDraft) return // c'è un input testo aperto: lascia gestire al blur
     if (tool === 'text') {
       setTextDraft({ x: p.x, y: p.y, size: fontFor(thickness), color, value: '' })
       return
@@ -512,19 +689,22 @@ function EditableImage({ filePath }: { filePath: string }) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     dragging.current = true
     dragStart.current = p
+    const base = { id: newId(), opacity: 1, rot: 0 }
+    const pt = (): Point => ({ ...p })
     let d: Shape
     if (tool === 'pen1' || tool === 'pen2') {
       const pen = penPresets[tool === 'pen1' ? 0 : 1]
-      d = { type: 'pen', color: pen.color, width: pen.width, opacity: pen.opacity, points: [p] }
+      d = { ...base, type: 'pen', color: pen.color, width: pen.width, opacity: pen.opacity, points: [p] }
     } else if (tool === 'arrow') {
-      d = { type: 'arrow', color, width: strokeFor(thickness), x1: p.x, y1: p.y, x2: p.x, y2: p.y }
+      d = { ...base, type: 'arrow', color, width: strokeFor(thickness), p1: pt(), mid: pt(), p2: pt() }
     } else {
       // tool === 'shape'
       const w = strokeFor(thickness)
-      if (shapeKind === 'line') d = { type: 'line', color, width: w, x1: p.x, y1: p.y, x2: p.x, y2: p.y }
-      else if (shapeKind === 'ellipse') d = { type: 'ellipse', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
-      else if (shapeKind === 'triangle') d = { type: 'triangle', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
-      else d = { type: 'rect', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
+      if (shapeKind === 'line') d = { ...base, type: 'line', color, width: w, p1: pt(), mid: pt(), p2: pt() }
+      else if (shapeKind === 'ellipse') d = { ...base, type: 'ellipse', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
+      else if (shapeKind === 'triangle')
+        d = { ...base, type: 'triangle', color, width: w, p1: pt(), p2: pt(), p3: pt() }
+      else d = { ...base, type: 'rect', color, width: w, x: p.x, y: p.y, w: 0, h: 0 }
     }
     draftRef.current = d
     setDraft(d)
@@ -535,17 +715,41 @@ function EditableImage({ filePath }: { filePath: string }) {
       setView((v) => ({ ...v, tx: s.tx + (e.clientX - s.cx), ty: s.ty + (e.clientY - s.cy) }))
       return
     }
+    // Selezione: sposta/ridimensiona/deforma (sempre dall'originale = niente drift).
+    const op = selOp.current
+    if (op) {
+      const p = toNative(e)
+      let updated: Shape
+      if (op.kind === 'move') updated = translateShape(op.orig, p.x - op.start.x, p.y - op.start.y)
+      else if (op.kind === 'resize') {
+        const lp = op.orig.rot ? rotatePt(p, centerOf(op.orig), -op.orig.rot) : p
+        const { ax, ay, sx, sy } = computeResize(op.bounds, op.handle, lp)
+        updated = scaleShape(op.orig, ax, ay, sx, sy)
+      } else if (op.kind === 'rotate') {
+        const ang = Math.atan2(p.y - op.center.y, p.x - op.center.x)
+        updated = { ...op.orig, rot: op.orig.rot + (ang - op.startAngle) }
+      } else updated = moveControl(op.orig, op.index, p)
+      setShapes((prev) => prev.map((s) => (s.id === op.orig.id ? updated : s)))
+      return
+    }
     if (!dragging.current) return
     const d = draftRef.current
     if (!d) return
     const p = toNative(e)
+    const s = dragStart.current!
+    const x = Math.min(s.x, p.x)
+    const y = Math.min(s.y, p.y)
+    const w = Math.abs(p.x - s.x)
+    const h = Math.abs(p.y - s.y)
     let nd: Shape
     if (d.type === 'pen') nd = { ...d, points: [...d.points, p] }
-    else if (d.type === 'arrow' || d.type === 'line') nd = { ...d, x2: p.x, y2: p.y }
-    else if (d.type === 'rect' || d.type === 'ellipse' || d.type === 'triangle') {
-      const s = dragStart.current!
-      nd = { ...d, x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) }
-    } else return
+    else if (d.type === 'arrow' || d.type === 'line')
+      // estremi = drag; centro a metà (retto finché non lo curvi col warp)
+      nd = { ...d, p2: { ...p }, mid: { x: (s.x + p.x) / 2, y: (s.y + p.y) / 2 } }
+    else if (d.type === 'triangle')
+      nd = { ...d, p1: { x: x + w / 2, y }, p2: { x, y: y + h }, p3: { x: x + w, y: y + h } }
+    else if (d.type === 'rect' || d.type === 'ellipse') nd = { ...d, x, y, w, h }
+    else return
     draftRef.current = nd
     setDraft(nd)
   }
@@ -555,15 +759,23 @@ function EditableImage({ filePath }: { filePath: string }) {
       panStart.current = null
       return
     }
+    if (selOp.current) {
+      selOp.current = null
+      return
+    }
     if (!dragging.current) return
     dragging.current = false
     const d = draftRef.current
     draftRef.current = null
     setDraft(null)
     if (!d) return
-    // Scarta forme degeneri (linee/forme troppo piccole).
-    if ((d.type === 'arrow' || d.type === 'line') && Math.hypot(d.x2 - d.x1, d.y2 - d.y1) < 3) return
-    if ((d.type === 'rect' || d.type === 'ellipse' || d.type === 'triangle') && (d.w < 3 || d.h < 3)) return
+    // Scarta forme degeneri (troppo piccole).
+    if ((d.type === 'arrow' || d.type === 'line') && Math.hypot(d.p2.x - d.p1.x, d.p2.y - d.p1.y) < 3) return
+    if ((d.type === 'rect' || d.type === 'ellipse') && (d.w < 3 || d.h < 3)) return
+    if (d.type === 'triangle') {
+      const b = boundsOf(d)
+      if (b.w < 3 || b.h < 3) return
+    }
     if (d.type === 'pen' && d.points.length === 0) return
     setShapes((prev) => [...prev, d])
   }
@@ -578,7 +790,7 @@ function EditableImage({ filePath }: { filePath: string }) {
     if (td && td.value.trim()) {
       setShapes((prev) => [
         ...prev,
-        { type: 'text', color: td.color, size: td.size, x: td.x, y: td.y, text: td.value },
+        { id: newId(), opacity: 1, rot: 0, type: 'text', color: td.color, size: td.size, x: td.x, y: td.y, text: td.value },
       ])
     }
     setTextDraft(null)
@@ -598,98 +810,56 @@ function EditableImage({ filePath }: { filePath: string }) {
     cancelAnnot()
   }
 
-  // Forma -> elemento SVG (preview live; stessa geometria del flatten su canvas).
-  function shapeSvg(s: Shape, key: number | string) {
+  // Disegno SVG di una forma (senza opacità: la mette il gruppo wrapper).
+  function shapeInner(s: Shape) {
     if (s.type === 'pen') {
       if (s.points.length === 1)
-        return (
-          <circle
-            key={key}
-            cx={s.points[0].x}
-            cy={s.points[0].y}
-            r={s.width / 2}
-            fill={s.color}
-            fillOpacity={s.opacity}
-          />
-        )
+        return <circle cx={s.points[0].x} cy={s.points[0].y} r={s.width / 2} fill={s.color} />
       const d = s.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ')
       return (
-        <path
-          key={key}
-          d={d}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={s.width}
-          strokeOpacity={s.opacity}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d={d} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />
       )
     }
     if (s.type === 'arrow') {
-      const g = arrowGeometry(s.x1, s.y1, s.x2, s.y2, s.width)
+      const a = arrowParts(s.p1, s.mid, s.p2, s.width)
       return (
-        <g key={key}>
-          <line
-            x1={s.x1}
-            y1={s.y1}
-            x2={g.base.x}
-            y2={g.base.y}
+        <>
+          <path
+            d={`M ${a.p1.x} ${a.p1.y} Q ${a.q0.x} ${a.q0.y} ${a.end.x} ${a.end.y}`}
+            fill="none"
             stroke={s.color}
             strokeWidth={s.width}
             strokeLinecap="round"
           />
           <polygon
-            points={`${g.tip.x},${g.tip.y} ${g.left.x},${g.left.y} ${g.right.x},${g.right.y}`}
+            points={a.head.map((pp) => `${pp.x},${pp.y}`).join(' ')}
             fill={s.color}
           />
-        </g>
+        </>
       )
     }
-    if (s.type === 'line')
+    if (s.type === 'line') {
+      const c = quadControl(s.p1, s.mid, s.p2)
       return (
-        <line
-          key={key}
-          x1={s.x1}
-          y1={s.y1}
-          x2={s.x2}
-          y2={s.y2}
+        <path
+          d={`M ${s.p1.x} ${s.p1.y} Q ${c.x} ${c.y} ${s.p2.x} ${s.p2.y}`}
+          fill="none"
           stroke={s.color}
           strokeWidth={s.width}
           strokeLinecap="round"
         />
       )
+    }
     if (s.type === 'rect')
-      return (
-        <rect
-          key={key}
-          x={s.x}
-          y={s.y}
-          width={s.w}
-          height={s.h}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={s.width}
-        />
-      )
+      return <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="none" stroke={s.color} strokeWidth={s.width} />
     if (s.type === 'ellipse')
       return (
-        <ellipse
-          key={key}
-          cx={s.x + s.w / 2}
-          cy={s.y + s.h / 2}
-          rx={s.w / 2}
-          ry={s.h / 2}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={s.width}
-        />
+        <ellipse cx={s.x + s.w / 2} cy={s.y + s.h / 2} rx={s.w / 2} ry={s.h / 2} fill="none" stroke={s.color} strokeWidth={s.width} />
       )
     if (s.type === 'triangle')
       return (
         <polygon
-          key={key}
-          points={`${s.x + s.w / 2},${s.y} ${s.x},${s.y + s.h} ${s.x + s.w},${s.y + s.h}`}
+          points={`${s.p1.x},${s.p1.y} ${s.p2.x},${s.p2.y} ${s.p3.x},${s.p3.y}`}
           fill="none"
           stroke={s.color}
           strokeWidth={s.width}
@@ -698,7 +868,6 @@ function EditableImage({ filePath }: { filePath: string }) {
       )
     return (
       <text
-        key={key}
         x={s.x}
         y={s.y}
         fontSize={s.size}
@@ -709,6 +878,78 @@ function EditableImage({ filePath }: { filePath: string }) {
       >
         {s.text}
       </text>
+    )
+  }
+  function shapeSvg(s: Shape, key: number | string) {
+    const c = s.rot ? centerOf(s) : null
+    return (
+      <g
+        key={key}
+        opacity={s.opacity}
+        transform={c ? `rotate(${(s.rot * 180) / Math.PI} ${c.x} ${c.y})` : undefined}
+      >
+        {shapeInner(s)}
+      </g>
+    )
+  }
+
+  // Gizmo di selezione: box + 8 maniglie, dimensioni costanti su schermo
+  // (divise per view.scale perché stiamo dentro l'SVG scalato dal viewport).
+  // Testo: box + 8 maniglie quadrate. Penna: box leggero (solo sposta).
+  // Altre forme: pallini tondi sui punti di controllo (warp del tratto), niente box.
+  function selectionGizmo() {
+    const sel = shapes.find((x) => x.id === selectedId)
+    if (!sel) return null
+    const s = view.scale
+    const stroke = 1.5 / s
+    const blue = '#3b82f6'
+    const b = boundsOf(sel)
+    const dash = (
+      <rect
+        x={b.x}
+        y={b.y}
+        width={b.w}
+        height={b.h}
+        fill="none"
+        stroke={blue}
+        strokeWidth={stroke}
+        strokeDasharray={`${4 / s} ${3 / s}`}
+      />
+    )
+    if (sel.type === 'text' || sel.type === 'pen' || sel.type === 'rect' || sel.type === 'ellipse') {
+      const hs = 5 / s
+      // Ruota il gizmo come la forma (solo il testo ha rot != 0).
+      const c = sel.rot ? centerOf(sel) : null
+      const rotY = b.y - 26 / s // posizione maniglia di rotazione (centro-alto)
+      return (
+        <g
+          pointerEvents="none"
+          transform={c ? `rotate(${(sel.rot * 180) / Math.PI} ${c.x} ${c.y})` : undefined}
+        >
+          {dash}
+          {HANDLES.map((h) => {
+            const pos = handlePos(b, h)
+            return (
+              <rect key={h} x={pos.x - hs} y={pos.y - hs} width={hs * 2} height={hs * 2} fill="#fff" stroke={blue} strokeWidth={stroke} />
+            )
+          })}
+          {sel.type === 'text' && (
+            <>
+              <line x1={b.x + b.w / 2} y1={b.y} x2={b.x + b.w / 2} y2={rotY} stroke={blue} strokeWidth={stroke} />
+              <circle cx={b.x + b.w / 2} cy={rotY} r={hs + 1 / s} fill="#fff" stroke={blue} strokeWidth={stroke} />
+            </>
+          )}
+        </g>
+      )
+    }
+    // Freccia/linea/triangolo: pallini sui punti di controllo.
+    const r = 5 / s
+    return (
+      <g pointerEvents="none">
+        {controlPoints(sel).map((cp, i) => (
+          <circle key={i} cx={cp.x} cy={cp.y} r={r} fill="#fff" stroke={blue} strokeWidth={stroke} />
+        ))}
+      </g>
     )
   }
 
@@ -726,6 +967,8 @@ function EditableImage({ filePath }: { filePath: string }) {
   const canEdit = !loading && !error
   // Indice della penna attiva (0/1) o null se lo strumento non è una penna.
   const penIdx = tool === 'pen1' ? 0 : tool === 'pen2' ? 1 : null
+  // Forma attualmente selezionata (per il pannello proprietà).
+  const selShape = annotMode ? shapes.find((s) => s.id === selectedId) : undefined
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -766,6 +1009,7 @@ function EditableImage({ filePath }: { filePath: string }) {
         <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1.5 text-xs flex-wrap">
           {(
             [
+              ['select', '⬚ Selez.'],
               ['pen1', '✏︎ Penna 1'],
               ['pen2', '✏︎ Penna 2'],
               ['arrow', '↗ Freccia'],
@@ -786,87 +1030,156 @@ function EditableImage({ filePath }: { filePath: string }) {
 
           <div className="w-px h-5 bg-zinc-700 mx-1" />
 
-          {/* Sotto-scelta della forma */}
-          {tool === 'shape' &&
-            (
-              [
-                ['rect', '▭'],
-                ['ellipse', '◯'],
-                ['triangle', '△'],
-                ['line', '╱'],
-              ] as [ShapeKind, string][]
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                title={k}
-                onClick={() => setShapeKind(k)}
-                className={shapeKind === k ? activeChip : toolBtn}
-              >
-                {label}
-              </button>
-            ))}
-          {tool === 'shape' && <div className="w-px h-5 bg-zinc-700 mx-1" />}
-
-          {/* Colori: per le penne è il colore della penna, altrimenti quello condiviso */}
-          {ANNOT_COLORS.map((c) => {
-            const current = penIdx !== null ? penPresets[penIdx].color : color
-            return (
-              <button
-                key={c}
-                title={c}
-                onClick={() => (penIdx !== null ? setPenPreset(penIdx, { color: c }) : setColor(c))}
-                className={`w-5 h-5 rounded-full border ${
-                  current === c
-                    ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
-                    : 'border-zinc-600'
-                }`}
-                style={{ backgroundColor: c }}
-              />
+          {tool === 'select' ? (
+            /* --- Pannello proprietà della forma selezionata --- */
+            selShape ? (
+              <>
+                {ANNOT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    title={c}
+                    onClick={() => patchSelected({ color: c })}
+                    className={`w-5 h-5 rounded-full border ${
+                      selShape.color === c
+                        ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
+                        : 'border-zinc-600'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+                <div className="w-px h-5 bg-zinc-700 mx-1" />
+                <label className="flex items-center gap-1 text-zinc-400">
+                  Opacità
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    value={Math.round(selShape.opacity * 100)}
+                    onChange={(e) => patchSelected({ opacity: +e.target.value / 100 })}
+                    className="w-20"
+                  />
+                  <span className="w-9 text-right text-zinc-500">{Math.round(selShape.opacity * 100)}%</span>
+                </label>
+                {selShape.type === 'text' ? (
+                  <label className="flex items-center gap-1 text-zinc-400">
+                    Dimensione
+                    <input
+                      type="range"
+                      min={8}
+                      max={200}
+                      value={Math.round(selShape.size)}
+                      onChange={(e) => patchSelected({ size: +e.target.value })}
+                      className="w-20"
+                    />
+                    <span className="w-8 text-right text-zinc-500">{Math.round(selShape.size)}</span>
+                  </label>
+                ) : (
+                  <label className="flex items-center gap-1 text-zinc-400">
+                    Spessore
+                    <input
+                      type="range"
+                      min={1}
+                      max={60}
+                      value={selShape.width}
+                      onChange={(e) => patchSelected({ width: +e.target.value })}
+                      className="w-20"
+                    />
+                    <span className="w-6 text-right text-zinc-500">{selShape.width}</span>
+                  </label>
+                )}
+                <div className="w-px h-5 bg-zinc-700 mx-1" />
+                <button className={toolBtn} onClick={deleteSelected} title="Elimina (Canc)">
+                  🗑 Elimina
+                </button>
+              </>
+            ) : (
+              <span className="text-zinc-500">Clicca un'annotazione per selezionarla.</span>
             )
-          })}
-
-          <div className="w-px h-5 bg-zinc-700 mx-1" />
-
-          {/* Penna: slider opacità + spessore (persistiti). Altri tool: spessore S/M/L */}
-          {penIdx !== null ? (
-            <>
-              <label className="flex items-center gap-1 text-zinc-400">
-                Opacità
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  value={Math.round(penPresets[penIdx].opacity * 100)}
-                  onChange={(e) => setPenPreset(penIdx, { opacity: +e.target.value / 100 })}
-                  className="w-20"
-                />
-                <span className="w-9 text-right text-zinc-500">
-                  {Math.round(penPresets[penIdx].opacity * 100)}%
-                </span>
-              </label>
-              <label className="flex items-center gap-1 text-zinc-400">
-                Spessore
-                <input
-                  type="range"
-                  min={1}
-                  max={60}
-                  value={penPresets[penIdx].width}
-                  onChange={(e) => setPenPreset(penIdx, { width: +e.target.value })}
-                  className="w-20"
-                />
-                <span className="w-6 text-right text-zinc-500">{penPresets[penIdx].width}</span>
-              </label>
-            </>
           ) : (
-            (['S', 'M', 'L'] as Thickness[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setThickness(t)}
-                className={thickness === t ? activeChip : toolBtn}
-              >
-                {t}
-              </button>
-            ))
+            <>
+              {/* Sotto-scelta della forma */}
+              {tool === 'shape' &&
+                (
+                  [
+                    ['rect', '▭'],
+                    ['ellipse', '◯'],
+                    ['triangle', '△'],
+                    ['line', '╱'],
+                  ] as [ShapeKind, string][]
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    title={k}
+                    onClick={() => setShapeKind(k)}
+                    className={shapeKind === k ? activeChip : toolBtn}
+                  >
+                    {label}
+                  </button>
+                ))}
+              {tool === 'shape' && <div className="w-px h-5 bg-zinc-700 mx-1" />}
+
+              {/* Colori: per le penne è il colore della penna, altrimenti quello condiviso */}
+              {ANNOT_COLORS.map((c) => {
+                const current = penIdx !== null ? penPresets[penIdx].color : color
+                return (
+                  <button
+                    key={c}
+                    title={c}
+                    onClick={() => (penIdx !== null ? setPenPreset(penIdx, { color: c }) : setColor(c))}
+                    className={`w-5 h-5 rounded-full border ${
+                      current === c
+                        ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
+                        : 'border-zinc-600'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                )
+              })}
+
+              <div className="w-px h-5 bg-zinc-700 mx-1" />
+
+              {/* Penna: slider opacità + spessore (persistiti). Altri tool: spessore S/M/L */}
+              {penIdx !== null ? (
+                <>
+                  <label className="flex items-center gap-1 text-zinc-400">
+                    Opacità
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      value={Math.round(penPresets[penIdx].opacity * 100)}
+                      onChange={(e) => setPenPreset(penIdx, { opacity: +e.target.value / 100 })}
+                      className="w-20"
+                    />
+                    <span className="w-9 text-right text-zinc-500">
+                      {Math.round(penPresets[penIdx].opacity * 100)}%
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-1 text-zinc-400">
+                    Spessore
+                    <input
+                      type="range"
+                      min={1}
+                      max={60}
+                      value={penPresets[penIdx].width}
+                      onChange={(e) => setPenPreset(penIdx, { width: +e.target.value })}
+                      className="w-20"
+                    />
+                    <span className="w-6 text-right text-zinc-500">{penPresets[penIdx].width}</span>
+                  </label>
+                </>
+              ) : (
+                (['S', 'M', 'L'] as Thickness[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setThickness(t)}
+                    className={thickness === t ? activeChip : toolBtn}
+                  >
+                    {t}
+                  </button>
+                ))
+              )}
+            </>
           )}
 
           <div className="flex-1" />
@@ -994,7 +1307,13 @@ function EditableImage({ filePath }: { filePath: string }) {
           {annotMode && (
             <svg
               className={
-                tool === 'pan' ? 'absolute cursor-grab' : tool === 'text' ? 'absolute cursor-text' : 'absolute cursor-crosshair'
+                tool === 'pan'
+                  ? 'absolute cursor-grab'
+                  : tool === 'text'
+                    ? 'absolute cursor-text'
+                    : tool === 'select'
+                      ? 'absolute cursor-default'
+                      : 'absolute cursor-crosshair'
               }
               style={{ left: 0, top: 0, touchAction: 'none' }}
               width={dims.w}
@@ -1010,6 +1329,7 @@ function EditableImage({ filePath }: { filePath: string }) {
             >
               {shapes.map((s, i) => shapeSvg(s, i))}
               {draft && shapeSvg(draft, 'draft')}
+              {tool === 'select' && selectionGizmo()}
             </svg>
           )}
         </div>
