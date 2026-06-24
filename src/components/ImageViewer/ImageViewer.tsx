@@ -308,6 +308,10 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [resizeOpen, setResizeOpen] = useState(false)
   const [cropMode, setCropMode] = useState(false)
   const [cropRect, setCropRect] = useState<CropRect | null>(null)
+  // Regolazioni (luminosità/contrasto/saturazione), 100 = neutro.
+  const [adjustMode, setAdjustMode] = useState(false)
+  const [adj, setAdj] = useState({ brightness: 100, contrast: 100, saturation: 100 })
+  const adjBase = useRef<HTMLCanvasElement | null>(null)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)
 
@@ -349,6 +353,7 @@ function EditableImage({ filePath }: { filePath: string }) {
     setError(false)
     setCropMode(false)
     setCropRect(null)
+    setAdjustMode(false)
     setAnnotMode(false)
     setShapes([])
     setDraft(null)
@@ -433,6 +438,51 @@ function EditableImage({ filePath }: { filePath: string }) {
       MIME[ext] ?? 'image/png',
       0.92,
     )
+  }
+
+  // --- Regolazioni (luminosità/contrasto/saturazione) con preview live ---
+  function renderAdjust(a: { brightness: number; contrast: number; saturation: number }) {
+    const cv = canvasRef.current
+    const base = adjBase.current
+    if (!cv || !base) return
+    const ctx = cv.getContext('2d')!
+    ctx.clearRect(0, 0, cv.width, cv.height)
+    ctx.filter = `brightness(${a.brightness}%) contrast(${a.contrast}%) saturate(${a.saturation}%)`
+    ctx.drawImage(base, 0, 0)
+    ctx.filter = 'none'
+  }
+  function startAdjust() {
+    const cv = canvasRef.current
+    if (!cv) return
+    adjBase.current = cloneCanvas(cv) // pixel originali (per il preview e l'annulla)
+    setAdj({ brightness: 100, contrast: 100, saturation: 100 })
+    setAdjustMode(true)
+  }
+  function changeAdjust(patch: Partial<typeof adj>) {
+    const next = { ...adj, ...patch }
+    setAdj(next)
+    renderAdjust(next)
+  }
+  function cancelAdjust() {
+    const cv = canvasRef.current
+    const base = adjBase.current
+    if (cv && base) {
+      const ctx = cv.getContext('2d')!
+      ctx.clearRect(0, 0, cv.width, cv.height)
+      ctx.drawImage(base, 0, 0)
+    }
+    adjBase.current = null
+    setAdjustMode(false)
+  }
+  function applyAdjust() {
+    const cv = canvasRef.current
+    adjBase.current = null
+    setAdjustMode(false)
+    if (!cv) return
+    setDirty(true) // il canvas mostra già il risultato filtrato
+    cv.toBlob((b) => {
+      if (b) setImageBuffer(filePath, b)
+    }, 'image/png')
   }
 
   // Ctrl/Cmd+S salva l'immagine.
@@ -1234,6 +1284,48 @@ function EditableImage({ filePath }: { filePath: string }) {
             Applica
           </button>
         </div>
+      ) : adjustMode ? (
+        <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-3 text-xs flex-wrap">
+          {(
+            [
+              ['Luminosità', 'brightness'],
+              ['Contrasto', 'contrast'],
+              ['Saturazione', 'saturation'],
+            ] as [string, 'brightness' | 'contrast' | 'saturation'][]
+          ).map(([label, key]) => (
+            <label key={key} className="flex items-center gap-1 text-zinc-400">
+              {label}
+              <input
+                type="range"
+                min={0}
+                max={200}
+                value={adj[key]}
+                onChange={(e) => changeAdjust({ [key]: +e.target.value })}
+                className="w-24"
+              />
+              <span className="w-8 text-right text-zinc-500">{adj[key]}</span>
+            </label>
+          ))}
+          <button
+            className={toolBtn}
+            onClick={() => changeAdjust({ brightness: 100, contrast: 100, saturation: 100 })}
+          >
+            Reset
+          </button>
+
+          <div className="flex-1" />
+
+          <button className={toolBtn} onClick={cancelAdjust}>
+            Annulla
+          </button>
+          <button
+            onClick={applyAdjust}
+            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white"
+            title="Applica le regolazioni"
+          >
+            Applica
+          </button>
+        </div>
       ) : (
         <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1 text-xs flex-wrap">
           <button className={toolBtn} title="Ruota a sinistra" disabled={!canEdit} onClick={() => applyTransform((c) => rotate90(c, -1))}>
@@ -1253,6 +1345,9 @@ function EditableImage({ filePath }: { filePath: string }) {
           </button>
           <button className={toolBtn} disabled={!canEdit} onClick={() => setResizeOpen(true)}>
             Ridimensiona
+          </button>
+          <button className={toolBtn} disabled={!canEdit} onClick={startAdjust}>
+            Regola
           </button>
           <button className={toolBtn} disabled={!canEdit} onClick={startAnnot}>
             Annota
