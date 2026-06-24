@@ -15,6 +15,8 @@
   immagine**, **Apri in Explorer** (entrambi i viewer)
 - **Regolazioni funzionali** (luminosità/contrasto/saturazione, preview live) e **OCR**
   (Tesseract.js, ita+eng; 1° uso scarica il modello lingua)
+- **Gomma a pixel** nell'annotatore (cancella i pixel delle annotazioni, non la foto)
+- **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
     citazioni annidate, righe, tabelle (monospazio), link, wikilink navigabile,
@@ -28,10 +30,13 @@
 
 ## Cosa fare (in ordine)
 
-### 1. Annotatore — gomma a pixel (PROSSIMO)
-- Gomma raster sul tratto a mano libera (scelta dell'utente: pixel, non per-oggetto).
-- Va gestita sul livello annotazioni prima del flatten (es. composito su un canvas
-  annotazioni separato, con `globalCompositeOperation = 'destination-out'`).
+> **Editor immagini COMPLETO** (incl. gomma a pixel). Prossimo grande blocco: i
+> viewer per gli altri formati, che è il cuore del "workspace multi-formato".
+
+### 1. Viewer altri formati (PROSSIMO)
+- **PDF** → PDF.js (view-only: scroll/zoom, magari ricerca testo)
+- **DOCX** → Mammoth.js (view, poi edit)
+- pptx / xlsx → SheetJS / viewer dedicati
 
 ### 2. Stampa (trasversale)
 - Funzione di stampa generica per tutti i tipi di file (non solo immagini), da
@@ -50,16 +55,11 @@
   decorazioni a blocco (crasha). Va fatto con uno **StateField** che fornisce le
   decorazioni a blocco, oppure con `EditorView.decorations.from(field)`.
 
-### 6. Viewer altri formati
-- PDF → PDF.js (view-only, scroll/zoom)
-- DOCX → Mammoth.js (view, poi edit)
-- pptx / xlsx → SheetJS / viewer dedicati
-
-### 7. Rifiniture Ibrida
+### 6. Rifiniture Ibrida
 - Liste numerate stilizzate + annidamento, footnote `[^1]`, math `$...$` (KaTeX)
 - Icona ↗ sui link esterni; rebuild dell'indice note/immagini sul watcher
 
-### 8. Parte grafica
+### 7. Parte grafica
 - Token colore (accent per pallini/selezione/link), tema unificato Codice/Ibrida/Lettura
 - Code-split di CodeMirror e highlight.js (bundle > 500kB)
 

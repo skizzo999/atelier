@@ -33,6 +33,8 @@ formati (PDF/DOCX).
 - [x] **Pannello Informazioni** (stile Foto di Windows): nome con rinomina inline,
   dimensioni, peso, DPI, tipo, percorso + copia; **Copia immagine** (PNG negli appunti);
   **Apri in Explorer** (plugin-opener). Su immagini editabili e sola-lettura
+- [x] **Gomma a pixel** (annotatore): tratto a mano libera che cancella i pixel delle
+  annotazioni (maschera SVG in preview, destination-out nel flatten); non tocca la foto
 - [x] **Regolazioni funzionali** (modalità Regola): luminosità/contrasto/saturazione con
   preview live, Applica/Annulla/Reset (niente filtri estetici)
 - [x] **OCR** (estrai testo): Tesseract.js lazy-load (ita+eng), risultato in modale con
@@ -53,14 +55,16 @@ formati (PDF/DOCX).
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Annotatore — gomma a pixel** (raster, sul tratto della penna).
+1. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
 4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
 5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-6. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
-7. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-8. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
+7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+
+> L'**editor immagini è completo**: trasformazioni, ritaglio, annotazioni con
+> selezione/modifica/rotazione, **gomma a pixel**, regolazioni, info/copia/OCR/Explorer.
 
 ## Note tecniche
 - Progetto: C:\Users\matte\Desktop\Atelier\atelier
