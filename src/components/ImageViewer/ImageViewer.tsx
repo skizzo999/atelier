@@ -312,6 +312,10 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [adjustMode, setAdjustMode] = useState(false)
   const [adj, setAdj] = useState({ brightness: 100, contrast: 100, saturation: 100 })
   const adjBase = useRef<HTMLCanvasElement | null>(null)
+  // OCR (estrai testo).
+  const [ocrRunning, setOcrRunning] = useState(false)
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [ocrText, setOcrText] = useState<string | null>(null)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)
 
@@ -1033,6 +1037,29 @@ function EditableImage({ filePath }: { filePath: string }) {
     }
   }
 
+  // OCR: estrae il testo dall'immagine corrente (Tesseract, lazy-load).
+  async function runOcr() {
+    const cv = canvasRef.current
+    if (!cv || ocrRunning) return
+    setOcrRunning(true)
+    setOcrText(null)
+    setOcrProgress(0)
+    try {
+      const Tesseract = (await import('tesseract.js')).default
+      const { data } = await Tesseract.recognize(cv, 'ita+eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') setOcrProgress(m.progress)
+        },
+      })
+      setOcrText(data.text.trim() || '(nessun testo riconosciuto)')
+    } catch (e) {
+      console.error('OCR fallito:', e)
+      setOcrText('Errore OCR: ' + (e instanceof Error ? e.message : 'sconosciuto'))
+    } finally {
+      setOcrRunning(false)
+    }
+  }
+
   const fileName = filePath.split('\\').pop()
   const canEdit = !loading && !error
   // Indice della penna attiva (0/1) o null se lo strumento non è una penna.
@@ -1365,6 +1392,9 @@ function EditableImage({ filePath }: { filePath: string }) {
           >
             ⓘ Info
           </button>
+          <button className={toolBtn} disabled={!canEdit || ocrRunning} onClick={runOcr} title="Estrai testo (OCR)">
+            {ocrRunning ? 'OCR…' : 'OCR'}
+          </button>
 
           <div className="flex-1" />
 
@@ -1527,6 +1557,53 @@ function EditableImage({ filePath }: { filePath: string }) {
               setResizeOpen(false)
             }}
           />
+        )}
+
+        {(ocrRunning || ocrText !== null) && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => {
+              if (!ocrRunning) setOcrText(null)
+            }}
+          >
+            <div
+              className="w-[34rem] max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold text-zinc-200">Testo riconosciuto (OCR)</h3>
+              {ocrRunning ? (
+                <div className="text-sm text-zinc-400 py-6 text-center">
+                  Riconoscimento in corso… {Math.round(ocrProgress * 100)}%
+                  <div className="mt-2 h-1 bg-zinc-800 rounded overflow-hidden">
+                    <div className="h-full bg-zinc-400" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-600">(al primo uso scarica il modello lingua)</div>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    readOnly
+                    value={ocrText ?? ''}
+                    className="h-60 w-full px-2 py-1.5 bg-zinc-950 border border-zinc-700 rounded text-zinc-100 text-xs font-mono resize-none focus:outline-none"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(ocrText ?? '').catch((e) => console.error(e))}
+                      className={toolBtn}
+                    >
+                      Copia testo
+                    </button>
+                    <button
+                      onClick={() => setOcrText(null)}
+                      className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white"
+                    >
+                      Chiudi
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         )}
       </div>
 

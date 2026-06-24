@@ -33,6 +33,7 @@
     "react": "^19.1.0",
     "react-arborist": "^3.10.1",
     "react-dom": "^19.1.0",
+    "tesseract.js": "^7.0.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
