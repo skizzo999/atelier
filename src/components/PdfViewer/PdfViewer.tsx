@@ -60,20 +60,26 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setScale(+Math.min(2, Math.max(0.4, (cw - 48) / baseWidthRef.current)).toFixed(2))
   }
 
-  const fileName = filePath.split('\\').pop()
+  const raw = filePath.split('\\').pop() ?? ''
+  let fileName = raw
+  try {
+    fileName = decodeURIComponent(raw) // path a volte URL-encoded (%20 -> spazio)
+  } catch {
+    /* nome con % non valido: tieni il grezzo */
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3">
-        <span className="text-sm text-zinc-400 truncate flex items-center gap-2">
+      <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+        <span className="text-sm text-zinc-300 truncate flex items-center gap-2">
           {fileName}
-          {numPages > 0 && <span className="text-xs text-zinc-600">{numPages} pagine</span>}
+          {numPages > 0 && <span className="text-xs text-zinc-500">· {numPages} pagine</span>}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button className={btn} title="Riduci" onClick={() => setScale((s) => +Math.max(0.4, s - 0.2).toFixed(2))}>
             −
           </button>
-          <span className="w-10 text-center text-zinc-500">{Math.round(scale * 100)}%</span>
+          <span className="w-12 text-center text-zinc-400 tabular-nums">{Math.round(scale * 100)}%</span>
           <button className={btn} title="Ingrandisci" onClick={() => setScale((s) => +Math.min(4, s + 0.2).toFixed(2))}>
             +
           </button>
@@ -83,9 +89,11 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 overflow-auto bg-zinc-950 flex flex-col items-center gap-4 p-6">
+      <div ref={containerRef} className="flex-1 overflow-auto bg-zinc-900 flex flex-col items-center gap-5 px-6 py-7">
         {error && <span className="m-auto text-zinc-500 text-sm">Impossibile aprire il PDF.</span>}
-        {loading && !error && <span className="m-auto text-zinc-500 text-sm">Caricamento…</span>}
+        {loading && !error && (
+          <div className="m-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
+        )}
         {doc &&
           Array.from({ length: numPages }, (_, i) => (
             <PdfPage key={i + 1} doc={doc} pageNumber={i + 1} scale={scale} />
@@ -136,11 +144,17 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
       const vp = page.getViewport({ scale })
       const canvas = canvasRef.current
       if (!canvas) return
-      canvas.width = Math.floor(vp.width)
-      canvas.height = Math.floor(vp.height)
+      // Renderizza alla risoluzione del dispositivo (HiDPI) e ridimensiona via CSS:
+      // così su schermi 2x/Retina non viene sgranato.
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = Math.floor(vp.width * dpr)
+      canvas.height = Math.floor(vp.height * dpr)
+      canvas.style.width = `${Math.floor(vp.width)}px`
+      canvas.style.height = `${Math.floor(vp.height)}px`
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-      task = page.render({ canvasContext: ctx, viewport: vp, canvas })
+      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
+      task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
       task.promise.catch(() => {}) // ignora le cancellazioni
     })
     return () => {
@@ -150,7 +164,11 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
   }, [visible, doc, pageNumber, scale])
 
   return (
-    <div ref={wrapRef} style={{ width: size?.w, height: size?.h }} className="bg-white shadow-lg shrink-0">
+    <div
+      ref={wrapRef}
+      style={{ width: size?.w, height: size?.h }}
+      className="bg-white rounded-md overflow-hidden shrink-0 ring-1 ring-black/5 shadow-[0_2px_16px_rgba(0,0,0,0.5)]"
+    >
       <canvas ref={canvasRef} className="block" />
     </div>
   )
