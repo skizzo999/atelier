@@ -41,6 +41,9 @@ formati (PDF/DOCX).
   preview live, Applica/Annulla/Reset (niente filtri estetici)
 - [x] **OCR** (estrai testo): Tesseract.js lazy-load (ita+eng), risultato in modale con
   copia. Nota: 1° uso scarica il modello lingua dalla rete (poi in cache)
+- [x] **Viewer PDF** (sola lettura, PDF.js): scroll continuo, pagine renderizzate alla
+  vista (IntersectionObserver), zoom −/+/Adatta-larghezza, conteggio pagine. Worker
+  bundlato localmente (offline)
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -57,7 +60,7 @@ formati (PDF/DOCX).
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
+1. **Viewer altri formati**: ✅ PDF (PDF.js) fatto → ora **DOCX** (Mammoth), poi pptx/xlsx (SheetJS)
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
 4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).

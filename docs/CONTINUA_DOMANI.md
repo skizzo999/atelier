@@ -33,9 +33,10 @@
 > **Editor immagini COMPLETO** (incl. gomma a pixel). Prossimo grande blocco: i
 > viewer per gli altri formati, che è il cuore del "workspace multi-formato".
 
-### 1. Viewer altri formati (PROSSIMO)
-- **PDF** → PDF.js (view-only: scroll/zoom, magari ricerca testo)
-- **DOCX** → Mammoth.js (view, poi edit)
+### 1. Viewer altri formati (in corso)
+- **PDF** → ✅ FATTO (PdfViewer, PDF.js: scroll continuo, render pigro per pagina,
+  zoom −/+/Adatta, worker bundlato offline). Eventuale +: ricerca testo nel PDF.
+- **DOCX** → Mammoth.js (view, poi edit) ← PROSSIMO
 - pptx / xlsx → SheetJS / viewer dedicati
 
 ### 2. Stampa (trasversale)
