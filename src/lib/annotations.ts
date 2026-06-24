@@ -2,7 +2,7 @@
 // Le coordinate sono sempre in pixel dell'immagine (spazio "nativo"), così la
 // preview SVG (con viewBox = dimensioni native) e il flatten su canvas coincidono.
 
-export type AnnotTool = 'pen1' | 'pen2' | 'arrow' | 'shape' | 'text' | 'pan' | 'select'
+export type AnnotTool = 'pen1' | 'pen2' | 'arrow' | 'shape' | 'text' | 'pan' | 'select' | 'eraser'
 export type ShapeKind = 'rect' | 'ellipse' | 'triangle' | 'line'
 
 export interface Point {
@@ -28,6 +28,8 @@ export type Shape = ShapeBase &
     | { type: 'ellipse'; color: string; width: number; x: number; y: number; w: number; h: number }
     | { type: 'triangle'; color: string; width: number; p1: Point; p2: Point; p3: Point }
     | { type: 'text'; color: string; size: number; x: number; y: number; text: string }
+    // Gomma: tratto a mano libera che cancella i pixel del livello annotazioni.
+    | { type: 'erase'; width: number; points: Point[] }
   )
 
 export interface Bounds {
@@ -122,6 +124,7 @@ export function arrowParts(p1: Point, mid: Point, p2: Point, width: number): Arr
 export function boundsOf(s: Shape): Bounds {
   switch (s.type) {
     case 'pen':
+    case 'erase':
       return bboxOfPoints(s.points)
     case 'arrow':
     case 'line':
@@ -174,6 +177,7 @@ export function translateShape(s: Shape, dx: number, dy: number): Shape {
   const mv = (p: Point): Point => ({ x: p.x + dx, y: p.y + dy })
   switch (s.type) {
     case 'pen':
+    case 'erase':
       return { ...s, points: s.points.map(mv) }
     case 'arrow':
     case 'line':
@@ -190,6 +194,7 @@ export function scaleShape(s: Shape, ax: number, ay: number, sx: number, sy: num
   const sp = (p: Point): Point => ({ x: ax + (p.x - ax) * sx, y: ay + (p.y - ay) * sy })
   switch (s.type) {
     case 'pen':
+    case 'erase':
       return { ...s, points: s.points.map(sp) }
     case 'arrow':
     case 'line':
@@ -234,6 +239,29 @@ export function arrowGeometry(
     tip: { x: x2, y: y2 },
     left: { x: base.x + (px * headW) / 2, y: base.y + (py * headW) / 2 },
     right: { x: base.x - (px * headW) / 2, y: base.y - (py * headW) / 2 },
+  }
+}
+
+// Path SVG da una polilinea di punti.
+export function pointsToPath(points: Point[]): string {
+  return points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ')
+}
+
+// Disegna un tratto (polilinea round-cap, o un punto se singolo) sul contesto.
+// Per la gomma il chiamante imposta globalCompositeOperation = 'destination-out'.
+export function strokePointsToCtx(ctx: CanvasRenderingContext2D, points: Point[], width: number): void {
+  ctx.lineWidth = width
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  if (points.length === 1) {
+    ctx.beginPath()
+    ctx.arc(points[0].x, points[0].y, width / 2, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (points.length > 1) {
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y)
+    ctx.stroke()
   }
 }
 

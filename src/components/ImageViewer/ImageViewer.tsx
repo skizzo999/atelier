@@ -13,8 +13,10 @@ import {
   drawShapesToCtx,
   moveControl,
   newId,
+  pointsToPath,
   quadControl,
   scaleShape,
+  strokePointsToCtx,
   translateShape,
   type AnnotTool,
   type Bounds,
@@ -736,7 +738,7 @@ function EditableImage({ filePath }: { filePath: string }) {
         }
       }
       const tol = 6 / viewRef.current.scale
-      const hit = [...shapes].reverse().find((s) => hitShape(s, p, tol))
+      const hit = [...shapes].reverse().find((s) => s.type !== 'erase' && hitShape(s, p, tol))
       if (hit) {
         setSelectedId(hit.id)
         selOp.current = { kind: 'move', orig: hit, start: p }
@@ -757,7 +759,9 @@ function EditableImage({ filePath }: { filePath: string }) {
     const base = { id: newId(), opacity: 1, rot: 0 }
     const pt = (): Point => ({ ...p })
     let d: Shape
-    if (tool === 'pen1' || tool === 'pen2') {
+    if (tool === 'eraser') {
+      d = { ...base, type: 'erase', width: Math.round(strokeFor(thickness) * 2.5), points: [p] }
+    } else if (tool === 'pen1' || tool === 'pen2') {
       const pen = penPresets[tool === 'pen1' ? 0 : 1]
       d = { ...base, type: 'pen', color: pen.color, width: pen.width, opacity: pen.opacity, points: [p] }
     } else if (tool === 'arrow') {
@@ -807,7 +811,7 @@ function EditableImage({ filePath }: { filePath: string }) {
     const w = Math.abs(p.x - s.x)
     const h = Math.abs(p.y - s.y)
     let nd: Shape
-    if (d.type === 'pen') nd = { ...d, points: [...d.points, p] }
+    if (d.type === 'pen' || d.type === 'erase') nd = { ...d, points: [...d.points, p] }
     else if (d.type === 'arrow' || d.type === 'line')
       // estremi = drag; centro a metà (retto finché non lo curvi col warp)
       nd = { ...d, p2: { ...p }, mid: { x: (s.x + p.x) / 2, y: (s.y + p.y) / 2 } }
@@ -841,7 +845,7 @@ function EditableImage({ filePath }: { filePath: string }) {
       const b = boundsOf(d)
       if (b.w < 3 || b.h < 3) return
     }
-    if (d.type === 'pen' && d.points.length === 0) return
+    if ((d.type === 'pen' || d.type === 'erase') && d.points.length === 0) return
     setShapes((prev) => [...prev, d])
   }
 
@@ -862,6 +866,8 @@ function EditableImage({ filePath }: { filePath: string }) {
   }
 
   // "Applica": riversa le annotazioni sull'immagine (distruttivo, come da V1).
+  // Le annotazioni vanno su un livello trasparente, la gomma le cancella
+  // (destination-out), poi il livello viene composito sull'immagine.
   function applyAnnotations() {
     if (shapes.length === 0) {
       setAnnotMode(false)
@@ -869,7 +875,20 @@ function EditableImage({ filePath }: { filePath: string }) {
     }
     applyTransform((src) => {
       const c = cloneCanvas(src)
-      drawShapesToCtx(c.getContext('2d')!, shapes)
+      const ann = document.createElement('canvas')
+      ann.width = src.width
+      ann.height = src.height
+      const actx = ann.getContext('2d')!
+      drawShapesToCtx(
+        actx,
+        shapes.filter((s) => s.type !== 'erase'),
+      )
+      actx.globalCompositeOperation = 'destination-out'
+      actx.fillStyle = '#000'
+      actx.strokeStyle = '#000'
+      for (const s of shapes) if (s.type === 'erase') strokePointsToCtx(actx, s.points, s.width)
+      actx.globalCompositeOperation = 'source-over'
+      c.getContext('2d')!.drawImage(ann, 0, 0)
       return c
     })
     cancelAnnot()
@@ -877,6 +896,7 @@ function EditableImage({ filePath }: { filePath: string }) {
 
   // Disegno SVG di una forma (senza opacità: la mette il gruppo wrapper).
   function shapeInner(s: Shape) {
+    if (s.type === 'erase') return null // la gomma vive nella maschera, non qui
     if (s.type === 'pen') {
       if (s.points.length === 1)
         return <circle cx={s.points[0].x} cy={s.points[0].y} r={s.width / 2} fill={s.color} />
@@ -955,6 +975,23 @@ function EditableImage({ filePath }: { filePath: string }) {
       >
         {shapeInner(s)}
       </g>
+    )
+  }
+  // Tratto gomma per la maschera SVG (nero = nasconde le annotazioni sotto).
+  function eraserMaskEl(s: Shape, key: number | string) {
+    if (s.type !== 'erase') return null
+    if (s.points.length === 1)
+      return <circle key={key} cx={s.points[0].x} cy={s.points[0].y} r={s.width / 2} fill="#000" />
+    return (
+      <path
+        key={key}
+        d={pointsToPath(s.points)}
+        stroke="#000"
+        strokeWidth={s.width}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     )
   }
 
@@ -1064,8 +1101,11 @@ function EditableImage({ filePath }: { filePath: string }) {
   const canEdit = !loading && !error
   // Indice della penna attiva (0/1) o null se lo strumento non è una penna.
   const penIdx = tool === 'pen1' ? 0 : tool === 'pen2' ? 1 : null
-  // Forma attualmente selezionata (per il pannello proprietà).
-  const selShape = annotMode ? shapes.find((s) => s.id === selectedId) : undefined
+  // Forma attualmente selezionata (per il pannello proprietà). Le gomme non sono
+  // mai selezionabili, quindi escludiamo 'erase' dal tipo.
+  const selShape = (annotMode ? shapes.find((s) => s.id === selectedId) : undefined) as
+    | Exclude<Shape, { type: 'erase' }>
+    | undefined
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -1113,6 +1153,7 @@ function EditableImage({ filePath }: { filePath: string }) {
               ['arrow', '↗ Freccia'],
               ['shape', '▭ Forme'],
               ['text', 'T Testo'],
+              ['eraser', '⌫ Gomma'],
               ['pan', '✋'],
             ] as [AnnotTool, string][]
           ).map(([t, label]) => (
@@ -1216,25 +1257,27 @@ function EditableImage({ filePath }: { filePath: string }) {
                 ))}
               {tool === 'shape' && <div className="w-px h-5 bg-zinc-700 mx-1" />}
 
-              {/* Colori: per le penne è il colore della penna, altrimenti quello condiviso */}
-              {ANNOT_COLORS.map((c) => {
-                const current = penIdx !== null ? penPresets[penIdx].color : color
-                return (
-                  <button
-                    key={c}
-                    title={c}
-                    onClick={() => (penIdx !== null ? setPenPreset(penIdx, { color: c }) : setColor(c))}
-                    className={`w-5 h-5 rounded-full border ${
-                      current === c
-                        ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
-                        : 'border-zinc-600'
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                )
-              })}
+              {/* Colori: per le penne è il colore della penna, altrimenti quello
+                  condiviso. La gomma non ha colore. */}
+              {tool !== 'eraser' &&
+                ANNOT_COLORS.map((c) => {
+                  const current = penIdx !== null ? penPresets[penIdx].color : color
+                  return (
+                    <button
+                      key={c}
+                      title={c}
+                      onClick={() => (penIdx !== null ? setPenPreset(penIdx, { color: c }) : setColor(c))}
+                      className={`w-5 h-5 rounded-full border ${
+                        current === c
+                          ? 'ring-2 ring-offset-1 ring-offset-zinc-900 ring-white border-white'
+                          : 'border-zinc-600'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  )
+                })}
 
-              <div className="w-px h-5 bg-zinc-700 mx-1" />
+              {tool !== 'eraser' && <div className="w-px h-5 bg-zinc-700 mx-1" />}
 
               {/* Penna: slider opacità + spessore (persistiti). Altri tool: spessore S/M/L */}
               {penIdx !== null ? (
@@ -1486,8 +1529,20 @@ function EditableImage({ filePath }: { filePath: string }) {
               onPointerMove={onAnnotMove}
               onPointerUp={onAnnotUp}
             >
-              {shapes.map((s, i) => shapeSvg(s, i))}
-              {draft && shapeSvg(draft, 'draft')}
+              {/* La gomma cancella i pixel del livello annotazioni via maschera:
+                  bianco = visibile, i tratti gomma (neri) nascondono. */}
+              <defs>
+                <mask id="er-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={dims.w} height={dims.h}>
+                  <rect x={0} y={0} width={dims.w} height={dims.h} fill="#fff" />
+                  {[...shapes, ...(draft ? [draft] : [])].map((s, i) =>
+                    s.type === 'erase' ? eraserMaskEl(s, i) : null,
+                  )}
+                </mask>
+              </defs>
+              <g mask="url(#er-mask)">
+                {shapes.map((s, i) => (s.type === 'erase' ? null : shapeSvg(s, i)))}
+                {draft && draft.type !== 'erase' && shapeSvg(draft, 'draft')}
+              </g>
               {tool === 'select' && selectionGizmo()}
             </svg>
           )}
