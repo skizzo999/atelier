@@ -1,0 +1,60 @@
+name: Release
+
+# Compila gli installer per Windows e macOS e li pubblica in una GitHub Release.
+# Si avvia a mano (Actions → Release → Run workflow) o pushando un tag "v*".
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest # macOS universale (Intel + Apple Silicon)
+            args: '--target universal-apple-darwin'
+          - platform: windows-latest # Windows x64 (.msi + .exe)
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build app and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: app-v__VERSION__
+          releaseName: 'Atelier v__VERSION__'
+          releaseBody: 'Installer automatici. Windows: .exe/.msi — macOS: .dmg (app non firmata: vedi note).'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
