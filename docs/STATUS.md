@@ -2,11 +2,12 @@
 
 ## Stato attuale
 Editor Markdown **completo** a 3 viste (Codice / Ibrida / Lettura) con live preview
-ricco in stile Obsidian. Già pronti: sistema vault, file tree con watcher, gestione
-file, ricerca, viewer immagini con editing + **annotazioni** (penna/frecce/forme/
-testo) e **zoom/pan dinamico** unificato. In corso: trasformare l'annotatore in un
-piccolo editor (selezione/modifica oggetti + gomma). Prossimo grande blocco dopo:
-viewer per altri formati (PDF/DOCX).
+ricco in stile Obsidian. Viewer immagini ricco: editing + **annotazioni** con
+**selezione/modifica** (sposta/ridimensiona/warp/rotazione testo), **zoom/pan dinamico**
+unificato, **pannello Informazioni**, copia immagine, apri in Explorer, **regolazioni
+funzionali** e **OCR**. Pronti anche: sistema vault, file tree con watcher, gestione
+file, ricerca. Prossimi: gomma a pixel (annotatore), stampa trasversale, viewer altri
+formati (PDF/DOCX).
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -22,9 +23,20 @@ viewer per altri formati (PDF/DOCX).
   persistenti, slider opacità+spessore), frecce (con punta), forme (rettangolo, ellisse,
   triangolo, linea), testo. Overlay SVG in coord immagine, "Applica" = flatten sul canvas
   (riusa la pipeline buffer+atomica, distruttivo in V1)
+- [x] **Annotazioni — selezione/modifica** (strumento Selez.): sposta, ridimensiona col
+  box (testo/penna/rettangolo/ellisse), warp dei punti di controllo (freccia/linea con
+  centro che curva, triangolo a 3 vertici), **rotazione 360° del testo**; pannello
+  proprietà (colore/opacità/spessore-dimensione), elimina (Canc)
 - [x] **Zoom/pan dinamico** unificato (hook `useImageViewport`): rotella verso il cursore,
   trascina per spostare, fit auto, controlli −/%/+/Adatta. Vale per immagini editabili e
   sola-lettura, dentro e fuori da "Annota"
+- [x] **Pannello Informazioni** (stile Foto di Windows): nome con rinomina inline,
+  dimensioni, peso, DPI, tipo, percorso + copia; **Copia immagine** (PNG negli appunti);
+  **Apri in Explorer** (plugin-opener). Su immagini editabili e sola-lettura
+- [x] **Regolazioni funzionali** (modalità Regola): luminosità/contrasto/saturazione con
+  preview live, Applica/Annulla/Reset (niente filtri estetici)
+- [x] **OCR** (estrai testo): Tesseract.js lazy-load (ita+eng), risultato in modale con
+  copia. Nota: 1° uso scarica il modello lingua dalla rete (poi in cache)
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -41,15 +53,14 @@ viewer per altri formati (PDF/DOCX).
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Annotatore — selezione/modifica oggetti**: selezionare un'annotazione e
-   spostarla / ridimensionarla dagli angoli / ruotarla + cambiare colore, opacità,
-   spessore. Un unico sistema di gizmo per testo E forme (copre il "testo manipolabile").
-2. **Annotatore — gomma a pixel** (raster, sul tratto della penna).
-3. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
-4. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-5. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
-6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+1. **Annotatore — gomma a pixel** (raster, sul tratto della penna).
+2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
+3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
+4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
+5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
+6. **Viewer altri formati**: PDF (PDF.js), DOCX (Mammoth), poi pptx/xlsx (SheetJS)
+7. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
+8. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
 
 ## Note tecniche
 - Progetto: C:\Users\matte\Desktop\Atelier\atelier
@@ -72,6 +83,16 @@ viewer per altri formati (PDF/DOCX).
   fotogrammi, SVG è vettoriale). Eventuale editing → esportazione come PNG
 - Input testo annotazione: `preventDefault` sul `mousedown` dell'SVG, altrimenti il
   browser sposta il focus al body e l'input si chiude subito
+- Selezione/modifica annotazioni: `controlPoints`/`moveControl` (warp), `boundsOf`/
+  `scaleShape`/`translateShape` (box resize), `rot` su ShapeBase (rotazione attorno al
+  centro, hit-test/resize nel frame locale via `toLocal`/`rotatePt`)
+- Metadati immagine: `src/lib/imageMeta.ts` (DPI da PNG pHYs / JPEG JFIF, peso);
+  azioni in `src/lib/imageActions.ts` (copia PNG appunti, revealItemInDir)
+- OCR: `tesseract.js` importato in lazy (chunk a parte); `ita+eng`; il modello lingua
+  è scaricato al 1° uso (CSP `null` lo consente) e poi in cache
+- **pnpm 11**: `pnpm-workspace.yaml` con `onlyBuiltDependencies` (esbuild, tesseract.js)
+  e `verifyDepsBeforeRun: false` — senza, il build-script ignorato di tesseract fa
+  uscire 1 dai comandi pnpm (blocca tsc/build/tauri)
 - Live preview: src/components/CodeMirror/livePreview.ts (decorazioni dall'albero
   sintattico + pass regex per `==`, `[[ ]]`, `![[ ]]`); tema in modalità Ibrida
   senza oneDark (aspetto "documento")
@@ -94,6 +115,6 @@ viewer per altri formati (PDF/DOCX).
 ## Per riprendere
 Aprire nuova chat AI e incollare:
 1. Contenuto di docs/STATUS.md (questo file)
-2. Contenuto di docs/sessions/2026-06-23_annotazioni-e-zoom.md
-3. Dire: "Continuiamo da dove abbiamo lasciato. Prossimo step: selezione/modifica
-   degli oggetti annotati (sposta/ridimensiona/ruota + colore/opacità/spessore), poi gomma a pixel."
+2. Contenuto di docs/sessions/2026-06-24_annotatore-e-funzioni-foto.md
+3. Dire: "Continuiamo da dove abbiamo lasciato. Prossimo step: gomma a pixel
+   nell'annotatore, poi stampa trasversale."
