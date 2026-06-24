@@ -5,6 +5,8 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-path",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-file",

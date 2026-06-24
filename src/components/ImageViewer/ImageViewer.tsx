@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { writeFileBinaryAtomic, uniquePathWithSuffix } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
+import { parseDpi } from '../../lib/imageMeta'
+import { copyCanvasToClipboard, copyImageElementToClipboard, revealInExplorer } from '../../lib/imageActions'
+import { ImageInfoPanel } from './ImageInfoPanel'
 import {
   arrowParts,
   boundsOf,
@@ -297,6 +300,10 @@ function EditableImage({ filePath }: { filePath: string }) {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dims, setDims] = useState({ w: 0, h: 0 })
+  const [sizeBytes, setSizeBytes] = useState(0)
+  const [dpi, setDpi] = useState<number | null>(null)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [resizeOpen, setResizeOpen] = useState(false)
   const [cropMode, setCropMode] = useState(false)
@@ -352,9 +359,13 @@ function EditableImage({ filePath }: { filePath: string }) {
       let blob: Blob
       if (buffered) {
         blob = buffered
+        setSizeBytes(buffered.size)
+        setDpi(null)
       } else {
         const bytes = await readFile(filePath)
         blob = new Blob([bytes], { type: MIME[ext] ?? 'image/png' })
+        setSizeBytes(bytes.length)
+        setDpi(parseDpi(bytes, ext))
       }
       const bmp = await createImageBitmap(blob)
       if (cancelled) {
@@ -963,6 +974,15 @@ function EditableImage({ filePath }: { filePath: string }) {
     oy = cr.top - cor.top
   }
 
+  async function copyImage() {
+    const cv = canvasRef.current
+    if (!cv) return
+    if (await copyCanvasToClipboard(cv)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    }
+  }
+
   const fileName = filePath.split('\\').pop()
   const canEdit = !loading && !error
   // Indice della penna attiva (0/1) o null se lo strumento non è una penna.
@@ -971,7 +991,8 @@ function EditableImage({ filePath }: { filePath: string }) {
   const selShape = annotMode ? shapes.find((s) => s.id === selectedId) : undefined
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3">
         <span className="text-sm text-zinc-400 truncate flex items-center gap-2">
           {dirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
@@ -1236,6 +1257,19 @@ function EditableImage({ filePath }: { filePath: string }) {
           <button className={toolBtn} disabled={!canEdit} onClick={startAnnot}>
             Annota
           </button>
+          <button className={toolBtn} disabled={!canEdit} onClick={copyImage} title="Copia immagine">
+            {copied ? 'Copiato ✓' : 'Copia'}
+          </button>
+          <button className={toolBtn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
+            Explorer
+          </button>
+          <button
+            className={infoOpen ? activeChip : toolBtn}
+            onClick={() => setInfoOpen((o) => !o)}
+            title="Informazioni"
+          >
+            ⓘ Info
+          </button>
 
           <div className="flex-1" />
 
@@ -1388,15 +1422,26 @@ function EditableImage({ filePath }: { filePath: string }) {
         )}
       </div>
 
-      {resizeOpen && (
-        <ResizeModal
-          width={dims.w}
-          height={dims.h}
-          onCancel={() => setResizeOpen(false)}
-          onApply={(w, h) => {
-            applyTransform((c) => resizeCanvas(c, w, h))
-            setResizeOpen(false)
-          }}
+        {resizeOpen && (
+          <ResizeModal
+            width={dims.w}
+            height={dims.h}
+            onCancel={() => setResizeOpen(false)}
+            onApply={(w, h) => {
+              applyTransform((c) => resizeCanvas(c, w, h))
+              setResizeOpen(false)
+            }}
+          />
+        )}
+      </div>
+
+      {infoOpen && (
+        <ImageInfoPanel
+          filePath={filePath}
+          dims={dims}
+          sizeBytes={sizeBytes}
+          dpi={dpi}
+          onClose={() => setInfoOpen(false)}
         />
       )}
     </div>
@@ -1479,7 +1524,12 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [dims, setDims] = useState({ w: 0, h: 0 })
+  const [sizeBytes, setSizeBytes] = useState(0)
+  const [dpi, setDpi] = useState<number | null>(null)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
   const { view, fitView, zoomBy, onViewDown, onViewMove, onViewUp } = useImageViewport(
     containerRef,
     dims,
@@ -1495,6 +1545,8 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
     readFile(filePath)
       .then((bytes) => {
         if (cancelled) return
+        setSizeBytes(bytes.length)
+        setDpi(parseDpi(bytes, ext))
         objectUrl = URL.createObjectURL(new Blob([bytes], { type: MIME[ext] ?? 'application/octet-stream' }))
         setUrl(objectUrl)
       })
@@ -1508,13 +1560,32 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
     }
   }, [filePath, ext])
 
+  async function copyImage() {
+    if (!imgRef.current) return
+    if (await copyImageElementToClipboard(imgRef.current)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    }
+  }
+
   const fileName = filePath.split('\\').pop()
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3">
         <span className="text-sm text-zinc-400 truncate">{fileName}</span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
+          <button className={toolBtn} onClick={copyImage} title="Copia immagine">
+            {copied ? 'Copiato ✓' : 'Copia'}
+          </button>
+          <button className={toolBtn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
+            Explorer
+          </button>
+          <button className={infoOpen ? activeChip : toolBtn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
+            ⓘ Info
+          </button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
           <button className={toolBtn} title="Riduci" onClick={() => zoomBy(1 / 1.25)}>
             −
           </button>
@@ -1556,6 +1627,7 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
             }}
           >
             <img
+              ref={imgRef}
               src={url}
               alt={fileName}
               draggable={false}
@@ -1572,6 +1644,17 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
           </div>
         )}
       </div>
+      </div>
+
+      {infoOpen && (
+        <ImageInfoPanel
+          filePath={filePath}
+          dims={dims}
+          sizeBytes={sizeBytes}
+          dpi={dpi}
+          onClose={() => setInfoOpen(false)}
+        />
+      )}
     </div>
   )
 }
