@@ -45,7 +45,9 @@ jobs:
           workspaces: ./src-tauri -> target
 
       - name: Install dependencies
-        run: pnpm install
+        # --ignore-scripts: evita che pnpm 11 esca con 1 sui build-script "ignorati"
+        # (tesseract/esbuild non richiedono postinstall per funzionare nel build).
+        run: pnpm install --ignore-scripts
 
       - name: Build app and publish release
         uses: tauri-apps/tauri-action@v0
