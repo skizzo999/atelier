@@ -10,7 +10,7 @@ import {
   boundsOf,
   centerOf,
   controlPoints,
-  drawShapesToCtx,
+  drawShapeToCtx,
   moveControl,
   newId,
   pointsToPath,
@@ -879,15 +879,19 @@ function EditableImage({ filePath }: { filePath: string }) {
       ann.width = src.width
       ann.height = src.height
       const actx = ann.getContext('2d')!
-      drawShapesToCtx(
-        actx,
-        shapes.filter((s) => s.type !== 'erase'),
-      )
-      actx.globalCompositeOperation = 'destination-out'
-      actx.fillStyle = '#000'
-      actx.strokeStyle = '#000'
-      for (const s of shapes) if (s.type === 'erase') strokePointsToCtx(actx, s.points, s.width)
-      actx.globalCompositeOperation = 'source-over'
+      // In ordine: i disegni vanno sopra (source-over), la gomma cancella solo
+      // ciò che è stato disegnato prima di lei (destination-out).
+      for (const s of shapes) {
+        if (s.type === 'erase') {
+          actx.globalCompositeOperation = 'destination-out'
+          actx.fillStyle = '#000'
+          actx.strokeStyle = '#000'
+          strokePointsToCtx(actx, s.points, s.width)
+          actx.globalCompositeOperation = 'source-over'
+        } else {
+          drawShapeToCtx(actx, s)
+        }
+      }
       c.getContext('2d')!.drawImage(ann, 0, 0)
       return c
     })
@@ -992,6 +996,50 @@ function EditableImage({ filePath }: { filePath: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    )
+  }
+
+  // Livello annotazioni con gomma ORDINATA: ogni disegno è cancellato solo dalle
+  // gomme che lo seguono (k = quante gomme lo precedono). Così dopo aver gommato
+  // si può ridisegnare sopra senza che venga cancellato.
+  function annotationLayer() {
+    const erasers: Shape[] = []
+    const groups = new Map<number, Shape[]>()
+    for (const s of shapes) {
+      if (s.type === 'erase') erasers.push(s)
+      else {
+        const k = erasers.length
+        const arr = groups.get(k) ?? []
+        arr.push(s)
+        groups.set(k, arr)
+      }
+    }
+    let draftK: number | null = null
+    if (draft) {
+      if (draft.type === 'erase') erasers.push(draft) // la più recente: cancella tutto sotto
+      else draftK = erasers.length
+    }
+    const total = erasers.length
+    const ks = [...new Set([...groups.keys(), ...(draftK !== null ? [draftK] : [])])].filter((k) => k < total)
+    return (
+      <>
+        <defs>
+          {ks.map((k) => (
+            <mask key={k} id={`erm-${k}`} maskUnits="userSpaceOnUse" x={0} y={0} width={dims.w} height={dims.h}>
+              <rect x={0} y={0} width={dims.w} height={dims.h} fill="#fff" />
+              {erasers.slice(k).map((e, i) => eraserMaskEl(e, i))}
+            </mask>
+          ))}
+        </defs>
+        {[...groups.entries()].map(([k, items]) => (
+          <g key={`g${k}`} mask={k < total ? `url(#erm-${k})` : undefined}>
+            {items.map((s) => shapeSvg(s, s.id))}
+          </g>
+        ))}
+        {draftK !== null && draft && (
+          <g mask={draftK < total ? `url(#erm-${draftK})` : undefined}>{shapeSvg(draft, 'draft')}</g>
+        )}
+      </>
     )
   }
 
@@ -1529,20 +1577,8 @@ function EditableImage({ filePath }: { filePath: string }) {
               onPointerMove={onAnnotMove}
               onPointerUp={onAnnotUp}
             >
-              {/* La gomma cancella i pixel del livello annotazioni via maschera:
-                  bianco = visibile, i tratti gomma (neri) nascondono. */}
-              <defs>
-                <mask id="er-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={dims.w} height={dims.h}>
-                  <rect x={0} y={0} width={dims.w} height={dims.h} fill="#fff" />
-                  {[...shapes, ...(draft ? [draft] : [])].map((s, i) =>
-                    s.type === 'erase' ? eraserMaskEl(s, i) : null,
-                  )}
-                </mask>
-              </defs>
-              <g mask="url(#er-mask)">
-                {shapes.map((s, i) => (s.type === 'erase' ? null : shapeSvg(s, i)))}
-                {draft && draft.type !== 'erase' && shapeSvg(draft, 'draft')}
-              </g>
+              {/* Livello annotazioni con gomma ordinata (vedi annotationLayer). */}
+              {annotationLayer()}
               {tool === 'select' && selectionGizmo()}
             </svg>
           )}

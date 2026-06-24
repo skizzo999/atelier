@@ -34,7 +34,9 @@ formati (PDF/DOCX).
   dimensioni, peso, DPI, tipo, percorso + copia; **Copia immagine** (PNG negli appunti);
   **Apri in Explorer** (plugin-opener). Su immagini editabili e sola-lettura
 - [x] **Gomma a pixel** (annotatore): tratto a mano libera che cancella i pixel delle
-  annotazioni (maschera SVG in preview, destination-out nel flatten); non tocca la foto
+  annotazioni (non tocca la foto). **Ordinata**: cancella solo i tratti precedenti, quindi
+  dopo aver gommato si può ridisegnare sopra (preview con maschere per-gruppo, flatten con
+  loop ordinato + destination-out → preview e salvato coincidono)
 - [x] **Regolazioni funzionali** (modalità Regola): luminosità/contrasto/saturazione con
   preview live, Applica/Annulla/Reset (niente filtri estetici)
 - [x] **OCR** (estrai testo): Tesseract.js lazy-load (ita+eng), risultato in modale con
