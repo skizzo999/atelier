@@ -184,7 +184,8 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         canvas.height = Math.floor(vp.height)
         const ctx = canvas.getContext('2d')
         if (!ctx) continue
-        await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise
+        await page.render({ canvasContext: ctx, viewport: vp, canvas, annotationMode: pdfjsLib.AnnotationMode.DISABLE })
+          .promise
         if (cancelled) return
         const words = await ocrCanvasWords(canvas)
         if (cancelled) return
@@ -783,7 +784,15 @@ function PdfPage({
       const ctx = canvas.getContext('2d')
       if (!ctx) return
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
-      task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
+      // Niente annotazioni nel canvas: le evidenziazioni le disegniamo noi come
+      // overlay, così rimuoverle è immediato (altrimenti restano "cotte" nel canvas).
+      task = page.render({
+        canvasContext: ctx,
+        viewport: vp,
+        transform,
+        canvas,
+        annotationMode: pdfjsLib.AnnotationMode.DISABLE,
+      })
       task.promise.catch(() => {})
     })
     return () => {
@@ -942,7 +951,13 @@ function PdfThumb({ doc, pageNumber, onClick }: { doc: PDFDocumentProxy; pageNum
       const ctx = canvas.getContext('2d')
       if (!ctx) return
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
-      task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
+      task = page.render({
+        canvasContext: ctx,
+        viewport: vp,
+        transform,
+        canvas,
+        annotationMode: pdfjsLib.AnnotationMode.DISABLE,
+      })
       task.promise.catch(() => {})
     })
     return () => {
