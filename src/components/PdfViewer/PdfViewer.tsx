@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
-import { openPath } from '@tauri-apps/plugin-opener'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { formatSize } from '../../lib/imageMeta'
@@ -35,6 +34,32 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+
+  // Zoom con Ctrl+rotella, tenendo fermo il centro verticale del viewport
+  // (le pagine restano centrate orizzontalmente dal layout flex).
+  useEffect(() => {
+    const cont = containerRef.current
+    if (!cont) return
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+      const s = scaleRef.current
+      const ns = +Math.min(4, Math.max(0.3, s * factor)).toFixed(2)
+      if (ns === s) return
+      const centerY = cont!.clientHeight / 2
+      const anchor = cont!.scrollTop + centerY
+      const ratio = ns / s
+      setScale(ns)
+      requestAnimationFrame(() => {
+        cont!.scrollTop = anchor * ratio - centerY
+      })
+    }
+    cont.addEventListener('wheel', onWheel, { passive: false })
+    return () => cont.removeEventListener('wheel', onWheel)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -102,9 +127,6 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           {numPages > 0 && <span className="text-xs text-zinc-500">· {numPages} pagine</span>}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
-          <button className={btn} title="Apri nell'app di sistema" onClick={() => openPath(filePath).catch((e) => console.error(e))}>
-            Apri
-          </button>
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
