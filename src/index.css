@@ -102,3 +102,20 @@ body {
 /* Evidenziazioni dei risultati di ricerca / evidenziatore (aggiunte dall'app). */
 .textLayer .app-highlight { background: rgba(250, 204, 21, 0.45); border-radius: 2px; }
 .textLayer .app-find { background: rgba(56, 138, 221, 0.45); border-radius: 2px; }
+
+/* Strato di testo da OCR (scansioni): span trasparenti posizionati sui box parola. */
+.ocrLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+}
+.ocrLayer span {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+.ocrLayer ::selection { background: rgba(56, 138, 221, 0.4); }

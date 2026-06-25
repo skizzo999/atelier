@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { formatSize } from '../../lib/imageMeta'
 import { revealInExplorer } from '../../lib/imageActions'
+import { ocrCanvasWords, type OcrWord } from '../../lib/pdfOcr'
 // Worker bundlato localmente (niente CDN: resta tutto offline).
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -41,6 +42,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [navTab, setNavTab] = useState<'thumbs' | 'outline'>('thumbs')
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
+  // OCR delle pagine scansionate: parola → box in coord a scala 1 (punti PDF).
+  const [ocrPages, setOcrPages] = useState<Map<number, OcrWord[]>>(new Map())
+  const [ocr, setOcr] = useState<{ done: number; total: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
   const scaleRef = useRef(scale)
@@ -78,6 +82,8 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setDoc(null)
     setNumPages(0)
     setOutline(null)
+    setOcrPages(new Map())
+    setOcr(null)
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
@@ -110,6 +116,59 @@ export function PdfViewer({ filePath }: { filePath: string }) {
       loadingTask?.destroy()
     }
   }, [filePath])
+
+  // OCR automatico in background sulle pagine senza testo (scansioni): le
+  // riconosce una alla volta e costruisce uno strato di testo selezionabile.
+  useEffect(() => {
+    if (!doc || !numPages) return
+    let cancelled = false
+    const canvas = document.createElement('canvas')
+    ;(async () => {
+      // Trova le pagine prive di testo (= scansioni/immagini).
+      const scanned: number[] = []
+      for (let n = 1; n <= numPages; n++) {
+        if (cancelled) return
+        const page = await doc.getPage(n)
+        const tc = await page.getTextContent()
+        if (tc.items.length === 0) scanned.push(n)
+      }
+      if (cancelled || scanned.length === 0) return
+      setOcr({ done: 0, total: scanned.length })
+      for (let i = 0; i < scanned.length; i++) {
+        if (cancelled) return
+        const n = scanned[i]
+        const page = await doc.getPage(n)
+        const base = page.getViewport({ scale: 1 })
+        const ocrScale = Math.min(3, 1600 / base.width) // ~1600px = buona resa OCR
+        const vp = page.getViewport({ scale: ocrScale })
+        canvas.width = Math.floor(vp.width)
+        canvas.height = Math.floor(vp.height)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) continue
+        await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise
+        if (cancelled) return
+        const words = await ocrCanvasWords(canvas)
+        if (cancelled) return
+        // Box in coord a scala 1 (punti PDF), indipendenti dallo zoom.
+        const inPts = words.map((w) => ({
+          text: w.text,
+          x0: w.x0 / ocrScale,
+          y0: w.y0 / ocrScale,
+          x1: w.x1 / ocrScale,
+          y1: w.y1 / ocrScale,
+        }))
+        setOcrPages((prev) => new Map(prev).set(n, inPts))
+        setOcr({ done: i + 1, total: scanned.length })
+      }
+      if (!cancelled) setOcr(null)
+    })().catch((e) => {
+      console.error('OCR PDF:', e)
+      if (!cancelled) setOcr(null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [doc, numPages])
 
   function fitWidth() {
     if (!baseWidthRef.current) return
@@ -191,6 +250,12 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           </button>
           <span className="truncate">{fileName}</span>
           {numPages > 0 && <span className="text-xs text-zinc-500 shrink-0">· {numPages} pagine</span>}
+          {ocr && (
+            <span className="text-xs text-blue-300 shrink-0 flex items-center gap-1" title="Riconoscimento testo sulle pagine scansionate">
+              <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+              OCR {ocr.done}/{ocr.total}
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
@@ -243,7 +308,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         )}
         {doc &&
           Array.from({ length: numPages }, (_, i) => (
-            <PdfPage key={i + 1} doc={doc} pageNumber={i + 1} scale={scale} />
+            <PdfPage key={i + 1} doc={doc} pageNumber={i + 1} scale={scale} ocrWords={ocrPages.get(i + 1)} />
           ))}
       </div>
       </div>
@@ -251,7 +316,44 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   )
 }
 
-function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber: number; scale: number }) {
+// Costruisce uno strato di testo invisibile dalle parole OCR (coord a scala 1),
+// posizionate alla scala di render; seconda passata = stira ogni parola alla
+// larghezza del suo box per una selezione/evidenziazione precisa.
+function buildOcrLayer(div: HTMLDivElement, words: OcrWord[], scale: number) {
+  div.className = 'ocrLayer'
+  div.replaceChildren()
+  const frag = document.createDocumentFragment()
+  const spans: { el: HTMLSpanElement; w: number }[] = []
+  for (const word of words) {
+    const w = (word.x1 - word.x0) * scale
+    const h = (word.y1 - word.y0) * scale
+    if (w <= 0 || h <= 0) continue
+    const span = document.createElement('span')
+    span.textContent = word.text
+    span.style.left = `${word.x0 * scale}px`
+    span.style.top = `${word.y0 * scale}px`
+    span.style.fontSize = `${h * 0.92}px`
+    frag.appendChild(span)
+    spans.push({ el: span, w })
+  }
+  div.appendChild(frag)
+  for (const { el, w } of spans) {
+    const natural = el.offsetWidth
+    if (natural > 0) el.style.transform = `scaleX(${w / natural})`
+  }
+}
+
+function PdfPage({
+  doc,
+  pageNumber,
+  scale,
+  ocrWords,
+}: {
+  doc: PDFDocumentProxy
+  pageNumber: number
+  scale: number
+  ocrWords?: OcrWord[]
+}) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
@@ -293,13 +395,12 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
     return () => obs.disconnect()
   }, [])
 
-  // Rasterizza canvas + text layer alla renderScale (HiDPI).
+  // Rasterizza il canvas alla renderScale (HiDPI).
   useEffect(() => {
     if (!visible) return
     let cancelled = false
     let task: { promise: Promise<unknown>; cancel: () => void } | null = null
-    let textLayer: { cancel: () => void } | null = null
-    doc.getPage(pageNumber).then(async (page) => {
+    doc.getPage(pageNumber).then((page) => {
       if (cancelled) return
       const vp = page.getViewport({ scale: renderScale })
       setRenderSize({ w: Math.floor(vp.width), h: Math.floor(vp.height) })
@@ -315,27 +416,43 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
       task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
       task.promise.catch(() => {})
-
-      // Strato di testo selezionabile/copiabile sopra il canvas.
-      const tlDiv = textLayerRef.current
-      if (tlDiv) {
-        tlDiv.replaceChildren()
-        tlDiv.style.setProperty('--total-scale-factor', String(renderScale))
-        tlDiv.style.width = `${Math.floor(vp.width)}px`
-        tlDiv.style.height = `${Math.floor(vp.height)}px`
-        const textContent = await page.getTextContent()
-        if (cancelled) return
-        const tl = new pdfjsLib.TextLayer({ textContentSource: textContent, container: tlDiv, viewport: vp })
-        textLayer = tl
-        tl.render().catch(() => {})
-      }
     })
     return () => {
       cancelled = true
       task?.cancel()
-      textLayer?.cancel()
     }
   }, [visible, doc, pageNumber, renderScale])
+
+  // Strato di testo selezionabile: OCR (scansioni) oppure pdf.js (PDF di testo).
+  useEffect(() => {
+    if (!visible) return
+    const tlDiv = textLayerRef.current
+    if (!tlDiv) return
+    let cancelled = false
+    let textLayer: { cancel: () => void } | null = null
+    if (ocrWords && ocrWords.length) {
+      buildOcrLayer(tlDiv, ocrWords, renderScale)
+    } else {
+      tlDiv.className = 'textLayer'
+      tlDiv.replaceChildren()
+      doc.getPage(pageNumber).then(async (page) => {
+        if (cancelled) return
+        const vp = page.getViewport({ scale: renderScale })
+        const textContent = await page.getTextContent()
+        if (cancelled || textContent.items.length === 0) return // scansione: aspetta l'OCR
+        tlDiv.style.setProperty('--total-scale-factor', String(renderScale))
+        tlDiv.style.width = `${Math.floor(vp.width)}px`
+        tlDiv.style.height = `${Math.floor(vp.height)}px`
+        const tl = new pdfjsLib.TextLayer({ textContentSource: textContent, container: tlDiv, viewport: vp })
+        textLayer = tl
+        tl.render().catch(() => {})
+      })
+    }
+    return () => {
+      cancelled = true
+      textLayer?.cancel()
+    }
+  }, [visible, doc, pageNumber, renderScale, ocrWords])
 
   // Zoom istantaneo: scala via CSS dal contenuto (renderScale) alla scala target.
   const k = renderSize && size && renderSize.w ? size.w / renderSize.w : 1
