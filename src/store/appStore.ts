@@ -21,6 +21,8 @@ interface AppState {
   mdView: MarkdownView
   // Due penne configurabili per le annotazioni (persistite).
   penPresets: [PenPreset, PenPreset]
+  // Tre colori dell'evidenziatore PDF, personalizzabili e persistiti.
+  pdfHlColors: [string, string, string]
   // File attualmente aperto nell'editor (null = nessuno). Non persistito.
   selectedFile: string | null
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
@@ -38,6 +40,7 @@ interface AppState {
   setMode: (mode: AppMode) => void
   setMdView: (view: MarkdownView) => void
   setPenPreset: (index: 0 | 1, patch: Partial<PenPreset>) => void
+  setPdfHlColor: (index: 0 | 1 | 2, color: string) => void
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
   setPendingHighlight: (term: string | null) => void
@@ -64,6 +67,7 @@ export const useAppStore = create<AppState>()(
         { color: '#ef4444', width: 6, opacity: 1 },
         { color: '#facc15', width: 22, opacity: 0.4 },
       ],
+      pdfHlColors: ['#facc15', '#4ade80', '#60a5fa'],
       selectedFile: null,
       dirtyBuffers: {},
       pendingHighlight: null,
@@ -78,6 +82,12 @@ export const useAppStore = create<AppState>()(
           const next: [PenPreset, PenPreset] = [{ ...state.penPresets[0] }, { ...state.penPresets[1] }]
           next[index] = { ...next[index], ...patch }
           return { penPresets: next }
+        }),
+      setPdfHlColor: (index, color) =>
+        set((state) => {
+          const next = [...state.pdfHlColors] as [string, string, string]
+          next[index] = color
+          return { pdfHlColors: next }
         }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
@@ -139,6 +149,7 @@ export const useAppStore = create<AppState>()(
         mode: state.mode,
         mdView: state.mdView,
         penPresets: state.penPresets,
+        pdfHlColors: state.pdfHlColors,
       }),
     },
   ),

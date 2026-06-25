@@ -6,6 +6,9 @@ import { formatSize } from '../../lib/imageMeta'
 import { revealInExplorer } from '../../lib/imageActions'
 import { ocrCanvasWords, type OcrWord } from '../../lib/pdfOcr'
 import { tokensForPage, searchTokens, type Box, type Token } from '../../lib/pdfSearch'
+import { prepareHighlights, writeHighlights, type Highlight } from '../../lib/pdfHighlights'
+import { writeFileBinaryAtomic } from '../../lib/fileOps'
+import { useAppStore } from '../../store/appStore'
 // Worker bundlato localmente (niente CDN: resta tutto offline).
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -55,6 +58,16 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const lastQuery = useRef('')
   const tokensCache = useRef<Map<number, { tokens: Token[]; ocr: boolean }>>(new Map())
+  // Evidenziatore.
+  const pdfHlColors = useAppStore((s) => s.pdfHlColors)
+  const setPdfHlColor = useAppStore((s) => s.setPdfHlColor)
+  const [highlights, setHighlights] = useState<Highlight[]>([])
+  const [hlMode, setHlMode] = useState(false)
+  const [hlColorIdx, setHlColorIdx] = useState(0)
+  const [hlSaving, setHlSaving] = useState(false)
+  const [removePopup, setRemovePopup] = useState<{ id: string; x: number; y: number } | null>(null)
+  const baseRef = useRef<Uint8Array | null>(null) // PDF "pulito" da cui ripartono i salvataggi
+  const hlDirty = useRef(false) // evita di risalvare le evidenziazioni appena caricate
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
   const scaleRef = useRef(scale)
@@ -97,12 +110,25 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setHits([])
     setCurrent(0)
     tokensCache.current.clear()
+    setHighlights([])
+    setRemovePopup(null)
+    baseRef.current = null
+    hlDirty.current = false
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
+      const forHl = bytes.slice() // copia: pdf.js può trasferire il buffer al worker
       loadingTask = pdfjsLib.getDocument({ data: bytes })
       const pdf = await loadingTask.promise
       if (cancelled) return
+      // Carica le evidenziazioni salvate nel PDF (se presenti) e prepara la base.
+      prepareHighlights(forHl)
+        .then(({ highlights: hls, base }) => {
+          if (cancelled) return
+          baseRef.current = base
+          setHighlights(hls)
+        })
+        .catch((e) => console.error('Lettura evidenziazioni:', e))
       const page1 = await pdf.getPage(1)
       baseWidthRef.current = page1.getViewport({ scale: 1 }).width
       const cw = containerRef.current?.clientWidth ?? 800
@@ -254,6 +280,29 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, query, searchOpen, numPages, ocrPages])
 
+  // Scrive le evidenziazioni nel PDF (debounce), ripartendo sempre dalla base
+  // pulita: niente duplicati. Non salva al caricamento iniziale (hlDirty=false).
+  useEffect(() => {
+    if (!hlDirty.current || !baseRef.current) return
+    const base = baseRef.current
+    let cancelled = false
+    setHlSaving(true)
+    const t = setTimeout(async () => {
+      try {
+        const out = await writeHighlights(base, highlights)
+        if (!cancelled) await writeFileBinaryAtomic(filePath, out)
+      } catch (e) {
+        console.error('Salvataggio evidenziazioni:', e)
+      } finally {
+        if (!cancelled) setHlSaving(false)
+      }
+    }, 1200)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [highlights, filePath])
+
   function fitWidth() {
     if (!baseWidthRef.current) return
     const cw = containerRef.current?.clientWidth ?? 800
@@ -314,6 +363,87 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     scrollToBox(hits[n].page, unionBox(hits[n].boxes))
   }
 
+  // Unisce i rettangoli di selezione per riga (riempie i buchi tra parole).
+  function mergeLineRects(rects: Box[]): Box[] {
+    const sorted = [...rects].sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)
+    const lines: Box[] = []
+    for (const r of sorted) {
+      const last = lines[lines.length - 1]
+      // Stessa riga se c'è sovrapposizione verticale sostanziale con l'ultima.
+      if (last && r.y0 < last.y1 - (last.y1 - last.y0) * 0.4) {
+        last.x0 = Math.min(last.x0, r.x0)
+        last.y0 = Math.min(last.y0, r.y0)
+        last.x1 = Math.max(last.x1, r.x1)
+        last.y1 = Math.max(last.y1, r.y1)
+      } else {
+        lines.push({ ...r })
+      }
+    }
+    return lines
+  }
+
+  // Dalla selezione attuale ricava pagina + rettangoli in coord scala 1.
+  function rectsFromRange(range: Range): { page: number; rects: Box[] } | null {
+    const sc = range.startContainer
+    const startEl = sc.nodeType === 3 ? sc.parentElement : (sc as Element)
+    const layer = startEl?.closest('.textLayer, .ocrLayer')
+    const pageEl = layer?.closest('[id^="pdfp-"]') as HTMLElement | null
+    if (!layer || !pageEl) return null
+    const page = parseInt(pageEl.id.replace('pdfp-', ''), 10)
+    if (!page) return null
+    const lr = layer.getBoundingClientRect()
+    const raw: Box[] = []
+    for (const r of Array.from(range.getClientRects())) {
+      if (r.width < 1 || r.height < 1) continue
+      raw.push({
+        x0: (r.left - lr.left) / scale,
+        y0: (r.top - lr.top) / scale,
+        x1: (r.right - lr.left) / scale,
+        y1: (r.bottom - lr.top) / scale,
+      })
+    }
+    return raw.length ? { page, rects: mergeLineRects(raw) } : null
+  }
+
+  function addHighlightFromSelection() {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return
+    const found = rectsFromRange(sel.getRangeAt(0))
+    if (!found) return
+    hlDirty.current = true
+    setHighlights((prev) => [
+      ...prev,
+      { id: Math.random().toString(36).slice(2), page: found.page, color: pdfHlColors[hlColorIdx], rects: found.rects },
+    ])
+    sel.removeAllRanges()
+  }
+
+  function removeHighlight(id: string) {
+    hlDirty.current = true
+    setHighlights((prev) => prev.filter((h) => h.id !== id))
+    setRemovePopup(null)
+  }
+
+  // Click (modalità spenta) su un'evidenziazione → popup "Rimuovi".
+  function onPagesClick(e: React.MouseEvent) {
+    if (hlMode) return
+    const sel = window.getSelection()
+    if (sel && !sel.isCollapsed) return // era una selezione, non un click
+    const pageEl = (e.target as Element).closest?.('[id^="pdfp-"]') as HTMLElement | null
+    if (!pageEl) {
+      setRemovePopup(null)
+      return
+    }
+    const page = parseInt(pageEl.id.replace('pdfp-', ''), 10)
+    const pr = pageEl.getBoundingClientRect()
+    const x = (e.clientX - pr.left) / scale
+    const y = (e.clientY - pr.top) / scale
+    const hit = highlights.find(
+      (h) => h.page === page && h.rects.some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1),
+    )
+    setRemovePopup(hit ? { id: hit.id, x: e.clientX, y: e.clientY } : null)
+  }
+
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
   try {
@@ -328,6 +458,14 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     const arr = findsByPage.get(h.page) ?? []
     arr.push(...h.boxes)
     findsByPage.set(h.page, arr)
+  }
+
+  // Evidenziazioni raggruppate per pagina.
+  const hlByPage = new Map<number, Highlight[]>()
+  for (const h of highlights) {
+    const arr = hlByPage.get(h.page) ?? []
+    arr.push(h)
+    hlByPage.set(h.page, arr)
   }
 
   return (
@@ -418,6 +556,36 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           >
             🔍 Cerca
           </button>
+          <button
+            className={hlMode ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            title="Evidenziatore: attiva e seleziona il testo da evidenziare"
+            onClick={() => setHlMode((o) => !o)}
+          >
+            🖍️ Evidenzia
+          </button>
+          {hlMode && (
+            <div className="flex items-center gap-1 pl-1">
+              {pdfHlColors.map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => setHlColorIdx(i)}
+                  className={`h-5 w-5 rounded-full border ${hlColorIdx === i ? 'ring-2 ring-white border-white' : 'border-zinc-600'}`}
+                  style={{ background: c }}
+                  title={`Colore ${i + 1}`}
+                />
+              ))}
+              <label className="cursor-pointer px-0.5" title="Personalizza il colore attivo">
+                <span className="text-sm">🎨</span>
+                <input
+                  type="color"
+                  value={pdfHlColors[hlColorIdx]}
+                  onChange={(e) => setPdfHlColor(hlColorIdx as 0 | 1 | 2, e.target.value)}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          )}
+          {hlSaving && <span className="text-xs text-zinc-500 px-1">Salvataggio…</span>}
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
@@ -461,7 +629,12 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-auto bg-zinc-900 flex flex-col items-center gap-5 px-6 py-7">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-zinc-900 flex flex-col items-center gap-5 px-6 py-7"
+        onMouseUp={() => hlMode && addHighlightFromSelection()}
+        onClick={onPagesClick}
+      >
         {error && <span className="m-auto text-zinc-500 text-sm">Impossibile aprire il PDF.</span>}
         {loading && !error && (
           <div className="m-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
@@ -479,10 +652,25 @@ export function PdfViewer({ filePath }: { filePath: string }) {
                 ocrWords={ocrPages.get(n)}
                 finds={findsByPage.get(n)}
                 currents={cur && cur.page === n ? cur.boxes : undefined}
+                highlights={hlByPage.get(n)}
               />
             )
           })}
       </div>
+
+      {removePopup && (
+        <div className="fixed z-50" style={{ left: removePopup.x, top: removePopup.y - 36 }}>
+          <button
+            className="px-2 py-1 bg-zinc-900 border border-zinc-700 rounded shadow-xl text-xs text-red-300 hover:bg-zinc-800 whitespace-nowrap"
+            onClick={(e) => {
+              e.stopPropagation()
+              removeHighlight(removePopup.id)
+            }}
+          >
+            ✕ Rimuovi evidenziazione
+          </button>
+        </div>
+      )}
       </div>
     </div>
   )
@@ -525,6 +713,7 @@ function PdfPage({
   ocrWords,
   finds,
   currents,
+  highlights,
 }: {
   doc: PDFDocumentProxy
   pageNumber: number
@@ -532,6 +721,7 @@ function PdfPage({
   ocrWords?: OcrWord[]
   finds?: Box[]
   currents?: Box[]
+  highlights?: Highlight[]
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -655,6 +845,24 @@ function PdfPage({
         }}
       >
         <canvas ref={canvasRef} className="block" />
+        {highlights?.map((h) =>
+          h.rects.map((r, i) => (
+            <div
+              key={`${h.id}-${i}`}
+              style={{
+                position: 'absolute',
+                left: r.x0 * renderScale,
+                top: r.y0 * renderScale,
+                width: (r.x1 - r.x0) * renderScale,
+                height: (r.y1 - r.y0) * renderScale,
+                background: h.color,
+                opacity: 0.4,
+                borderRadius: 2,
+                pointerEvents: 'none',
+              }}
+            />
+          )),
+        )}
         {finds?.map((b, i) => (
           <div
             key={`f${i}`}
