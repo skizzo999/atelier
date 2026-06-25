@@ -132,3 +132,14 @@ body {
   border-radius: 2px;
   pointer-events: none;
 }
+
+/* Ricerca nel DOCX: <mark> sulle occorrenze, corrente in arancione. */
+mark.docx-find {
+  background: rgba(250, 204, 21, 0.5);
+  color: inherit;
+  border-radius: 2px;
+}
+mark.docx-find-current {
+  background: rgba(251, 146, 60, 0.9);
+  color: #111827;
+}
