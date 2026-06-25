@@ -152,6 +152,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         // Box in coord a scala 1 (punti PDF), indipendenti dallo zoom.
         const inPts = words.map((w) => ({
           text: w.text,
+          eol: w.eol,
           x0: w.x0 / ocrScale,
           y0: w.y0 / ocrScale,
           x1: w.x1 / ocrScale,
@@ -323,23 +324,26 @@ function buildOcrLayer(div: HTMLDivElement, words: OcrWord[], scale: number) {
   div.className = 'ocrLayer'
   div.replaceChildren()
   const frag = document.createDocumentFragment()
-  const spans: { el: HTMLSpanElement; w: number }[] = []
+  const spans: { el: HTMLSpanElement; w: number; text: string; sep: string }[] = []
   for (const word of words) {
     const w = (word.x1 - word.x0) * scale
     const h = (word.y1 - word.y0) * scale
     if (w <= 0 || h <= 0) continue
     const span = document.createElement('span')
-    span.textContent = word.text
+    span.textContent = word.text // solo la parola, per misurare la larghezza
     span.style.left = `${word.x0 * scale}px`
     span.style.top = `${word.y0 * scale}px`
     span.style.fontSize = `${h * 0.92}px`
     frag.appendChild(span)
-    spans.push({ el: span, w })
+    spans.push({ el: span, w, text: word.text, sep: word.eol ? '\n' : ' ' })
   }
   div.appendChild(frag)
-  for (const { el, w } of spans) {
+  // Stira ogni parola alla larghezza del box, poi aggiunge spazio/a-capo:
+  // così selezione e copia escono con spazi tra parole e righe separate.
+  for (const { el, w, text, sep } of spans) {
     const natural = el.offsetWidth
     if (natural > 0) el.style.transform = `scaleX(${w / natural})`
+    el.textContent = text + sep
   }
 }
 
