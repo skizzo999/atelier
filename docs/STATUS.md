@@ -5,9 +5,11 @@ Editor Markdown **completo** a 3 viste (Codice / Ibrida / Lettura) con live prev
 ricco in stile Obsidian. Viewer immagini ricco: editing + **annotazioni** con
 **selezione/modifica** (sposta/ridimensiona/warp/rotazione testo), **zoom/pan dinamico**
 unificato, **pannello Informazioni**, copia immagine, apri in Explorer, **regolazioni
-funzionali** e **OCR**. Pronti anche: sistema vault, file tree con watcher, gestione
-file, ricerca. Prossimi: gomma a pixel (annotatore), stampa trasversale, viewer altri
-formati (PDF/DOCX).
+funzionali** e **OCR**. **Viewer PDF avanzato**: selezione testo (vero + OCR automatico
+sulle scansioni), zoom Ctrl+rotella fluido e centrato, navigazione laterale (miniature +
+indice), ricerca nel PDF (Ctrl+F) e globale (Ctrl+Shift+F entra nei PDF), **evidenziatore
+salvato dentro al PDF** (3 colori personalizzabili). Pronti anche: sistema vault, file
+tree con watcher, gestione file, ricerca. Prossimi: viewer DOCX, stampa trasversale.
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -41,9 +43,25 @@ formati (PDF/DOCX).
   preview live, Applica/Annulla/Reset (niente filtri estetici)
 - [x] **OCR** (estrai testo): Tesseract.js lazy-load (ita+eng), risultato in modale con
   copia. Nota: 1° uso scarica il modello lingua dalla rete (poi in cache)
-- [x] **Viewer PDF** (sola lettura, PDF.js): scroll continuo, pagine renderizzate alla
-  vista (IntersectionObserver), zoom −/+/Adatta-larghezza, conteggio pagine. Worker
-  bundlato localmente (offline)
+- [x] **Viewer PDF avanzato** (PDF.js + pdf-lib): scroll continuo, render pigro per
+  pagina (IntersectionObserver), worker bundlato offline. In più:
+  - **Zoom Ctrl+rotella** fluido (scale CSS istantaneo + ri-render nitido al rilascio,
+    debounce) che tiene le pagine centrate; anche −/+/Adatta
+  - **Selezione/copia testo** (text layer pdf.js) su PDF di testo
+  - **OCR automatico** sulle pagine scansionate (Tesseract, worker persistente): in
+    background trova le pagine senza testo, le riconosce e crea uno strato di testo
+    selezionabile/cercabile (spazi+a-capo per copia leggibile, filtro confidenza)
+  - **Navigazione laterale a scomparsa**: miniature (lazy) + indice/segnalibri del PDF
+  - **Ricerca nel PDF** (Ctrl+F): testo vero + OCR, conteggio, prev/next, scroll e
+    evidenziazione risultati (corrente in arancione)
+  - **Ricerca globale** (Ctrl+Shift+F) ora entra anche nei PDF di testo (estrazione in
+    cache); aprendo un risultato salta al match dentro al PDF
+  - **Evidenziatore** (modalità a tasto): selezioni il testo → evidenzi; 3 colori
+    personalizzabili (persistiti); rimozione con click (modalità spenta) → "Rimuovi";
+    **salvataggio automatico DENTRO il PDF** come annotazioni /Highlight + JSON nel
+    catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
+    di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
+  - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -60,9 +78,10 @@ formati (PDF/DOCX).
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Viewer altri formati**: ✅ PDF (PDF.js) fatto → ora **DOCX** (Mammoth), poi pptx/xlsx (SheetJS)
+1. **Viewer altri formati**: ✅ PDF (completo) → ora **DOCX** (Mammoth), poi pptx/xlsx (SheetJS)
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
+   - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).
 4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
 5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
 6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
@@ -114,12 +133,30 @@ formati (PDF/DOCX).
   titolo callout: niente widget, hide del marker + pseudo-elemento `::before`
   (`content: attr(data-callout)`). Vale come regola generale per i "titoli a blocco".
 - Indici del vault (nome→path) per immagini (lib/images) e note (lib/notes), costruiti in App
+- **PDF** (componente `PdfViewer.tsx`, lib `pdfOcr`/`pdfSearch`/`pdfHighlights`):
+  - Render HiDPI (canvas a devicePixelRatio). Zoom: `scale` target (immediato, dimensione
+    segnaposto) vs `renderScale` (debounce, rasterizzazione); il contenuto è scalato via
+    CSS `scale(k)` finché non si ri-rasterizza nitido → zoom fluido senza lag
+  - Text layer: pdf.js `TextLayer` per i PDF di testo; per le scansioni uno strato `.ocrLayer`
+    costruito dai box delle parole OCR (coord a scala 1, stiramento scaleX a larghezza box)
+  - Tutto in coord **scala 1** (punti PDF): token ricerca, parole OCR, rettangoli evidenziatore
+  - Evidenziatore: annotazioni `/Highlight` (QuadPoints, y-flip via `page.getHeight()`) +
+    JSON `AtelierHighlights` nel catalog (ricarica esatta). `annotationMode: DISABLE` nel
+    render così il canvas non "cuoce" le annotazioni (le disegna solo l'overlay)
+  - Salvataggio: `writeHighlights` riparte da una **base pulita** (strip delle nostre annot.)
+    e **valida** l'output (riapre con pdf-lib) prima di sovrascrivere col file atomico
 
 ## Problemi aperti
 - Bundle > 500kB (CM6 + highlight.js): valutare code-split / lazy import
 - Indici immagini/note ricostruiti solo all'apertura del vault (una nota creata in
   sessione è apribile via fallback, ma entra nell'indice al riavvio)
 - Tabelle in Ibrida ancora monospazio (boxate = step futuro con StateField)
+- **PDF evidenziatore**: pagine con `/Rotate` non gestite (coord potrebbero non combaciare);
+  cross-reader senza appearance stream (Adobe sì, lettori minimali forse no); selezione che
+  attraversa due pagine non gestita
+- **PDF ricerca globale**: non OCR-izza le scansioni del vault (troppo pesante) → trova solo
+  i PDF con testo vero; le scansioni si cercano aprendole (OCR + Ctrl+F)
+- **PDF OCR**: modello lingua scaricato dalla rete al 1° uso (come OCR immagini)
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:

@@ -16,6 +16,9 @@
 - **Regolazioni funzionali** (luminosità/contrasto/saturazione, preview live) e **OCR**
   (Tesseract.js, ita+eng; 1° uso scarica il modello lingua)
 - **Gomma a pixel** nell'annotatore (cancella i pixel delle annotazioni, non la foto)
+- **Viewer PDF avanzato**: zoom Ctrl+rotella fluido/centrato, selezione testo (vero +
+  **OCR automatico** scansioni), nav laterale (miniature+indice), **ricerca** nel PDF e
+  globale (anche nei PDF), **evidenziatore salvato nel PDF** (3 colori personalizzabili)
 - **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
@@ -34,8 +37,12 @@
 > viewer per gli altri formati, che è il cuore del "workspace multi-formato".
 
 ### 1. Viewer altri formati (in corso)
-- **PDF** → ✅ FATTO (PdfViewer, PDF.js: scroll continuo, render pigro per pagina,
-  zoom −/+/Adatta, worker bundlato offline). Eventuale +: ricerca testo nel PDF.
+- **PDF** → ✅ FATTO E RICCO (PdfViewer + lib pdfOcr/pdfSearch/pdfHighlights):
+  zoom Ctrl+rotella fluido centrato, selezione testo (vero + **OCR automatico** sulle
+  scansioni), navigazione laterale (miniature + indice), **ricerca nel PDF** (Ctrl+F) e
+  **globale** (Ctrl+Shift+F entra nei PDF di testo), **evidenziatore salvato nel PDF**
+  (3 colori personalizzabili, rimozione, auto-save come annotazioni /Highlight + JSON).
+  Eventuali +: OCR anche nella ricerca globale, pagine /Rotate, appearance stream.
 - **DOCX** → Mammoth.js (view, poi edit) ← PROSSIMO
 - pptx / xlsx → SheetJS / viewer dedicati
 
@@ -70,18 +77,22 @@ git add . && git commit # Commit
 git push                # Push su GitHub
 
 ## File principali
-- src/store/appStore.ts                      (vaultPath, mode, mdView, penPresets, buffer testo/immagini)
-- src/lib/{vault,fileOps,images,notes,search}.ts
+- src/store/appStore.ts                      (vaultPath, mode, mdView, penPresets, pdfHlColors, buffer)
+- src/lib/{vault,fileOps,images,notes,search}.ts  (search ora estrae anche il testo dei PDF)
 - src/lib/annotations.ts                      (tipi forme + disegno + bounds/warp/scale/rotazione)
 - src/lib/{imageMeta,imageActions}.ts         (DPI/peso; copia appunti, apri in Explorer)
+- src/lib/pdfOcr.ts                           (worker Tesseract persistente + box parole)
+- src/lib/pdfSearch.ts                        (token testo+box per pagina; ricerca nel PDF)
+- src/lib/pdfHighlights.ts                    (pdf-lib: leggi/scrivi evidenziazioni nel PDF)
 - src/components/FileTree/FileTree.tsx        (albero + watcher + menu file)
 - src/components/FileView/FileView.tsx        (routing per tipo)
 - src/components/ImageViewer/ImageViewer.tsx  (viewer + editing + annotazioni + selezione + regola + OCR)
 - src/components/ImageViewer/ImageInfoPanel.tsx (pannello Informazioni)
+- src/components/PdfViewer/PdfViewer.tsx      (viewer PDF: zoom, OCR, nav, ricerca, evidenziatore)
 - src/components/Editor/Editor.tsx            (3 viste; marked + estensioni; immagini Lettura)
 - src/components/CodeMirror/CodeMirrorEditor.tsx (bridge React↔CM6)
 - src/components/CodeMirror/livePreview.ts    (decorazioni Ibrida)
-- src/components/SearchPalette/SearchPalette.tsx
+- src/components/SearchPalette/SearchPalette.tsx  (Ctrl+P nomi, Ctrl+Shift+F contenuto incl. PDF)
 - src-tauri/src/lib.rs                        (comando allow_path)
 
 ## Problemi noti
