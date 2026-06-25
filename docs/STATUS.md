@@ -8,8 +8,10 @@ unificato, **pannello Informazioni**, copia immagine, apri in Explorer, **regola
 funzionali** e **OCR**. **Viewer PDF avanzato**: selezione testo (vero + OCR automatico
 sulle scansioni), zoom Ctrl+rotella fluido e centrato, navigazione laterale (miniature +
 indice), ricerca nel PDF (Ctrl+F) e globale (Ctrl+Shift+F entra nei PDF), **evidenziatore
-salvato dentro al PDF** (3 colori personalizzabili). Pronti anche: sistema vault, file
-tree con watcher, gestione file, ricerca. Prossimi: viewer DOCX, stampa trasversale.
+salvato dentro al PDF** (3 colori personalizzabili). **Viewer DOCX** (sola lettura,
+Mammoth): HTML semantico in stile Lettura, pannello Info, ricerca (Ctrl+F), export in
+Markdown. Pronti anche: sistema vault, file tree con watcher, gestione file, ricerca.
+Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -62,6 +64,12 @@ tree con watcher, gestione file, ricerca. Prossimi: viewer DOCX, stampa trasvers
     catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
     di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
   - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
+- [x] **Viewer DOCX** (sola lettura, Mammoth): converte il .docx in HTML semantico
+  (titoli, grassetto/corsivo, liste, tabelle, immagini base64), sanitizzato (DOMPurify)
+  e reso con `prose prose-invert`. **Pannello Info** (nome/parole/peso/percorso+copia),
+  **ricerca** nel documento (Ctrl+F, <mark> + scroll, X/Y), **export in Markdown**
+  (convertToMarkdown, scrive un .md accanto e lo apre), **Apri in Explorer**. Solo .docx
+  (il vecchio .doc binario non è supportato). Editing = step successivo
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -78,14 +86,18 @@ tree con watcher, gestione file, ricerca. Prossimi: viewer DOCX, stampa trasvers
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Viewer altri formati**: ✅ PDF (completo) → ora **DOCX** (Mammoth), poi pptx/xlsx (SheetJS)
-2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
-3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
+1. **Editing DOCX** (DA DECIDERE l'approccio): (a) workflow Markdown — si edita il .md
+   esportato con l'editor esistente, il .docx resta intatto (semplice, no perdita);
+   (b) editing vero che riscrive il .docx (writer tipo `docx`/`html-to-docx`, lossy e
+   complesso). Consigliata la (a) per coerenza/sicurezza.
+2. **Altri formati**: ✅ PDF e DOCX (view) → **pptx/xlsx** (SheetJS / viewer dedicati).
+3. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
+4. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).
-4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
-5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+5. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
+6. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
+7. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
+8. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
 
 > L'**editor immagini è completo**: trasformazioni, ritaglio, annotazioni con
 > selezione/modifica/rotazione, **gomma a pixel**, regolazioni, info/copia/OCR/Explorer.

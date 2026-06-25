@@ -19,6 +19,8 @@
 - **Viewer PDF avanzato**: zoom Ctrl+rotella fluido/centrato, selezione testo (vero +
   **OCR automatico** scansioni), nav laterale (miniature+indice), **ricerca** nel PDF e
   globale (anche nei PDF), **evidenziatore salvato nel PDF** (3 colori personalizzabili)
+- **Viewer DOCX** (sola lettura, Mammoth): HTML semantico in stile Lettura, **Info**,
+  **ricerca** (Ctrl+F), **export in Markdown**. Editing = domani
 - **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
@@ -43,7 +45,12 @@
   **globale** (Ctrl+Shift+F entra nei PDF di testo), **evidenziatore salvato nel PDF**
   (3 colori personalizzabili, rimozione, auto-save come annotazioni /Highlight + JSON).
   Eventuali +: OCR anche nella ricerca globale, pagine /Rotate, appearance stream.
-- **DOCX** → Mammoth.js (view, poi edit) ← PROSSIMO
+- **DOCX** → ✅ VIEW FATTO (DocxViewer, Mammoth → HTML prose; Info, ricerca Ctrl+F,
+  export in Markdown). **EDITING = PROSSIMO** — decidere l'approccio:
+  - (a) **workflow Markdown**: si edita il .md esportato con l'editor a 3 viste esistente,
+    il .docx resta intatto (semplice, robusto, nessuna perdita). CONSIGLIATO per partire.
+  - (b) **editing vero del .docx**: rigenerare il file Word dall'HTML modificato con un
+    writer (`docx` / `html-to-docx`). Lossy e più complesso.
 - pptx / xlsx → SheetJS / viewer dedicati
 
 ### 2. Stampa (trasversale)
@@ -89,6 +96,7 @@ git push                # Push su GitHub
 - src/components/ImageViewer/ImageViewer.tsx  (viewer + editing + annotazioni + selezione + regola + OCR)
 - src/components/ImageViewer/ImageInfoPanel.tsx (pannello Informazioni)
 - src/components/PdfViewer/PdfViewer.tsx      (viewer PDF: zoom, OCR, nav, ricerca, evidenziatore)
+- src/components/DocxViewer/DocxViewer.tsx    (viewer DOCX: Mammoth→HTML, Info, ricerca, export md)
 - src/components/Editor/Editor.tsx            (3 viste; marked + estensioni; immagini Lettura)
 - src/components/CodeMirror/CodeMirrorEditor.tsx (bridge React↔CM6)
 - src/components/CodeMirror/livePreview.ts    (decorazioni Ibrida)
