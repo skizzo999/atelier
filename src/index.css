@@ -119,3 +119,16 @@ body {
   user-select: text;
 }
 .ocrLayer ::selection { background: rgba(56, 138, 221, 0.4); }
+
+/* Risultati di ricerca: rettangoli sopra il canvas (sotto al testo trasparente). */
+.pdf-find {
+  background: rgba(56, 138, 221, 0.32);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.pdf-find-current {
+  background: rgba(251, 146, 60, 0.55);
+  outline: 1.5px solid rgba(234, 88, 12, 0.9);
+  border-radius: 2px;
+  pointer-events: none;
+}

@@ -5,6 +5,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { formatSize } from '../../lib/imageMeta'
 import { revealInExplorer } from '../../lib/imageActions'
 import { ocrCanvasWords, type OcrWord } from '../../lib/pdfOcr'
+import { tokensForPage, searchTokens, type Box, type Token } from '../../lib/pdfSearch'
 // Worker bundlato localmente (niente CDN: resta tutto offline).
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -45,6 +46,15 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   // OCR delle pagine scansionate: parola → box in coord a scala 1 (punti PDF).
   const [ocrPages, setOcrPages] = useState<Map<number, OcrWord[]>>(new Map())
   const [ocr, setOcr] = useState<{ done: number; total: number } | null>(null)
+  // Ricerca nel PDF.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<{ page: number; boxes: Box[] }[]>([])
+  const [current, setCurrent] = useState(0)
+  const [searching, setSearching] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const lastQuery = useRef('')
+  const tokensCache = useRef<Map<number, { tokens: Token[]; ocr: boolean }>>(new Map())
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
   const scaleRef = useRef(scale)
@@ -84,6 +94,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setOutline(null)
     setOcrPages(new Map())
     setOcr(null)
+    setHits([])
+    setCurrent(0)
+    tokensCache.current.clear()
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
@@ -171,6 +184,76 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     }
   }, [doc, numPages])
 
+  // Ctrl+F apre la ricerca nel PDF (Ctrl+Shift+F resta la ricerca globale dell'app).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setSearchOpen(true)
+        requestAnimationFrame(() => searchInputRef.current?.select())
+      } else if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [searchOpen])
+
+  // Esegue la ricerca (debounce) su tutte le pagine: testo vero + OCR.
+  useEffect(() => {
+    if (!searchOpen) {
+      setHits([])
+      setCurrent(0)
+      return
+    }
+    if (!doc) return
+    const q = query.trim().toLowerCase()
+    if (q.length < 2) {
+      setHits([])
+      setCurrent(0)
+      setSearching(false)
+      lastQuery.current = ''
+      return
+    }
+    let cancelled = false
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      const found: { page: number; boxes: Box[] }[] = []
+      for (let n = 1; n <= numPages; n++) {
+        if (cancelled) return
+        const ocr = ocrPages.get(n)
+        const cached = tokensCache.current.get(n)
+        let tokens: Token[]
+        if (cached && cached.ocr === !!ocr) {
+          tokens = cached.tokens
+        } else {
+          const page = await doc.getPage(n)
+          tokens = await tokensForPage(page, ocr)
+          tokensCache.current.set(n, { tokens, ocr: !!ocr })
+        }
+        if (cancelled) return
+        for (const boxes of searchTokens(tokens, q)) found.push({ page: n, boxes })
+      }
+      if (cancelled) return
+      setHits(found)
+      setSearching(false)
+      // Salta al primo risultato solo per una query NUOVA: se invece i risultati
+      // sono cambiati perché l'OCR ha finito una pagina, non strappare la vista.
+      if (q !== lastQuery.current) {
+        lastQuery.current = q
+        setCurrent(0)
+        if (found.length) scrollToBox(found[0].page, unionBox(found[0].boxes))
+      } else {
+        setCurrent((c) => Math.min(c, Math.max(0, found.length - 1)))
+      }
+    }, 350)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, query, searchOpen, numPages, ocrPages])
+
   function fitWidth() {
     if (!baseWidthRef.current) return
     const cw = containerRef.current?.clientWidth ?? 800
@@ -204,12 +287,47 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     }
   }
 
+  // Scorre il contenitore così che il box (coord scala 1) sia ben visibile.
+  function scrollToBox(page: number, box: Box) {
+    const el = document.getElementById(`pdfp-${page}`)
+    const cont = containerRef.current
+    if (!el || !cont) return
+    const offsetWithin = el.getBoundingClientRect().top - cont.getBoundingClientRect().top + cont.scrollTop
+    const target = offsetWithin + box.y0 * scale - cont.clientHeight / 3
+    cont.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+  }
+
+  function unionBox(boxes: Box[]): Box {
+    return {
+      x0: Math.min(...boxes.map((b) => b.x0)),
+      y0: Math.min(...boxes.map((b) => b.y0)),
+      x1: Math.max(...boxes.map((b) => b.x1)),
+      y1: Math.max(...boxes.map((b) => b.y1)),
+    }
+  }
+
+  // Va al risultato i (con wrap) e ci scorre sopra.
+  function goToHit(i: number) {
+    if (!hits.length) return
+    const n = ((i % hits.length) + hits.length) % hits.length
+    setCurrent(n)
+    scrollToBox(hits[n].page, unionBox(hits[n].boxes))
+  }
+
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
   try {
     fileName = decodeURIComponent(raw) // path a volte URL-encoded (%20 -> spazio)
   } catch {
     /* nome con % non valido: tieni il grezzo */
+  }
+
+  // Tutti i box dei risultati, raggruppati per pagina (per le evidenziazioni).
+  const findsByPage = new Map<number, Box[]>()
+  for (const h of hits) {
+    const arr = findsByPage.get(h.page) ?? []
+    arr.push(...h.boxes)
+    findsByPage.set(h.page, arr)
   }
 
   return (
@@ -243,7 +361,38 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         </aside>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative">
+      {searchOpen && (
+        <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl px-2 py-1.5">
+          <input
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                goToHit(e.shiftKey ? current - 1 : current + 1)
+              } else if (e.key === 'Escape') {
+                setSearchOpen(false)
+              }
+            }}
+            placeholder="Cerca nel PDF…"
+            className="bg-transparent text-sm text-zinc-100 w-48 px-1 focus:outline-none placeholder:text-zinc-600"
+          />
+          <span className="text-xs text-zinc-500 tabular-nums w-14 text-center shrink-0">
+            {searching ? '…' : hits.length ? `${current + 1}/${hits.length}` : query.trim().length >= 2 ? '0/0' : ''}
+          </span>
+          <button className={btn} title="Precedente (Shift+Invio)" onClick={() => goToHit(current - 1)} disabled={!hits.length}>
+            ↑
+          </button>
+          <button className={btn} title="Successivo (Invio)" onClick={() => goToHit(current + 1)} disabled={!hits.length}>
+            ↓
+          </button>
+          <button className={btn} title="Chiudi (Esc)" onClick={() => setSearchOpen(false)}>
+            ✕
+          </button>
+        </div>
+      )}
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0">
         <span className="text-sm text-zinc-300 flex items-center gap-2 min-w-0">
           <button className={btn} title="Pannello navigazione" onClick={() => setSidebarOpen((o) => !o)}>
@@ -259,6 +408,16 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           )}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
+          <button
+            className={searchOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            title="Cerca nel PDF (Ctrl+F)"
+            onClick={() => {
+              setSearchOpen((o) => !o)
+              requestAnimationFrame(() => searchInputRef.current?.select())
+            }}
+          >
+            🔍 Cerca
+          </button>
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
@@ -308,9 +467,21 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           <div className="m-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
         )}
         {doc &&
-          Array.from({ length: numPages }, (_, i) => (
-            <PdfPage key={i + 1} doc={doc} pageNumber={i + 1} scale={scale} ocrWords={ocrPages.get(i + 1)} />
-          ))}
+          Array.from({ length: numPages }, (_, i) => {
+            const n = i + 1
+            const cur = hits[current]
+            return (
+              <PdfPage
+                key={n}
+                doc={doc}
+                pageNumber={n}
+                scale={scale}
+                ocrWords={ocrPages.get(n)}
+                finds={findsByPage.get(n)}
+                currents={cur && cur.page === n ? cur.boxes : undefined}
+              />
+            )
+          })}
       </div>
       </div>
     </div>
@@ -352,11 +523,15 @@ function PdfPage({
   pageNumber,
   scale,
   ocrWords,
+  finds,
+  currents,
 }: {
   doc: PDFDocumentProxy
   pageNumber: number
   scale: number
   ocrWords?: OcrWord[]
+  finds?: Box[]
+  currents?: Box[]
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -480,6 +655,32 @@ function PdfPage({
         }}
       >
         <canvas ref={canvasRef} className="block" />
+        {finds?.map((b, i) => (
+          <div
+            key={`f${i}`}
+            className="pdf-find"
+            style={{
+              position: 'absolute',
+              left: b.x0 * renderScale,
+              top: b.y0 * renderScale,
+              width: (b.x1 - b.x0) * renderScale,
+              height: (b.y1 - b.y0) * renderScale,
+            }}
+          />
+        ))}
+        {currents?.map((b, i) => (
+          <div
+            key={`c${i}`}
+            className="pdf-find-current"
+            style={{
+              position: 'absolute',
+              left: b.x0 * renderScale,
+              top: b.y0 * renderScale,
+              width: (b.x1 - b.x0) * renderScale,
+              height: (b.y1 - b.y0) * renderScale,
+            }}
+          />
+        ))}
         <div ref={textLayerRef} className="textLayer" />
       </div>
     </div>
