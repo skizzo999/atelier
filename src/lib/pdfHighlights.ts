@@ -110,5 +110,9 @@ export async function writeHighlights(base: Uint8Array, highlights: Highlight[])
   }
 
   doc.catalog.set(PDFName.of(META_KEY), PDFString.of(JSON.stringify(highlights)))
-  return await doc.save({ useObjectStreams: false })
+  const out = await doc.save({ useObjectStreams: false })
+  // Sicurezza: non restituire (e quindi non sovrascrivere il file) se l'output
+  // non è un PDF rileggibile. Meglio non salvare che corrompere il PDF.
+  await PDFDocument.load(out, { ignoreEncryption: true, updateMetadata: false })
+  return out
 }
