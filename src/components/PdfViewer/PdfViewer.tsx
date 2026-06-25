@@ -255,10 +255,22 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
+  // Segnaposto alla scala TARGET (layout/scroll immediati).
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  // Scala a cui il contenuto è davvero rasterizzato (in ritardo = debounce).
+  const [renderScale, setRenderScale] = useState(scale)
+  // Dimensioni del contenuto alla renderScale (per lo scale CSS dello zoom).
+  const [renderSize, setRenderSize] = useState<{ w: number; h: number } | null>(null)
   const [visible, setVisible] = useState(false)
 
-  // Dimensioni della pagina alla scala corrente (per il segnaposto = scroll corretto).
+  // Durante lo zoom ri-rasterizza solo quando ci si ferma (niente lag per scatto).
+  useEffect(() => {
+    if (renderScale === scale) return
+    const t = setTimeout(() => setRenderScale(scale), 160)
+    return () => clearTimeout(t)
+  }, [scale, renderScale])
+
+  // Segnaposto alla scala target (immediato, così lo scroll è giusto).
   useEffect(() => {
     let cancelled = false
     doc.getPage(pageNumber).then((page) => {
@@ -270,20 +282,18 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
     }
   }, [doc, pageNumber, scale])
 
-  // Renderizza solo quando la pagina è (quasi) in vista.
+  // Render solo quando (quasi) in vista.
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setVisible(true)
-      },
-      { rootMargin: '400px 0px' },
-    )
+    const obs = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setVisible(true), {
+      rootMargin: '500px 0px',
+    })
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
 
+  // Rasterizza canvas + text layer alla renderScale (HiDPI).
   useEffect(() => {
     if (!visible) return
     let cancelled = false
@@ -291,11 +301,10 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
     let textLayer: { cancel: () => void } | null = null
     doc.getPage(pageNumber).then(async (page) => {
       if (cancelled) return
-      const vp = page.getViewport({ scale })
+      const vp = page.getViewport({ scale: renderScale })
+      setRenderSize({ w: Math.floor(vp.width), h: Math.floor(vp.height) })
       const canvas = canvasRef.current
       if (!canvas) return
-      // Renderizza alla risoluzione del dispositivo (HiDPI) e ridimensiona via CSS:
-      // così su schermi 2x/Retina non viene sgranato.
       const dpr = window.devicePixelRatio || 1
       canvas.width = Math.floor(vp.width * dpr)
       canvas.height = Math.floor(vp.height * dpr)
@@ -305,13 +314,13 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
       if (!ctx) return
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
       task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
-      task.promise.catch(() => {}) // ignora le cancellazioni
+      task.promise.catch(() => {})
 
       // Strato di testo selezionabile/copiabile sopra il canvas.
       const tlDiv = textLayerRef.current
       if (tlDiv) {
         tlDiv.replaceChildren()
-        tlDiv.style.setProperty('--total-scale-factor', String(scale))
+        tlDiv.style.setProperty('--total-scale-factor', String(renderScale))
         tlDiv.style.width = `${Math.floor(vp.width)}px`
         tlDiv.style.height = `${Math.floor(vp.height)}px`
         const textContent = await page.getTextContent()
@@ -326,7 +335,10 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
       task?.cancel()
       textLayer?.cancel()
     }
-  }, [visible, doc, pageNumber, scale])
+  }, [visible, doc, pageNumber, renderScale])
+
+  // Zoom istantaneo: scala via CSS dal contenuto (renderScale) alla scala target.
+  const k = renderSize && size && renderSize.w ? size.w / renderSize.w : 1
 
   return (
     <div
@@ -335,8 +347,20 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
       style={{ width: size?.w, height: size?.h, scrollMarginTop: 16 }}
       className="relative bg-white rounded-md overflow-hidden shrink-0 ring-1 ring-black/5 shadow-[0_2px_16px_rgba(0,0,0,0.5)]"
     >
-      <canvas ref={canvasRef} className="block" />
-      <div ref={textLayerRef} className="textLayer" />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: renderSize?.w,
+          height: renderSize?.h,
+          transform: k !== 1 ? `scale(${k})` : undefined,
+          transformOrigin: '0 0',
+        }}
+      >
+        <canvas ref={canvasRef} className="block" />
+        <div ref={textLayerRef} className="textLayer" />
+      </div>
     </div>
   )
 }
