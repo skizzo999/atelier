@@ -12,6 +12,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 const btn =
   'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
 
+interface OutlineNode {
+  title: string
+  dest: string | unknown[] | null
+  items: OutlineNode[]
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
@@ -32,6 +38,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const [sizeBytes, setSizeBytes] = useState(0)
   const [infoOpen, setInfoOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [navTab, setNavTab] = useState<'thumbs' | 'outline'>('thumbs')
+  const [outline, setOutline] = useState<OutlineNode[] | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
   const scaleRef = useRef(scale)
@@ -68,6 +77,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setError(false)
     setDoc(null)
     setNumPages(0)
+    setOutline(null)
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
@@ -82,6 +92,12 @@ export function PdfViewer({ filePath }: { filePath: string }) {
       setDoc(pdf)
       setNumPages(pdf.numPages)
       setLoading(false)
+      pdf
+        .getOutline()
+        .then((o) => {
+          if (!cancelled) setOutline((o as OutlineNode[] | null) ?? null)
+        })
+        .catch(() => setOutline(null))
     })().catch((e) => {
       console.error('Errore apertura PDF:', e)
       if (!cancelled) {
@@ -111,6 +127,23 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     }
   }
 
+  function scrollToPage(n: number) {
+    document.getElementById(`pdfp-${n}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  async function gotoDest(dest: string | unknown[] | null) {
+    if (!dest || !doc) return
+    try {
+      const explicit = typeof dest === 'string' ? await doc.getDestination(dest) : dest
+      const ref = (explicit as unknown[] | null)?.[0]
+      if (!ref) return
+      const idx = await doc.getPageIndex(ref as Parameters<PDFDocumentProxy['getPageIndex']>[0])
+      scrollToPage(idx + 1)
+    } catch (e) {
+      console.error('Destinazione PDF non risolta:', e)
+    }
+  }
+
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
   try {
@@ -120,11 +153,44 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex overflow-hidden">
+      {sidebarOpen && (
+        <aside className="w-56 shrink-0 border-r border-zinc-800 bg-zinc-900/40 flex flex-col overflow-hidden">
+          <div className="flex border-b border-zinc-800 text-xs shrink-0">
+            <button
+              onClick={() => setNavTab('thumbs')}
+              className={`flex-1 px-2 py-2 ${navTab === 'thumbs' ? 'text-zinc-100 bg-zinc-800/60' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Miniature
+            </button>
+            <button
+              onClick={() => setNavTab('outline')}
+              className={`flex-1 px-2 py-2 ${navTab === 'outline' ? 'text-zinc-100 bg-zinc-800/60' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Indice
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {navTab === 'thumbs'
+              ? doc &&
+                Array.from({ length: numPages }, (_, i) => (
+                  <PdfThumb key={i + 1} doc={doc} pageNumber={i + 1} onClick={() => scrollToPage(i + 1)} />
+                ))
+              : outline && outline.length > 0
+                ? <OutlineTree nodes={outline} onSelect={gotoDest} />
+                : <p className="text-xs text-zinc-600 px-1 py-2">Nessun indice in questo PDF.</p>}
+          </div>
+        </aside>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0">
-        <span className="text-sm text-zinc-300 truncate flex items-center gap-2">
-          {fileName}
-          {numPages > 0 && <span className="text-xs text-zinc-500">· {numPages} pagine</span>}
+        <span className="text-sm text-zinc-300 flex items-center gap-2 min-w-0">
+          <button className={btn} title="Pannello navigazione" onClick={() => setSidebarOpen((o) => !o)}>
+            ☰
+          </button>
+          <span className="truncate">{fileName}</span>
+          {numPages > 0 && <span className="text-xs text-zinc-500 shrink-0">· {numPages} pagine</span>}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
@@ -179,6 +245,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           Array.from({ length: numPages }, (_, i) => (
             <PdfPage key={i + 1} doc={doc} pageNumber={i + 1} scale={scale} />
           ))}
+      </div>
       </div>
     </div>
   )
@@ -264,11 +331,110 @@ function PdfPage({ doc, pageNumber, scale }: { doc: PDFDocumentProxy; pageNumber
   return (
     <div
       ref={wrapRef}
-      style={{ width: size?.w, height: size?.h }}
+      id={`pdfp-${pageNumber}`}
+      style={{ width: size?.w, height: size?.h, scrollMarginTop: 16 }}
       className="relative bg-white rounded-md overflow-hidden shrink-0 ring-1 ring-black/5 shadow-[0_2px_16px_rgba(0,0,0,0.5)]"
     >
       <canvas ref={canvasRef} className="block" />
       <div ref={textLayerRef} className="textLayer" />
     </div>
+  )
+}
+
+const THUMB_W = 150
+
+// Miniatura di pagina (render piccolo e pigro) cliccabile.
+function PdfThumb({ doc, pageNumber, onClick }: { doc: PDFDocumentProxy; pageNumber: number; onClick: () => void }) {
+  const wrapRef = useRef<HTMLButtonElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    doc.getPage(pageNumber).then((page) => {
+      const base = page.getViewport({ scale: 1 })
+      const vp = page.getViewport({ scale: THUMB_W / base.width })
+      if (!cancelled) setSize({ w: Math.floor(vp.width), h: Math.floor(vp.height) })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [doc, pageNumber])
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const obs = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && setVisible(true), {
+      rootMargin: '200px 0px',
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
+    let cancelled = false
+    let task: { promise: Promise<unknown>; cancel: () => void } | null = null
+    doc.getPage(pageNumber).then((page) => {
+      if (cancelled) return
+      const base = page.getViewport({ scale: 1 })
+      const dpr = window.devicePixelRatio || 1
+      const vp = page.getViewport({ scale: THUMB_W / base.width })
+      const canvas = canvasRef.current
+      if (!canvas) return
+      canvas.width = Math.floor(vp.width * dpr)
+      canvas.height = Math.floor(vp.height * dpr)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
+      task = page.render({ canvasContext: ctx, viewport: vp, transform, canvas })
+      task.promise.catch(() => {})
+    })
+    return () => {
+      cancelled = true
+      task?.cancel()
+    }
+  }, [visible, doc, pageNumber])
+
+  return (
+    <button ref={wrapRef} onClick={onClick} className="block w-full mb-3 group">
+      <div
+        style={{ width: size?.w, height: size?.h }}
+        className="mx-auto bg-white rounded ring-1 ring-black/10 overflow-hidden group-hover:ring-2 group-hover:ring-blue-500"
+      >
+        <canvas ref={canvasRef} className="block w-full h-full" />
+      </div>
+      <span className="block text-center text-[11px] text-zinc-500 mt-1">{pageNumber}</span>
+    </button>
+  )
+}
+
+// Indice (bookmarks) del PDF, ricorsivo.
+function OutlineTree({
+  nodes,
+  onSelect,
+  depth = 0,
+}: {
+  nodes: OutlineNode[]
+  onSelect: (dest: OutlineNode['dest']) => void
+  depth?: number
+}) {
+  return (
+    <ul className="text-xs">
+      {nodes.map((n, i) => (
+        <li key={i}>
+          <button
+            onClick={() => onSelect(n.dest)}
+            className="block w-full text-left py-1 px-1 rounded text-zinc-300 hover:bg-zinc-800 truncate"
+            style={{ paddingLeft: 4 + depth * 12 }}
+            title={n.title}
+          >
+            {n.title}
+          </button>
+          {n.items && n.items.length > 0 && <OutlineTree nodes={n.items} onSelect={onSelect} depth={depth + 1} />}
+        </li>
+      ))}
+    </ul>
   )
 }
