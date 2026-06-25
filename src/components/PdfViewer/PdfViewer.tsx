@@ -58,6 +58,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const lastQuery = useRef('')
   const tokensCache = useRef<Map<number, { tokens: Token[]; ocr: boolean }>>(new Map())
+  const setPendingHighlight = useAppStore((s) => s.setPendingHighlight)
   // Evidenziatore.
   const pdfHlColors = useAppStore((s) => s.pdfHlColors)
   const setPdfHlColor = useAppStore((s) => s.setPdfHlColor)
@@ -210,6 +211,19 @@ export function PdfViewer({ filePath }: { filePath: string }) {
       cancelled = true
     }
   }, [doc, numPages])
+
+  // Aperto da una ricerca globale nel contenuto: apri la ricerca interna col
+  // termine, così salta al primo risultato dentro al PDF.
+  useEffect(() => {
+    const term = useAppStore.getState().pendingHighlight
+    if (term && term.trim().length >= 2) {
+      setQuery(term)
+      setSearchOpen(true)
+      setPendingHighlight(null)
+      requestAnimationFrame(() => searchInputRef.current?.select())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filePath])
 
   // Ctrl+F apre la ricerca nel PDF (Ctrl+Shift+F resta la ricerca globale dell'app).
   useEffect(() => {

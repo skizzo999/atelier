@@ -165,7 +165,9 @@ export function SearchPalette({
                 <span className="text-sm text-zinc-200 truncate">{r.name}</span>
                 {isContent ? (
                   <span className="text-xs text-zinc-500 truncate">
-                    {(r as ContentMatch).rel}:{(r as ContentMatch).line} — {(r as ContentMatch).preview}
+                    {(r as ContentMatch).rel}
+                    {(r as ContentMatch).page ? ` · p. ${(r as ContentMatch).page}` : `:${(r as ContentMatch).line}`} —{' '}
+                    {(r as ContentMatch).preview}
                   </span>
                 ) : (
                   <span className="text-xs text-zinc-500 truncate">{(r as VaultFile).rel}</span>

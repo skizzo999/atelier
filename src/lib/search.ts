@@ -1,4 +1,8 @@
-import { readDir, readTextFile } from '@tauri-apps/plugin-fs'
+import { readDir, readTextFile, readFile } from '@tauri-apps/plugin-fs'
+import * as pdfjsLib from 'pdfjs-dist'
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
 export interface VaultFile {
   path: string
@@ -11,6 +15,7 @@ export interface ContentMatch {
   name: string
   rel: string
   line: number
+  page?: number // per i PDF: pagina del primo match
   preview: string
 }
 
@@ -56,6 +61,37 @@ function isTextFile(name: string): boolean {
   return ext ? TEXT_EXT.has(ext) : false
 }
 
+function isPdf(name: string): boolean {
+  return name.toLowerCase().endsWith('.pdf')
+}
+
+// Testo per pagina di un PDF, in cache per sessione (i PDF cambiano di rado e
+// ri-estrarre a ogni tasto premuto sarebbe lentissimo). Solo testo "vero": le
+// scansioni senza testo non vengono trovate qui (vanno aperte e cercate con l'OCR).
+const pdfTextCache = new Map<string, string[]>()
+
+async function pdfPageTexts(path: string): Promise<string[]> {
+  const cached = pdfTextCache.get(path)
+  if (cached) return cached
+  const bytes = await readFile(path)
+  const task = pdfjsLib.getDocument({ data: bytes })
+  const pdf = await task.promise
+  const pages: string[] = []
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n)
+    const tc = await page.getTextContent()
+    pages.push(tc.items.map((it) => ('str' in it ? it.str : '')).join(' '))
+  }
+  task.destroy()
+  pdfTextCache.set(path, pages)
+  return pages
+}
+
+function snippet(text: string, idx: number, len: number): string {
+  const start = Math.max(0, idx - 40)
+  return (start > 0 ? '…' : '') + text.slice(start, idx + len + 80).replace(/\s+/g, ' ').trim()
+}
+
 // Cerca `query` nel contenuto dei file testuali. Una riga per file (la prima),
 // per restare leggera; limite ai risultati totali.
 export async function searchContent(
@@ -67,6 +103,30 @@ export async function searchContent(
   const results: ContentMatch[] = []
 
   for (const f of files) {
+    if (isPdf(f.name)) {
+      let pages: string[]
+      try {
+        pages = await pdfPageTexts(f.path)
+      } catch {
+        continue
+      }
+      for (let p = 0; p < pages.length; p++) {
+        const idx = pages[p].toLowerCase().indexOf(q)
+        if (idx >= 0) {
+          results.push({
+            path: f.path,
+            name: f.name,
+            rel: f.rel,
+            line: 0,
+            page: p + 1,
+            preview: snippet(pages[p], idx, q.length),
+          })
+          break // primo match per PDF
+        }
+      }
+      if (results.length >= limit) break
+      continue
+    }
     if (!isTextFile(f.name)) continue
     let text: string
     try {
