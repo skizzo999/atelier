@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { readFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
 import { formatSize } from '../../lib/imageMeta'
 import { revealInExplorer } from '../../lib/imageActions'
+import { writeFileBinaryAtomic } from '../../lib/fileOps'
+import { htmlToDocxBlob } from '../../lib/htmlToDocx'
 import { useAppStore } from '../../store/appStore'
 
 const btn =
@@ -74,7 +76,10 @@ export function DocxViewer({ filePath }: { filePath: string }) {
   const [matchCount, setMatchCount] = useState(0)
   const [current, setCurrent] = useState(0)
   const [displayedHtml, setDisplayedHtml] = useState('') // HTML con i <mark> bakeati
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
+  const editRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -85,6 +90,7 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     setDisplayedHtml('')
     setSearchOpen(false)
     setQuery('')
+    setEditing(false)
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
@@ -126,10 +132,11 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     setWords(text.trim() ? text.trim().split(/\s+/).length : 0)
   }, [html])
 
-  // Ctrl+F apre la ricerca nel documento.
+  // Ctrl+F apre la ricerca (non in modalità modifica).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') {
+        if (editing) return
         e.preventDefault()
         setSearchOpen(true)
         requestAnimationFrame(() => searchInputRef.current?.select())
@@ -139,7 +146,16 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [searchOpen])
+  }, [searchOpen, editing])
+
+  // Popola il div editabile quando si entra in modifica (div non controllato da
+  // React, così le modifiche non vengono sovrascritte ai re-render).
+  useLayoutEffect(() => {
+    if (editing && editRef.current) {
+      editRef.current.innerHTML = html
+      editRef.current.focus()
+    }
+  }, [editing, html])
 
   // Costruisce l'HTML con i <mark> (debounce). I mark sono nell'HTML reso da
   // React, quindi NON spariscono ai re-render (il bug del "lampo").
@@ -212,6 +228,35 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     }
   }
 
+  // Salva le modifiche SOVRASCRIVENDO il .docx (con backup .bak la prima volta).
+  // L'HTML modificato viene riconvertito in .docx (fedeltà "Mammoth").
+  async function saveDocx() {
+    if (saving) return
+    const editor = editRef.current
+    if (!editor) return
+    const content = editor.innerHTML
+    setSaving(true)
+    try {
+      const bak = `${filePath}.bak`
+      if (!(await exists(bak))) {
+        const orig = await readFile(filePath) // backup pristino, una sola volta
+        await writeFileBinaryAtomic(bak, orig)
+      }
+      const blob = await htmlToDocxBlob(editor) // elemento live: immagini con dimensioni
+      const buf = new Uint8Array(await blob.arrayBuffer())
+      await writeFileBinaryAtomic(filePath, buf)
+      const clean = DOMPurify.sanitize(content)
+      setHtml(clean)
+      setDisplayedHtml(clean)
+      setSizeBytes(buf.length)
+      setEditing(false)
+    } catch (e) {
+      console.error('Salvataggio DOCX:', e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
   try {
@@ -259,15 +304,36 @@ export function DocxViewer({ filePath }: { filePath: string }) {
           <span className="truncate">{fileName}</span>
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
-          <button className={btn} title="Esporta in Markdown" disabled={exporting || loading} onClick={exportMarkdown}>
-            {exporting ? 'Esporto…' : '↧ Esporta .md'}
-          </button>
-          <button className={infoOpen ? btnActive : btn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
-            ⓘ Info
-          </button>
-          <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
-            Explorer
-          </button>
+          {editing ? (
+            <>
+              <span className="text-xs text-amber-400 px-1">Modifica — sovrascriverà il .docx</span>
+              <button
+                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+                onClick={saveDocx}
+                disabled={saving}
+              >
+                {saving ? 'Salvataggio…' : '💾 Salva'}
+              </button>
+              <button className={btn} onClick={() => setEditing(false)} disabled={saving}>
+                Annulla
+              </button>
+            </>
+          ) : (
+            <>
+              <button className={btn} title="Modifica il documento" disabled={loading || error} onClick={() => { setSearchOpen(false); setEditing(true) }}>
+                ✏️ Modifica
+              </button>
+              <button className={btn} title="Esporta in Markdown" disabled={exporting || loading} onClick={exportMarkdown}>
+                {exporting ? 'Esporto…' : '↧ Esporta .md'}
+              </button>
+              <button className={infoOpen ? btnActive : btn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
+                ⓘ Info
+              </button>
+              <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
+                Explorer
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -305,11 +371,21 @@ export function DocxViewer({ filePath }: { filePath: string }) {
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
         )}
-        <div
-          ref={contentRef}
-          className={`prose prose-invert max-w-3xl mx-auto ${loading || error ? 'hidden' : ''}`}
-          dangerouslySetInnerHTML={{ __html: displayedHtml }}
-        />
+        {editing ? (
+          // Div NON controllato da React (popolato a mano): contentEditable.
+          <div
+            ref={editRef}
+            contentEditable
+            suppressContentEditableWarning
+            className="prose prose-invert max-w-3xl mx-auto focus:outline-none ring-1 ring-amber-500/40 rounded p-3"
+          />
+        ) : (
+          <div
+            ref={contentRef}
+            className={`prose prose-invert max-w-3xl mx-auto ${loading || error ? 'hidden' : ''}`}
+            dangerouslySetInnerHTML={{ __html: displayedHtml }}
+          />
+        )}
       </div>
     </div>
   )

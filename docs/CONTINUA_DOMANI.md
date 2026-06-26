@@ -19,8 +19,9 @@
 - **Viewer PDF avanzato**: zoom Ctrl+rotella fluido/centrato, selezione testo (vero +
   **OCR automatico** scansioni), nav laterale (miniature+indice), **ricerca** nel PDF e
   globale (anche nei PDF), **evidenziatore salvato nel PDF** (3 colori personalizzabili)
-- **Viewer DOCX** (sola lettura, Mammoth): HTML semantico in stile Lettura, **Info**,
-  **ricerca** (Ctrl+F), **export in Markdown**. Editing = domani
+- **Viewer + editor DOCX** (Mammoth + docx): HTML semantico in stile Lettura, **Info**,
+  **ricerca** (Ctrl+F), **export in Markdown**, **editing diretto** che sovrascrive il
+  .docx (contentEditable → riconversione, backup .bak)
 - **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
@@ -45,13 +46,13 @@
   **globale** (Ctrl+Shift+F entra nei PDF di testo), **evidenziatore salvato nel PDF**
   (3 colori personalizzabili, rimozione, auto-save come annotazioni /Highlight + JSON).
   Eventuali +: OCR anche nella ricerca globale, pagine /Rotate, appearance stream.
-- **DOCX** → ✅ VIEW FATTO (DocxViewer, Mammoth → HTML prose; Info, ricerca Ctrl+F,
-  export in Markdown). **EDITING = PROSSIMO** — decidere l'approccio:
-  - (a) **workflow Markdown**: si edita il .md esportato con l'editor a 3 viste esistente,
-    il .docx resta intatto (semplice, robusto, nessuna perdita). CONSIGLIATO per partire.
-  - (b) **editing vero del .docx**: rigenerare il file Word dall'HTML modificato con un
-    writer (`docx` / `html-to-docx`). Lossy e più complesso.
-- pptx / xlsx → SheetJS / viewer dedicati
+- **DOCX** → ✅ VIEW + EDIT FATTO (DocxViewer, Mammoth → HTML prose; Info, ricerca Ctrl+F,
+  export Markdown). **Editing diretto**: ✏️ Modifica (contentEditable) → 💾 Salva
+  SOVRASCRIVE il .docx riconvertendo l'HTML con la libreria `docx` (`lib/htmlToDocx.ts`),
+  backup `.bak` la 1ª volta. Fedeltà "Mammoth" (lossy, dichiarato all'utente).
+  - Da rifinire se serve: immagini/tabelle/liste annidate nella conversione; pulsanti di
+    formattazione (grassetto/lista) nella barra; salvare come NUOVO file in alternativa.
+- pptx / xlsx → SheetJS / viewer dedicati ← PROSSIMO grande blocco formati
 
 ### 2. Stampa (trasversale)
 - Funzione di stampa generica per tutti i tipi di file (non solo immagini), da
@@ -96,7 +97,8 @@ git push                # Push su GitHub
 - src/components/ImageViewer/ImageViewer.tsx  (viewer + editing + annotazioni + selezione + regola + OCR)
 - src/components/ImageViewer/ImageInfoPanel.tsx (pannello Informazioni)
 - src/components/PdfViewer/PdfViewer.tsx      (viewer PDF: zoom, OCR, nav, ricerca, evidenziatore)
-- src/components/DocxViewer/DocxViewer.tsx    (viewer DOCX: Mammoth→HTML, Info, ricerca, export md)
+- src/components/DocxViewer/DocxViewer.tsx    (viewer+editor DOCX: Mammoth→HTML, Info, ricerca, export, edit)
+- src/lib/htmlToDocx.ts                        (HTML→DOCX con la libreria `docx`, per salvare le modifiche)
 - src/components/Editor/Editor.tsx            (3 viste; marked + estensioni; immagini Lettura)
 - src/components/CodeMirror/CodeMirrorEditor.tsx (bridge React↔CM6)
 - src/components/CodeMirror/livePreview.ts    (decorazioni Ibrida)

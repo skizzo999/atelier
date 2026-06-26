@@ -27,6 +27,7 @@
     "@tiptap/pm": "^3.26.0",
     "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.26.0",
+    "docx": "^9.7.1",
     "dompurify": "^3.4.11",
     "highlight.js": "^11.11.1",
     "mammoth": "^1.12.0",

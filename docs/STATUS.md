@@ -64,13 +64,17 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
     catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
     di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
   - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
-- [x] **Viewer DOCX** (sola lettura, Mammoth): converte il .docx in HTML semantico
+- [x] **Viewer + editor DOCX** (Mammoth + docx): converte il .docx in HTML semantico
   (titoli, grassetto/corsivo, liste, tabelle, immagini base64), sanitizzato (DOMPurify)
   e reso con `prose prose-invert`. **Pannello Info** (nome/parole/peso/percorso+copia),
-  **ricerca** nel documento (solo Ctrl+F, <mark> + scroll alla corrente, X/Y), **export
-  in Markdown** (scrive un .md accanto e lo apre), entra nella **ricerca globale**
-  (Ctrl+Shift+F), **Apri in Explorer**. Solo .docx (il vecchio .doc binario non è
-  supportato). Editing = step successivo
+  **ricerca** nel documento (solo Ctrl+F, <mark> bakeati nell'HTML + scroll alla
+  corrente, X/Y), **export in Markdown** (scrive un .md accanto e lo apre), entra nella
+  **ricerca globale** (Ctrl+Shift+F), **Apri in Explorer**. Solo .docx.
+  - **Editing diretto** (✏️ Modifica → contentEditable → 💾 Salva): SOVRASCRIVE il .docx
+    riconvertendo l'HTML in docx (`lib/htmlToDocx.ts` con la libreria `docx`: titoli,
+    grassetto/corsivo/sottolineato/barrato, apici/pedici, liste anche annidate, citazioni,
+    tabelle, immagini). **Backup `.bak`** pristino la 1ª volta. Fedeltà "Mammoth" (la
+    formattazione non catturata in import va persa nel salvataggio)
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -87,11 +91,9 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Editing DOCX** (DA DECIDERE l'approccio): (a) workflow Markdown — si edita il .md
-   esportato con l'editor esistente, il .docx resta intatto (semplice, no perdita);
-   (b) editing vero che riscrive il .docx (writer tipo `docx`/`html-to-docx`, lossy e
-   complesso). Consigliata la (a) per coerenza/sicurezza.
-2. **Altri formati**: ✅ PDF e DOCX (view) → **pptx/xlsx** (SheetJS / viewer dedicati).
+1. **Drag-and-drop file** nel tree (richiesto, da fare dopo i DOCX): react-arborist
+   `onMove` + `rename` su disco (lib/fileOps) + aggiorna i buffer.
+2. **Altri formati**: ✅ PDF e DOCX (view+edit) → **pptx/xlsx** (SheetJS / viewer dedicati).
 3. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 4. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).
@@ -170,6 +172,10 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 - **PDF ricerca globale**: non OCR-izza le scansioni del vault (troppo pesante) → trova solo
   i PDF con testo vero; le scansioni si cercano aprendole (OCR + Ctrl+F)
 - **PDF OCR**: modello lingua scaricato dalla rete al 1° uso (come OCR immagini)
+- **DOCX editing**: salvando si SOVRASCRIVE il .docx riconvertendo l'HTML semplificato
+  (fedeltà "Mammoth": stili/font/intestazioni non catturati in import vanno persi).
+  Mitigazione: backup `.bak` pristino. Conversione `htmlToDocx.ts` da provare a fondo
+  (immagini/tabelle/liste annidate); html-docx-js scartato (usa `with`, Vite 7 non lo parsa)
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:
