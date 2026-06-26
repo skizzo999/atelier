@@ -7,7 +7,7 @@ ricco in stile Obsidian. Viewer immagini ricco: editing + **annotazioni** con
 unificato, **pannello Informazioni**, copia immagine, apri in Explorer, **regolazioni
 funzionali** e **OCR**. **Viewer PDF avanzato**: selezione testo (vero + OCR automatico
 sulle scansioni), zoom Ctrl+rotella fluido e centrato, navigazione laterale (miniature +
-indice), ricerca nel PDF (Ctrl+F) e globale (Ctrl+Shift+F entra nei PDF), **evidenziatore
+indice), ricerca nel PDF (Ctrl+F) e globale (Ctrl+Shift+F entra in PDF e DOCX), **evidenziatore
 salvato dentro al PDF** (3 colori personalizzabili). **Viewer DOCX** (sola lettura,
 Mammoth): HTML semantico in stile Lettura, pannello Info, ricerca (Ctrl+F), export in
 Markdown. Pronti anche: sistema vault, file tree con watcher, gestione file, ricerca.
@@ -67,9 +67,10 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 - [x] **Viewer DOCX** (sola lettura, Mammoth): converte il .docx in HTML semantico
   (titoli, grassetto/corsivo, liste, tabelle, immagini base64), sanitizzato (DOMPurify)
   e reso con `prose prose-invert`. **Pannello Info** (nome/parole/peso/percorso+copia),
-  **ricerca** nel documento (Ctrl+F, <mark> + scroll, X/Y), **export in Markdown**
-  (convertToMarkdown, scrive un .md accanto e lo apre), **Apri in Explorer**. Solo .docx
-  (il vecchio .doc binario non è supportato). Editing = step successivo
+  **ricerca** nel documento (solo Ctrl+F, <mark> + scroll alla corrente, X/Y), **export
+  in Markdown** (scrive un .md accanto e lo apre), entra nella **ricerca globale**
+  (Ctrl+Shift+F), **Apri in Explorer**. Solo .docx (il vecchio .doc binario non è
+  supportato). Editing = step successivo
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)

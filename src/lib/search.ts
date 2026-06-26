@@ -1,6 +1,7 @@
 import { readDir, readTextFile, readFile } from '@tauri-apps/plugin-fs'
 import * as pdfjsLib from 'pdfjs-dist'
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import * as mammoth from 'mammoth'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
@@ -92,6 +93,23 @@ function snippet(text: string, idx: number, len: number): string {
   return (start > 0 ? '…' : '') + text.slice(start, idx + len + 80).replace(/\s+/g, ' ').trim()
 }
 
+function isDocx(name: string): boolean {
+  return name.toLowerCase().endsWith('.docx')
+}
+
+// Testo grezzo di un DOCX (Mammoth), in cache per sessione.
+const docxTextCache = new Map<string, string>()
+
+async function docxText(path: string): Promise<string> {
+  const cached = docxTextCache.get(path)
+  if (cached !== undefined) return cached
+  const bytes = await readFile(path)
+  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  const r = await mammoth.extractRawText({ arrayBuffer })
+  docxTextCache.set(path, r.value)
+  return r.value
+}
+
 // Cerca `query` nel contenuto dei file testuali. Una riga per file (la prima),
 // per restare leggera; limite ai risultati totali.
 export async function searchContent(
@@ -123,6 +141,20 @@ export async function searchContent(
           })
           break // primo match per PDF
         }
+      }
+      if (results.length >= limit) break
+      continue
+    }
+    if (isDocx(f.name)) {
+      let text: string
+      try {
+        text = await docxText(f.path)
+      } catch {
+        continue
+      }
+      const idx = text.toLowerCase().indexOf(q)
+      if (idx >= 0) {
+        results.push({ path: f.path, name: f.name, rel: f.rel, line: 0, preview: snippet(text, idx, q.length) })
       }
       if (results.length >= limit) break
       continue

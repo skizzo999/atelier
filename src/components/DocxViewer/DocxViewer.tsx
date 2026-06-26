@@ -65,6 +65,7 @@ function addMarks(root: HTMLElement, query: string): HTMLElement[] {
 // reso come la vista Lettura. Con pannello Info, ricerca (Ctrl+F) ed export in Markdown.
 export function DocxViewer({ filePath }: { filePath: string }) {
   const setSelectedFile = useAppStore((s) => s.setSelectedFile)
+  const setPendingHighlight = useAppStore((s) => s.setPendingHighlight)
   const [html, setHtml] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -106,6 +107,18 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     return () => {
       cancelled = true
     }
+  }, [filePath])
+
+  // Aperto da una ricerca globale: apri la ricerca col termine (le evidenziazioni
+  // compaiono appena l'HTML è pronto, grazie alla dipendenza da `html`).
+  useEffect(() => {
+    const term = useAppStore.getState().pendingHighlight
+    if (term && term.trim().length >= 2) {
+      setQuery(term)
+      setSearchOpen(true)
+      setPendingHighlight(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath])
 
   // Conteggio parole dal testo reso.
@@ -250,16 +263,6 @@ export function DocxViewer({ filePath }: { filePath: string }) {
           <span className="truncate">{fileName}</span>
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
-          <button
-            className={searchOpen ? btnActive : btn}
-            title="Cerca (Ctrl+F)"
-            onClick={() => {
-              setSearchOpen((o) => !o)
-              requestAnimationFrame(() => searchInputRef.current?.select())
-            }}
-          >
-            🔍 Cerca
-          </button>
           <button className={btn} title="Esporta in Markdown" disabled={exporting || loading} onClick={exportMarkdown}>
             {exporting ? 'Esporto…' : '↧ Esporta .md'}
           </button>
