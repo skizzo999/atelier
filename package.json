@@ -46,7 +46,6 @@
     "react-arborist": "^3.10.1",
     "react-dom": "^19.1.0",
     "tesseract.js": "^7.0.0",
-    "tiptap-extension-pagination": "^2.1.4",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

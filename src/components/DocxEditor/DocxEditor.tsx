@@ -7,7 +7,6 @@ import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import Pagination, { PageNode, HeaderFooterNode, BodyNode } from 'tiptap-extension-pagination'
 import { readFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
@@ -24,16 +23,6 @@ const extensions = [
   TableRow,
   TableHeader,
   TableCell,
-  // Paginazione vera: il contenuto scorre su fogli A4 con margini reali.
-  Pagination.configure({
-    defaultPaperSize: 'A4',
-    defaultPaperColour: '#ffffff',
-    useDeviceThemeForPaperColour: false,
-    defaultMarginConfig: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
-  }),
-  PageNode,
-  HeaderFooterNode,
-  BodyNode,
 ]
 
 // Bottone della barra strumenti (stile Atelier: attivo = accento blu).
@@ -111,9 +100,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const buffered = useAppStore.getState().dirtyBuffers[filePath]
       if (buffered !== undefined) {
         editor.commands.setContent(buffered)
+        importingRef.current = false
         setLoading(false)
-        // assorbe le transazioni di ri-paginazione iniziali (non sono modifiche utente)
-        setTimeout(() => (importingRef.current = false), 350)
         return
       }
       const bytes = await readFile(filePath)
@@ -121,8 +109,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
       editor.commands.setContent(DOMPurify.sanitize(result.value))
+      importingRef.current = false // setContent emette update in modo sincrono: ora basta
       setLoading(false)
-      setTimeout(() => (importingRef.current = false), 350)
     })().catch((e) => {
       console.error('Errore apertura DOCX:', e)
       if (!cancelled) {
@@ -337,13 +325,16 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         </div>
       )}
 
-      {/* Sfondo grigio; i fogli A4 li disegna l'estensione di paginazione. Zoom via CSS. */}
+      {/* Sfondo grigio + foglio A4 bianco (stile Word/Google Docs), con zoom. */}
       <div ref={scrollRef} className="flex-1 overflow-auto bg-neutral-700/60 py-8 px-4">
         {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
         )}
-        <div className={`docx-prose ${loading || error ? 'hidden' : ''}`} style={{ zoom }}>
+        <div
+          className={`docx-pages mx-auto shadow-2xl ${loading || error ? 'hidden' : ''}`}
+          style={{ width: 794, minHeight: 1123, padding: '76px 80px', zoom }}
+        >
           <EditorContent editor={editor} />
         </div>
       </div>
