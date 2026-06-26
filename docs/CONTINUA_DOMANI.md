@@ -36,6 +36,19 @@
 
 ## Cosa fare (in ordine)
 
+### 0. DOCX paginazione — DA FARE PER PRIMO (richiesto dall'utente 2026-06-26)
+Due problemi della paginazione attuale (`src/lib/pagination.ts` + CSS `.docx-page-break`):
+1. **Divisore tra i fogli = colore dello sfondo.** Ora il gap tra le pagine è grigio
+   `#6b7280`; deve essere **uguale allo sfondo** del contenitore (`.docx-prose` parent,
+   `bg-neutral-700/60`) così i fogli sembrano davvero staccati. (CSS in `index.css`:
+   il gradient del `.docx-page-break` e il colore gap nel `pagination.ts` → usare il
+   colore dello sfondo.)
+2. **Paginazione a livello di RIGA, non di blocco.** Oggi quando un paragrafo non
+   entra, va TUTTO alla pagina dopo. Invece deve **spezzarsi all'ultima riga/parola
+   che ci sta**: es. "ciao come stai", se "stai" non entra, va a capo SOLO "stai", non
+   tutta la frase. = vera paginazione con split del paragrafo a metà (la parte difficile:
+   serve misurare le righe dentro il blocco, non solo il blocco intero).
+
 > **Editor immagini COMPLETO** (incl. gomma a pixel). Prossimo grande blocco: i
 > viewer per gli altri formati, che è il cuore del "workspace multi-formato".
 
