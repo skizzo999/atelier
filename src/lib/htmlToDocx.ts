@@ -192,6 +192,7 @@ function convertBlocks(container: Node, ctx: Ctx, out: (Paragraph | Table)[]) {
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return
     const el = node as HTMLElement
+    if (el.classList.contains('docx-page-break')) return // separatore di pagina: ignora
     const tag = el.tagName
     if (HEADING[tag]) {
       out.push(paragraphOf(el, { heading: HEADING[tag] }))

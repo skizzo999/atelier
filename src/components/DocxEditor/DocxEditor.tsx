@@ -13,6 +13,7 @@ import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { htmlToDocxBlob } from '../../lib/htmlToDocx'
+import { Pagination } from '../../lib/pagination'
 import { useAppStore } from '../../store/appStore'
 
 const extensions = [
@@ -23,6 +24,7 @@ const extensions = [
   TableRow,
   TableHeader,
   TableCell,
+  Pagination, // fogli A4 distinti, salto pagina a livello di blocco
 ]
 
 // Bottone della barra strumenti (stile Atelier: attivo = accento blu).
@@ -325,16 +327,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         </div>
       )}
 
-      {/* Sfondo grigio + foglio A4 bianco (stile Word/Google Docs), con zoom. */}
+      {/* Sfondo grigio; i fogli A4 (bianchi, con margini) e i salti pagina li
+          gestisce il motore di paginazione. Zoom via CSS. */}
       <div ref={scrollRef} className="flex-1 overflow-auto bg-neutral-700/60 py-8 px-4">
         {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
         )}
-        <div
-          className={`docx-pages mx-auto shadow-2xl ${loading || error ? 'hidden' : ''}`}
-          style={{ width: 794, minHeight: 1123, padding: '76px 80px', zoom }}
-        >
+        <div className={`docx-prose ${loading || error ? 'hidden' : ''}`} style={{ zoom }}>
           <EditorContent editor={editor} />
         </div>
       </div>
