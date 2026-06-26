@@ -19,9 +19,9 @@
 - **Viewer PDF avanzato**: zoom Ctrl+rotella fluido/centrato, selezione testo (vero +
   **OCR automatico** scansioni), nav laterale (miniature+indice), **ricerca** nel PDF e
   globale (anche nei PDF), **evidenziatore salvato nel PDF** (3 colori personalizzabili)
-- **Viewer + editor DOCX** (Mammoth + docx): HTML semantico in stile Lettura, **Info**,
-  **ricerca** (Ctrl+F), **export in Markdown**, **editing diretto** che sovrascrive il
-  .docx (contentEditable → riconversione, backup .bak)
+- **Editor DOCX vero stile Word** (TipTap + Mammoth + docx): apri ed è editabile con
+  barra strumenti Atelier (titoli, B/I/U/barrato, liste, citazione, allineamenti…),
+  **export in Markdown**, **salva** che sovrascrive il .docx (backup .bak)
 - **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
@@ -46,12 +46,13 @@
   **globale** (Ctrl+Shift+F entra nei PDF di testo), **evidenziatore salvato nel PDF**
   (3 colori personalizzabili, rimozione, auto-save come annotazioni /Highlight + JSON).
   Eventuali +: OCR anche nella ricerca globale, pagine /Rotate, appearance stream.
-- **DOCX** → ✅ VIEW + EDIT FATTO (DocxViewer, Mammoth → HTML prose; Info, ricerca Ctrl+F,
-  export Markdown). **Editing diretto**: ✏️ Modifica (contentEditable) → 💾 Salva
-  SOVRASCRIVE il .docx riconvertendo l'HTML con la libreria `docx` (`lib/htmlToDocx.ts`),
-  backup `.bak` la 1ª volta. Fedeltà "Mammoth" (lossy, dichiarato all'utente).
-  - Da rifinire se serve: immagini/tabelle/liste annidate nella conversione; pulsanti di
-    formattazione (grassetto/lista) nella barra; salvare come NUOVO file in alternativa.
+- **DOCX** → ✅ EDITOR VERO STILE WORD (DocxEditor, **TipTap/ProseMirror**): apri ed è
+  editabile, barra strumenti Atelier (titoli, B/I/U/barrato/codice, liste, citazione,
+  allineamenti, riga). Import Mammoth; **Salva** (Ctrl+S) SOVRASCRIVE il .docx via
+  `lib/htmlToDocx.ts` (libreria `docx`), backup `.bak`. Fedeltà "Mammoth" (lossy, dichiarato).
+  - Da rifinire: tabelle (inserisci/righe/colonne), font/colore testo, UI link/immagini,
+    "salva come nuovo file", provare a fondo immagini/tabelle nel salvataggio.
+  - Editor docx FEDELE "vero": solo SuperDoc (AGPL/commerciale) — valutare se serve.
 - pptx / xlsx → SheetJS / viewer dedicati ← PROSSIMO grande blocco formati
 
 ### 2. Stampa (trasversale)
@@ -97,7 +98,7 @@ git push                # Push su GitHub
 - src/components/ImageViewer/ImageViewer.tsx  (viewer + editing + annotazioni + selezione + regola + OCR)
 - src/components/ImageViewer/ImageInfoPanel.tsx (pannello Informazioni)
 - src/components/PdfViewer/PdfViewer.tsx      (viewer PDF: zoom, OCR, nav, ricerca, evidenziatore)
-- src/components/DocxViewer/DocxViewer.tsx    (viewer+editor DOCX: Mammoth→HTML, Info, ricerca, export, edit)
+- src/components/DocxEditor/DocxEditor.tsx    (editor DOCX TipTap: barra strumenti, import Mammoth, salva, export)
 - src/lib/htmlToDocx.ts                        (HTML→DOCX con la libreria `docx`, per salvare le modifiche)
 - src/components/Editor/Editor.tsx            (3 viste; marked + estensioni; immagini Lettura)
 - src/components/CodeMirror/CodeMirrorEditor.tsx (bridge React↔CM6)

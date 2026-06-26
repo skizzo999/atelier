@@ -64,17 +64,18 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
     catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
     di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
   - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
-- [x] **Viewer + editor DOCX** (Mammoth + docx): converte il .docx in HTML semantico
-  (titoli, grassetto/corsivo, liste, tabelle, immagini base64), sanitizzato (DOMPurify)
-  e reso con `prose prose-invert`. **Pannello Info** (nome/parole/peso/percorso+copia),
-  **ricerca** nel documento (solo Ctrl+F, <mark> bakeati nell'HTML + scroll alla
-  corrente, X/Y), **export in Markdown** (scrive un .md accanto e lo apre), entra nella
-  **ricerca globale** (Ctrl+Shift+F), **Apri in Explorer**. Solo .docx.
-  - **Editing diretto** (✏️ Modifica → contentEditable → 💾 Salva): SOVRASCRIVE il .docx
-    riconvertendo l'HTML in docx (`lib/htmlToDocx.ts` con la libreria `docx`: titoli,
-    grassetto/corsivo/sottolineato/barrato, apici/pedici, liste anche annidate, citazioni,
-    tabelle, immagini). **Backup `.bak`** pristino la 1ª volta. Fedeltà "Mammoth" (la
-    formattazione non catturata in import va persa nel salvataggio)
+- [x] **Editor DOCX vero, stile Word** (TipTap/ProseMirror + Mammoth + docx): apri un
+  .docx ed è **subito editabile** (no bottone), con **barra strumenti Atelier**:
+  annulla/ripeti, menu titoli (Paragrafo/H1-3), grassetto/corsivo/sottolineato/barrato/
+  codice, elenco puntato/numerato, citazione, allineamenti, riga orizzontale. Estensioni:
+  StarterKit (ha già Underline+Link) + TextAlign + Image + Table.
+  - **Import**: Mammoth (docx→HTML→TipTap, sanitizzato DOMPurify)
+  - **Salva** (Ctrl+S / 💾): **SOVRASCRIVE** il .docx convertendo l'HTML dell'editor in
+    docx (`lib/htmlToDocx.ts` con la libreria `docx`: titoli, B/I/U/barrato, apici/pedici,
+    liste annidate, citazioni, tabelle, immagini live). **Backup `.bak`** pristino la 1ª volta
+  - **Export in Markdown** (.md accanto), **Apri in Explorer**, indicatore "non salvato"
+  - Fedeltà "Mammoth" (import/export buono, non byte-perfect come Word): è il trade-off
+    scelto con l'utente. Solo .docx
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -172,10 +173,13 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 - **PDF ricerca globale**: non OCR-izza le scansioni del vault (troppo pesante) → trova solo
   i PDF con testo vero; le scansioni si cercano aprendole (OCR + Ctrl+F)
 - **PDF OCR**: modello lingua scaricato dalla rete al 1° uso (come OCR immagini)
-- **DOCX editing**: salvando si SOVRASCRIVE il .docx riconvertendo l'HTML semplificato
-  (fedeltà "Mammoth": stili/font/intestazioni non catturati in import vanno persi).
-  Mitigazione: backup `.bak` pristino. Conversione `htmlToDocx.ts` da provare a fondo
-  (immagini/tabelle/liste annidate); html-docx-js scartato (usa `with`, Vite 7 non lo parsa)
+- **DOCX editing (TipTap)**: salvando si SOVRASCRIVE il .docx riconvertendo l'HTML
+  dell'editor (fedeltà "Mammoth": stili/font/intestazioni non catturati in import vanno
+  persi). Mitigazione: backup `.bak` pristino + indicatore "non salvato". Da provare a
+  fondo: `htmlToDocx.ts` su immagini/tabelle/liste annidate. Possibili +: tasti tabella
+  (inserisci/righe), font/colore, link UI, "salva come nuovo". html-docx-js scartato
+  (usa `with`, Vite 7 non lo parsa) → libreria `docx`. Editor docx fedele "vero" = solo
+  SuperDoc (AGPL/commerciale) o costruirlo: scelto TipTap (nostro, permissivo)
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:
