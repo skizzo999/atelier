@@ -19,46 +19,41 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-// Toglie le evidenziazioni di ricerca precedenti (riunisce i nodi di testo).
-function clearMarks(root: HTMLElement) {
-  root.querySelectorAll('mark.docx-find').forEach((m) => {
-    const parent = m.parentNode
-    if (parent) {
-      parent.replaceChild(document.createTextNode(m.textContent || ''), m)
-      parent.normalize()
-    }
-  })
-}
-
-// Avvolge le occorrenze della query in <mark> e ne restituisce l'elenco.
-function addMarks(root: HTMLElement, query: string): HTMLElement[] {
+// Restituisce l'HTML con le occorrenze della query avvolte in <mark data-i=N>
+// (e il conteggio). Lavora su un albero staccato e serializza: così i mark sono
+// PARTE dell'HTML gestito da React e non vengono cancellati a ogni re-render.
+function buildMarkedHtml(baseHtml: string, query: string): { html: string; count: number } {
   const q = query.toLowerCase()
-  const marks: HTMLElement[] = []
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  if (q.length < 2) return { html: baseHtml, count: 0 }
+  const tpl = document.createElement('div')
+  tpl.innerHTML = baseHtml
+  let count = 0
+  const walker = document.createTreeWalker(tpl, NodeFilter.SHOW_TEXT)
   const nodes: Text[] = []
   let n: Node | null
   while ((n = walker.nextNode())) nodes.push(n as Text)
   for (const node of nodes) {
     const text = node.nodeValue || ''
     const lower = text.toLowerCase()
-    let idx = lower.indexOf(q)
-    if (idx < 0) continue
+    if (!lower.includes(q)) continue
     const frag = document.createDocumentFragment()
     let last = 0
+    let idx = lower.indexOf(q)
     while (idx >= 0) {
       if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)))
       const mark = document.createElement('mark')
       mark.className = 'docx-find'
+      mark.setAttribute('data-i', String(count))
       mark.textContent = text.slice(idx, idx + q.length)
       frag.appendChild(mark)
-      marks.push(mark)
+      count++
       last = idx + q.length
       idx = lower.indexOf(q, last)
     }
     if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)))
     node.parentNode?.replaceChild(frag, node)
   }
-  return marks
+  return { html: tpl.innerHTML, count }
 }
 
 // Viewer DOCX (sola lettura): Mammoth converte il .docx in HTML semantico,
@@ -78,8 +73,8 @@ export function DocxViewer({ filePath }: { filePath: string }) {
   const [query, setQuery] = useState('')
   const [matchCount, setMatchCount] = useState(0)
   const [current, setCurrent] = useState(0)
+  const [displayedHtml, setDisplayedHtml] = useState('') // HTML con i <mark> bakeati
   const contentRef = useRef<HTMLDivElement>(null)
-  const marksRef = useRef<HTMLElement[]>([])
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -87,6 +82,7 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     setLoading(true)
     setError(false)
     setHtml('')
+    setDisplayedHtml('')
     setSearchOpen(false)
     setQuery('')
     ;(async () => {
@@ -95,7 +91,9 @@ export function DocxViewer({ filePath }: { filePath: string }) {
       const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
-      setHtml(DOMPurify.sanitize(result.value))
+      const clean = DOMPurify.sanitize(result.value)
+      setHtml(clean)
+      setDisplayedHtml(clean)
       setLoading(false)
     })().catch((e) => {
       console.error('Errore apertura DOCX:', e)
@@ -143,38 +141,36 @@ export function DocxViewer({ filePath }: { filePath: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [searchOpen])
 
-  // Evidenzia le occorrenze (debounce) e salta alla prima.
+  // Costruisce l'HTML con i <mark> (debounce). I mark sono nell'HTML reso da
+  // React, quindi NON spariscono ai re-render (il bug del "lampo").
   useEffect(() => {
-    const root = contentRef.current
-    if (!root) return
-    clearMarks(root)
-    marksRef.current = []
-    setMatchCount(0)
-    setCurrent(0)
     const q = query.trim()
-    if (!searchOpen || q.length < 2) return
+    if (!searchOpen || q.length < 2) {
+      setDisplayedHtml(html)
+      setMatchCount(0)
+      setCurrent(0)
+      return
+    }
     const t = setTimeout(() => {
-      const r = contentRef.current
-      if (!r) return
-      const marks = addMarks(r, q)
-      marksRef.current = marks
-      setMatchCount(marks.length)
-      if (marks.length) {
-        marks[0].classList.add('docx-find-current')
-        marks[0].scrollIntoView({ block: 'center', behavior: 'smooth' })
-      }
+      const { html: marked, count } = buildMarkedHtml(html, q)
+      setDisplayedHtml(marked)
+      setMatchCount(count)
+      setCurrent(0)
     }, 250)
     return () => clearTimeout(t)
   }, [query, searchOpen, html])
 
+  // Scorre fino all'occorrenza corrente quando cambia (o quando appaiono i mark).
+  useEffect(() => {
+    if (!matchCount) return
+    contentRef.current
+      ?.querySelector(`mark[data-i="${current}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [current, matchCount, displayedHtml])
+
   function goTo(delta: number) {
-    const marks = marksRef.current
-    if (!marks.length) return
-    marks[current]?.classList.remove('docx-find-current')
-    const next = (current + delta + marks.length) % marks.length
-    setCurrent(next)
-    marks[next].classList.add('docx-find-current')
-    marks[next].scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (!matchCount) return
+    setCurrent((c) => (c + delta + matchCount) % matchCount)
   }
 
   async function copyPath() {
@@ -298,6 +294,12 @@ export function DocxViewer({ filePath }: { filePath: string }) {
         </div>
       )}
 
+      {/* Colore del risultato corrente, via stile dinamico: cambiare "current"
+          non ritocca l'HTML (niente re-parse), evidenzia solo il mark giusto. */}
+      {matchCount > 0 && (
+        <style>{`mark.docx-find[data-i="${current}"]{background:rgba(251,146,60,0.9);color:#111827;}`}</style>
+      )}
+
       <div className="flex-1 overflow-y-auto bg-zinc-900 py-8 px-6">
         {error && <p className="text-zinc-500 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
@@ -306,7 +308,7 @@ export function DocxViewer({ filePath }: { filePath: string }) {
         <div
           ref={contentRef}
           className={`prose prose-invert max-w-3xl mx-auto ${loading || error ? 'hidden' : ''}`}
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: displayedHtml }}
         />
       </div>
     </div>
