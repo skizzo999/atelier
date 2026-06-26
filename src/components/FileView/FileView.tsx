@@ -2,7 +2,7 @@ import { useAppStore } from '../../store/appStore'
 import { Editor } from '../Editor/Editor'
 import { ImageViewer } from '../ImageViewer/ImageViewer'
 import { PdfViewer } from '../PdfViewer/PdfViewer'
-import { DocxViewer } from '../DocxViewer/DocxViewer'
+import { DocxEditor } from '../DocxEditor/DocxEditor'
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 
@@ -17,7 +17,7 @@ function kindOf(path: string): FileKind {
 }
 
 // Instrada il file selezionato verso il viewer giusto in base al tipo.
-// Immagini → ImageViewer; PDF → PdfViewer; DOCX → DocxViewer; resto → Editor testo.
+// Immagini → ImageViewer; PDF → PdfViewer; DOCX → DocxEditor; resto → Editor testo.
 export function FileView() {
   const filePath = useAppStore((s) => s.selectedFile)
 
@@ -32,7 +32,7 @@ export function FileView() {
   const kind = kindOf(filePath)
   if (kind === 'image') return <ImageViewer filePath={filePath} />
   if (kind === 'pdf') return <PdfViewer key={filePath} filePath={filePath} />
-  if (kind === 'docx') return <DocxViewer key={filePath} filePath={filePath} />
+  if (kind === 'docx') return <DocxEditor key={filePath} filePath={filePath} />
 
   return <Editor />
 }

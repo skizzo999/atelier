@@ -133,6 +133,16 @@ body {
   pointer-events: none;
 }
 
+/* Editor DOCX (TipTap/ProseMirror): tabelle, immagini, focus. */
+.ProseMirror:focus { outline: none; }
+.ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
+.ProseMirror td,
+.ProseMirror th { border: 1px solid #52525b; padding: 4px 8px; vertical-align: top; }
+.ProseMirror th { background: rgba(255, 255, 255, 0.05); }
+.ProseMirror img { max-width: 100%; height: auto; }
+.ProseMirror img.ProseMirror-selectednode { outline: 2px solid #3b82f6; }
+.ProseMirror .selectedCell { background: rgba(56, 138, 221, 0.2); }
+
 /* Ricerca nel DOCX: <mark> sulle occorrenze, corrente in arancione. */
 mark.docx-find {
   background: rgba(250, 204, 21, 0.5);

@@ -73,6 +73,24 @@ function dataUriToBytes(uri: string): { bytes: Uint8Array; type: 'png' | 'jpg' |
   }
 }
 
+function imageRunFrom(el: HTMLElement): ImageRun | null {
+  try {
+    const d = dataUriToBytes(el.getAttribute('src') || '')
+    if (!d) return null
+    const img = el as HTMLImageElement
+    const w = img.naturalWidth || img.width || 300
+    const h = img.naturalHeight || img.height || 200
+    const scale = Math.min(1, 480 / w)
+    return new ImageRun({
+      type: d.type,
+      data: d.bytes,
+      transformation: { width: Math.round(w * scale), height: Math.round(h * scale) },
+    })
+  } catch {
+    return null
+  }
+}
+
 // Raccoglie i run inline di un elemento (salta i blocchi annidati: es. liste).
 function inlineRuns(node: Node, fmt: Fmt, out: RunChild[]) {
   node.childNodes.forEach((child) => {
@@ -100,24 +118,8 @@ function inlineRuns(node: Node, fmt: Fmt, out: RunChild[]) {
       return
     }
     if (tag === 'IMG') {
-      try {
-        const d = dataUriToBytes(el.getAttribute('src') || '')
-        if (d) {
-          const img = el as HTMLImageElement
-          const w = img.naturalWidth || img.width || 300
-          const h = img.naturalHeight || img.height || 200
-          const scale = Math.min(1, 480 / w)
-          out.push(
-            new ImageRun({
-              type: d.type,
-              data: d.bytes,
-              transformation: { width: Math.round(w * scale), height: Math.round(h * scale) },
-            }),
-          )
-        }
-      } catch {
-        /* immagine non gestibile: ignorala */
-      }
+      const r = imageRunFrom(el)
+      if (r) out.push(r)
       return
     }
     if (BLOCK.has(tag)) return // i blocchi annidati li gestisce convertBlocks
@@ -160,14 +162,20 @@ function listToParagraphs(listEl: Element, ordered: boolean, level: number, ctx:
   }
 }
 
-function tableOf(tableEl: Element): Table | null {
+function tableOf(tableEl: Element, ctx: Ctx): Table | null {
   const rows: TableRow[] = []
   for (const tr of Array.from(tableEl.querySelectorAll('tr'))) {
     const cells: TableCell[] = []
     for (const td of Array.from(tr.querySelectorAll('td,th'))) {
-      const runs: RunChild[] = []
-      inlineRuns(td, td.tagName === 'TH' ? { bold: true } : {}, runs)
-      cells.push(new TableCell({ children: [new Paragraph({ children: runs })] }))
+      // Le celle possono contenere <p> (TipTap) o testo nudo (Mammoth).
+      const cellChildren: (Paragraph | Table)[] = []
+      convertBlocks(td, ctx, cellChildren)
+      if (!cellChildren.length) {
+        const runs: RunChild[] = []
+        inlineRuns(td, td.tagName === 'TH' ? { bold: true } : {}, runs)
+        cellChildren.push(new Paragraph({ children: runs }))
+      }
+      cells.push(new TableCell({ children: cellChildren }))
     }
     if (cells.length) rows.push(new TableRow({ children: cells }))
   }
@@ -198,8 +206,11 @@ function convertBlocks(container: Node, ctx: Ctx, out: (Paragraph | Table)[]) {
     } else if (tag === 'PRE') {
       out.push(new Paragraph({ children: [new TextRun({ text: el.textContent ?? '', font: 'Consolas' })] }))
     } else if (tag === 'TABLE') {
-      const t = tableOf(el)
+      const t = tableOf(el, ctx)
       if (t) out.push(t)
+    } else if (tag === 'IMG') {
+      const r = imageRunFrom(el)
+      if (r) out.push(new Paragraph({ children: [r] }))
     } else if (tag === 'DIV' || tag === 'SECTION' || tag === 'ARTICLE') {
       // Riga del contentEditable: se contiene blocchi scendi, altrimenti un paragrafo.
       if (hasBlockChildren(el)) convertBlocks(el, ctx, out)
