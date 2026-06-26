@@ -50,8 +50,13 @@
   editabile, barra strumenti Atelier (titoli, B/I/U/barrato/codice, liste, citazione,
   allineamenti, riga). Import Mammoth; **Salva** (Ctrl+S) SOVRASCRIVE il .docx via
   `lib/htmlToDocx.ts` (libreria `docx`), backup `.bak`. Fedeltà "Mammoth" (lossy, dichiarato).
-  - Da rifinire: tabelle (inserisci/righe/colonne), font/colore testo, UI link/immagini,
-    "salva come nuovo file", provare a fondo immagini/tabelle nel salvataggio.
+  - Vista a **foglio A4** (pila di pagine bianche su sfondo grigio, stile Word/Docs) +
+    **zoom** (Ctrl+rotella, −/%/+). Modifiche nel buffer del store (pallino tree, non
+    perse cambiando file). `.bak` nascosti dal tree.
+  - Da rendere "quasi professionale": **paginazione vera** (oggi le pagine A4 sono solo
+    sfondo: il testo scorre continuo e può finire sul gap — la paginazione reale con
+    margini per-pagina e split del contenuto è il pezzo grosso); tabelle (inserisci/righe/
+    colonne), font/colore testo, UI link/immagini, "salva come nuovo file".
   - Editor docx FEDELE "vero": solo SuperDoc (AGPL/commerciale) — valutare se serve.
 - pptx / xlsx → SheetJS / viewer dedicati ← PROSSIMO grande blocco formati
 

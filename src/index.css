@@ -135,6 +135,29 @@ body {
 
 /* Editor DOCX (TipTap/ProseMirror): tabelle, immagini, focus. */
 .ProseMirror:focus { outline: none; }
+
+/* Pila di fogli A4: bande bianche alte 1123px (A4 @96dpi) separate da un gap grigio,
+   ripetute mentre il contenuto cresce. Testo scuro (override delle variabili prose). */
+.docx-pages {
+  --tw-prose-body: #1f2937;
+  --tw-prose-headings: #111827;
+  --tw-prose-bold: #111827;
+  --tw-prose-bullets: #52525b;
+  --tw-prose-counters: #52525b;
+  --tw-prose-quotes: #374151;
+  --tw-prose-quote-borders: #d4d4d8;
+  --tw-prose-hr: #d4d4d8;
+  --tw-prose-links: #1d4ed8;
+  background-color: #6b7280;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    #ffffff 0px,
+    #ffffff 1123px,
+    transparent 1123px,
+    transparent 1147px
+  );
+}
+.docx-pages .ProseMirror { color: var(--tw-prose-body); }
 .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
 .ProseMirror td,
 .ProseMirror th { border: 1px solid #52525b; padding: 4px 8px; vertical-align: top; }

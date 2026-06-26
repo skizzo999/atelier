@@ -332,7 +332,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
         )}
         <div
-          className={`mx-auto bg-white text-neutral-900 shadow-2xl ${loading || error ? 'hidden' : ''}`}
+          className={`docx-pages mx-auto shadow-2xl ${loading || error ? 'hidden' : ''}`}
           style={{ width: 794, minHeight: 1123, padding: '76px 80px', zoom }}
         >
           <EditorContent editor={editor} />
