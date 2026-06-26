@@ -61,46 +61,56 @@ const Sep = () => <span className="w-px h-5 bg-zinc-700 mx-1" />
 // in stile Word ma con l'identità di Atelier. Salva = sovrascrive il .docx.
 export function DocxEditor({ filePath }: { filePath: string }) {
   const setSelectedFile = useAppStore((s) => s.setSelectedFile)
+  const setBuffer = useAppStore((s) => s.setBuffer)
+  const clearBuffer = useAppStore((s) => s.clearBuffer)
+  // "Non salvato" = c'è un buffer per questo file (mostra anche il pallino nel tree).
+  const dirty = useAppStore((s) => s.dirtyBuffers[filePath] !== undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [zoom, setZoom] = useState(1)
   const [, setTick] = useState(0)
-  const loadingRef = useRef(true)
+  const importingRef = useRef(true) // true mentre carico: ignora gli update
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     extensions,
     content: '',
     immediatelyRender: false, // evita problemi col doppio mount di StrictMode
     editorProps: {
-      attributes: { class: 'prose prose-invert max-w-3xl mx-auto focus:outline-none pb-24' },
+      attributes: { class: 'prose max-w-none focus:outline-none' },
     },
-    onUpdate: () => {
-      if (!loadingRef.current) setDirty(true)
+    onUpdate: ({ editor }) => {
+      if (importingRef.current) return
+      setBuffer(filePath, editor.getHTML()) // modifica → buffer (persiste tra i file)
     },
     onTransaction: () => setTick((t) => (t + 1) % 1_000_000), // barra riflette lo stato
   })
 
-  // Importa il .docx (Mammoth → HTML) nell'editor.
+  // Apre il .docx: se ci sono modifiche non salvate (buffer) le ripristina,
+  // altrimenti importa dal file (Mammoth → HTML).
   useEffect(() => {
     if (!editor) return
     let cancelled = false
-    loadingRef.current = true
+    importingRef.current = true
     setLoading(true)
     setError(false)
-    setDirty(false)
     ;(async () => {
+      const buffered = useAppStore.getState().dirtyBuffers[filePath]
+      if (buffered !== undefined) {
+        editor.commands.setContent(buffered)
+        importingRef.current = false
+        setLoading(false)
+        return
+      }
       const bytes = await readFile(filePath)
       const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
       editor.commands.setContent(DOMPurify.sanitize(result.value))
+      importingRef.current = false // setContent emette update in modo sincrono: ora basta
       setLoading(false)
-      // lascia assestare il setContent, poi riattiva il tracking delle modifiche
-      requestAnimationFrame(() => {
-        loadingRef.current = false
-      })
     })().catch((e) => {
       console.error('Errore apertura DOCX:', e)
       if (!cancelled) {
@@ -126,7 +136,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const blob = await htmlToDocxBlob(editor.view.dom as HTMLElement)
       const buf = new Uint8Array(await blob.arrayBuffer())
       await writeFileBinaryAtomic(filePath, buf)
-      setDirty(false)
+      clearBuffer(filePath) // salvato → niente più "non salvato"
     } catch (e) {
       console.error('Salvataggio DOCX:', e)
     } finally {
@@ -146,6 +156,19 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, saving, filePath])
+
+  // Zoom della pagina con Ctrl+rotella.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoom((z) => +Math.min(2.5, Math.max(0.5, z + (e.deltaY < 0 ? 0.1 : -0.1))).toFixed(2))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
   async function exportMarkdown() {
     if (exporting) return
@@ -287,15 +310,33 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <TBtn title="Riga orizzontale" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
             ―
           </TBtn>
+          <div className="flex-1" />
+          {/* Zoom della pagina */}
+          <TBtn title="Riduci zoom" onClick={() => setZoom((z) => +Math.max(0.5, z - 0.1).toFixed(2))}>
+            −
+          </TBtn>
+          <span className="w-11 text-center text-xs text-zinc-400 tabular-nums">{Math.round(zoom * 100)}%</span>
+          <TBtn title="Aumenta zoom" onClick={() => setZoom((z) => +Math.min(2.5, z + 0.1).toFixed(2))}>
+            +
+          </TBtn>
+          <TBtn title="Reimposta zoom" onClick={() => setZoom(1)}>
+            ⟳
+          </TBtn>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto bg-zinc-900 py-8 px-6">
-        {error && <p className="text-zinc-500 text-sm text-center">Impossibile aprire il documento.</p>}
+      {/* Sfondo grigio + foglio A4 bianco (stile Word/Google Docs), con zoom. */}
+      <div ref={scrollRef} className="flex-1 overflow-auto bg-neutral-700/60 py-8 px-4">
+        {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
-          <div className="mx-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
+          <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
         )}
-        <EditorContent editor={editor} className={loading || error ? 'hidden' : ''} />
+        <div
+          className={`mx-auto bg-white text-neutral-900 shadow-2xl ${loading || error ? 'hidden' : ''}`}
+          style={{ width: 794, minHeight: 1123, padding: '76px 80px', zoom }}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   )

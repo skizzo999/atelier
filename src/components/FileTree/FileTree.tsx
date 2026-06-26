@@ -24,6 +24,7 @@ async function loadDirectory(path: string): Promise<FileNode[]> {
       if (!entry.name) continue
       if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
       if (entry.name.endsWith('.tmp')) continue // file temporanei del salvataggio atomico
+      if (entry.name.endsWith('.bak')) continue // backup .docx: utili ma non li mostriamo
 
       const fullPath = `${path}\\${entry.name}`
       nodes.push({
