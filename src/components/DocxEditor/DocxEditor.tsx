@@ -7,6 +7,8 @@ import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
+import { TextStyle, Color, FontFamily, FontSize } from '@tiptap/extension-text-style'
+import Highlight from '@tiptap/extension-highlight'
 import { readFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
@@ -20,6 +22,9 @@ import { useAppStore } from '../../store/appStore'
 // (bianchi) sembrano staccati l'uno dall'altro.
 const PAGE_BG = '#4b4f55'
 
+const FONTS = ['Predefinito', 'Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Verdana', 'Courier New']
+const SIZES = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
+
 const extensions = [
   StarterKit,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -28,6 +33,12 @@ const extensions = [
   TableRow,
   TableHeader,
   TableCell,
+  // Stile testo: colore, font, dimensione, evidenziato (gratis, MIT).
+  TextStyle,
+  Color,
+  FontFamily,
+  FontSize,
+  Highlight.configure({ multicolor: true }),
   // Paginazione vera A4 (open-source, v3): fogli distinti, margini, header/footer.
   PaginationPlus.configure({
     pageWidth: 794,
@@ -330,6 +341,113 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <Sep />
           <TBtn title="Riga orizzontale" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
             ―
+          </TBtn>
+          <Sep />
+          {/* Carattere */}
+          <select
+            value={editor.getAttributes('textStyle').fontFamily || 'Predefinito'}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'Predefinito') editor.chain().focus().unsetFontFamily().run()
+              else editor.chain().focus().setFontFamily(v).run()
+            }}
+            title="Carattere"
+            className="h-7 max-w-[7.5rem] bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-xs px-1"
+          >
+            {FONTS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          {/* Dimensione */}
+          <select
+            value={String(editor.getAttributes('textStyle').fontSize || '').replace('px', '')}
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) editor.chain().focus().unsetFontSize().run()
+              else editor.chain().focus().setFontSize(`${v}px`).run()
+            }}
+            title="Dimensione"
+            className="h-7 bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-xs px-1"
+          >
+            <option value="">—</option>
+            {SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {/* Colore testo */}
+          <label className="h-7 px-1 rounded hover:bg-zinc-700 flex items-center cursor-pointer" title="Colore testo">
+            <span className="font-bold text-sm leading-none" style={{ color: editor.getAttributes('textStyle').color || '#e5e7eb' }}>
+              A
+            </span>
+            <input
+              type="color"
+              className="sr-only"
+              value={editor.getAttributes('textStyle').color || '#000000'}
+              onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+            />
+          </label>
+          {/* Evidenziato */}
+          <label className="h-7 px-1 rounded hover:bg-zinc-700 flex items-center cursor-pointer" title="Evidenziatore">
+            <span
+              className="text-sm leading-none px-0.5 rounded"
+              style={{ background: editor.getAttributes('highlight').color || '#fde047', color: '#111827' }}
+            >
+              H
+            </span>
+            <input
+              type="color"
+              className="sr-only"
+              value={editor.getAttributes('highlight').color || '#fde047'}
+              onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()}
+            />
+          </label>
+          <TBtn title="Togli evidenziato" onClick={() => editor.chain().focus().unsetHighlight().run()}>
+            ⌫
+          </TBtn>
+          <Sep />
+          {/* Tabella */}
+          <TBtn
+            title="Inserisci tabella 3×3"
+            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          >
+            ▦
+          </TBtn>
+          {editor.isActive('table') && (
+            <>
+              <TBtn title="Aggiungi riga" onClick={() => editor.chain().focus().addRowAfter().run()}>
+                +R
+              </TBtn>
+              <TBtn title="Aggiungi colonna" onClick={() => editor.chain().focus().addColumnAfter().run()}>
+                +C
+              </TBtn>
+              <TBtn title="Elimina riga" onClick={() => editor.chain().focus().deleteRow().run()}>
+                −R
+              </TBtn>
+              <TBtn title="Elimina colonna" onClick={() => editor.chain().focus().deleteColumn().run()}>
+                −C
+              </TBtn>
+              <TBtn title="Elimina tabella" onClick={() => editor.chain().focus().deleteTable().run()}>
+                ✕▦
+              </TBtn>
+            </>
+          )}
+          {/* Link */}
+          <TBtn
+            title="Inserisci/Modifica link"
+            active={editor.isActive('link')}
+            onClick={() => {
+              const prev = editor.getAttributes('link').href as string | undefined
+              const url = window.prompt('URL del link:', prev ?? 'https://')
+              if (url === null) return
+              if (url === '') editor.chain().focus().extendMarkRange('link').unsetLink().run()
+              else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+            }}
+          >
+            🔗
           </TBtn>
           <div className="flex-1" />
           {/* Zoom della pagina */}

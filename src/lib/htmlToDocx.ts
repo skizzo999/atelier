@@ -11,6 +11,7 @@ import {
   WidthType,
   AlignmentType,
   LevelFormat,
+  ShadingType,
 } from 'docx'
 
 // Converte l'HTML (semplificato, stile Mammoth) dell'editor in un .docx vero.
@@ -25,6 +26,27 @@ interface Fmt {
   strike?: boolean
   sup?: boolean
   sub?: boolean
+  color?: string // hex senza # (es. "FF0000")
+  font?: string
+  size?: number // half-points (12pt = 24)
+  highlight?: string // hex senza # per lo sfondo evidenziatore
+}
+
+// Converte un colore CSS (#rgb, #rrggbb, rgb()) in hex "RRGGBB" per docx.
+function cssToHex(c: string): string | undefined {
+  const s = c.trim()
+  let m = /^#?([0-9a-f]{6})$/i.exec(s)
+  if (m) return m[1].toUpperCase()
+  m = /^#?([0-9a-f]{3})$/i.exec(s)
+  if (m)
+    return m[1]
+      .split('')
+      .map((x) => x + x)
+      .join('')
+      .toUpperCase()
+  m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(s)
+  if (m) return [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase()
+  return undefined
 }
 interface Ctx {
   numConfigs: { reference: string; levels: ReturnType<typeof decimalLevels> }[]
@@ -106,6 +128,12 @@ function inlineRuns(node: Node, fmt: Fmt, out: RunChild[]) {
             strike: fmt.strike,
             superScript: fmt.sup,
             subScript: fmt.sub,
+            color: fmt.color,
+            font: fmt.font,
+            size: fmt.size,
+            shading: fmt.highlight
+              ? { type: ShadingType.SOLID, color: fmt.highlight, fill: fmt.highlight }
+              : undefined,
           }),
         )
       return
@@ -130,6 +158,16 @@ function inlineRuns(node: Node, fmt: Fmt, out: RunChild[]) {
     else if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') next.strike = true
     else if (tag === 'SUP') next.sup = true
     else if (tag === 'SUB') next.sub = true
+    // Stili inline (colore, font, dimensione) e evidenziatore (<mark>/sfondo).
+    const st = el.style
+    if (st.color) next.color = cssToHex(st.color) ?? next.color
+    if (st.fontFamily) next.font = st.fontFamily.replace(/['"]/g, '').split(',')[0].trim()
+    if (st.fontSize) {
+      const px = parseFloat(st.fontSize)
+      if (px > 0) next.size = Math.round(px * 1.5) // px → mezzi-punti (px*0.75pt*2)
+    }
+    const bg = st.backgroundColor || (tag === 'MARK' ? el.getAttribute('data-color') || '' : '')
+    if (bg) next.highlight = cssToHex(bg) ?? next.highlight
     inlineRuns(el, next, out)
   })
 }
