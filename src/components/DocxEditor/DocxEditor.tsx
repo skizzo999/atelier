@@ -212,6 +212,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [pageNumMode, setPageNumMode] = useState<PageNumMode>('none')
   const pageNumModeRef = useRef<PageNumMode>('none')
   pageNumModeRef.current = pageNumMode
+  const [footerLeft, setFooterLeft] = useState('') // testo libero in basso a sinistra
+  const footerLeftRef = useRef('')
+  footerLeftRef.current = footerLeft
   const [, setTick] = useState(0)
   const importingRef = useRef(true) // true mentre carico: ignora gli update
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -313,10 +316,17 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, saving, filePath])
 
-  // Imposta il numero di pagina nel piè (con totale calcolato).
+  // Piè di pagina = testo libero a sinistra + numero di pagina a destra (col totale).
+  function applyFooter(left: string, mode: PageNumMode) {
+    if (editor) editor.commands.updateFooterContent(left, footerTextFor(mode, pageTotalOf(editor)))
+  }
   function changePageNumMode(mode: PageNumMode) {
     setPageNumMode(mode)
-    if (editor) editor.commands.updateFooterContent('', footerTextFor(mode, pageTotalOf(editor)))
+    applyFooter(footerLeftRef.current, mode)
+  }
+  function changeFooterLeft(text: string) {
+    setFooterLeft(text)
+    applyFooter(text, pageNumModeRef.current)
   }
 
   // Aggiorna il totale nel piè quando cambia il numero di pagine.
@@ -331,7 +341,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         const total = pageTotalOf(editor)
         if (total === last) return
         last = total
-        editor.commands.updateFooterContent('', footerTextFor(pageNumModeRef.current, total))
+        editor.commands.updateFooterContent(footerLeftRef.current, footerTextFor(pageNumModeRef.current, total))
       })
     }
     editor.on('update', onUpd)
@@ -438,6 +448,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           setPaper={setPaperColor}
           pageNumMode={pageNumMode}
           setPageNumMode={changePageNumMode}
+          footerLeft={footerLeft}
+          setFooterLeft={changeFooterLeft}
         />
       )}
 

@@ -24,6 +24,8 @@ export function DocSettings({
   setPaper,
   pageNumMode,
   setPageNumMode,
+  footerLeft,
+  setFooterLeft,
 }: {
   editor: Editor
   onClose: () => void
@@ -31,6 +33,8 @@ export function DocSettings({
   setPaper: (c: string) => void
   pageNumMode: PageNumMode
   setPageNumMode: (m: PageNumMode) => void
+  footerLeft: string
+  setFooterLeft: (t: string) => void
 }) {
   const [tab, setTab] = useState<'doc' | 'hf'>('doc')
   const [format, setFormat] = useState('A4')
@@ -194,7 +198,17 @@ export function DocSettings({
             </div>
 
             <div>
-              <label className={lab}>Numero di pagina (piè)</label>
+              <label className={lab}>Piè di pagina (basso a sinistra)</label>
+              <input
+                className={field}
+                placeholder="Testo libero"
+                value={footerLeft}
+                onChange={(e) => setFooterLeft(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className={lab}>Numero di pagina (basso a destra)</label>
               <select className={field} value={pageNumMode} onChange={(e) => setPageNumMode(e.target.value as PageNumMode)}>
                 <option value="none">Nessuno</option>
                 <option value="page">Solo numero — “3”</option>
