@@ -19,9 +19,10 @@
 - **Viewer PDF avanzato**: zoom Ctrl+rotella fluido/centrato, selezione testo (vero +
   **OCR automatico** scansioni), nav laterale (miniature+indice), **ricerca** nel PDF e
   globale (anche nei PDF), **evidenziatore salvato nel PDF** (3 colori personalizzabili)
-- **Editor DOCX vero stile Word** (TipTap + Mammoth + docx): apri ed è editabile con
-  barra strumenti Atelier (titoli, B/I/U/barrato, liste, citazione, allineamenti…),
-  **export in Markdown**, **salva** che sovrascrive il .docx (backup .bak)
+- **Editor DOCX stile Word con PAGINE A4 VERE** (TipTap + tiptap-pagination-plus + docx):
+  barra ricca (font/dimensione/colore/interlinea/liste/tabelle…), ⚙️ Impostazioni documento
+  (formato/orientamento/margini/header/piè coi numeri pagina), **salva** che riscrive il
+  .docx con formattazione + sezione Word + intestazioni/piè (backup .bak)
 - **Distribuzione**: GitHub Actions builda Win+macOS e pubblica la Release a ogni tag `v*`
 - **Editor Markdown completo** a 3 viste: Codice / Ibrida (live preview) / Lettura
   - Ibrida copre: titoli, grassetto/corsivo/barrato, evidenziato, liste, task,
@@ -36,18 +37,8 @@
 
 ## Cosa fare (in ordine)
 
-### 0. DOCX paginazione — DA FARE PER PRIMO (richiesto dall'utente 2026-06-26)
-Due problemi della paginazione attuale (`src/lib/pagination.ts` + CSS `.docx-page-break`):
-1. **Divisore tra i fogli = colore dello sfondo.** Ora il gap tra le pagine è grigio
-   `#6b7280`; deve essere **uguale allo sfondo** del contenitore (`.docx-prose` parent,
-   `bg-neutral-700/60`) così i fogli sembrano davvero staccati. (CSS in `index.css`:
-   il gradient del `.docx-page-break` e il colore gap nel `pagination.ts` → usare il
-   colore dello sfondo.)
-2. **Paginazione a livello di RIGA, non di blocco.** Oggi quando un paragrafo non
-   entra, va TUTTO alla pagina dopo. Invece deve **spezzarsi all'ultima riga/parola
-   che ci sta**: es. "ciao come stai", se "stai" non entra, va a capo SOLO "stai", non
-   tutta la frase. = vera paginazione con split del paragrafo a metà (la parte difficile:
-   serve misurare le righe dentro il blocco, non solo il blocco intero).
+> **DOCX paginazione**: RISOLTA con `tiptap-pagination-plus` (il fai-da-te sfarfallava).
+> Vedi sotto. Il `lib/pagination.ts` custom è stato rimosso.
 
 > **Editor immagini COMPLETO** (incl. gomma a pixel). Prossimo grande blocco: i
 > viewer per gli altri formati, che è il cuore del "workspace multi-formato".
@@ -59,18 +50,19 @@ Due problemi della paginazione attuale (`src/lib/pagination.ts` + CSS `.docx-pag
   **globale** (Ctrl+Shift+F entra nei PDF di testo), **evidenziatore salvato nel PDF**
   (3 colori personalizzabili, rimozione, auto-save come annotazioni /Highlight + JSON).
   Eventuali +: OCR anche nella ricerca globale, pagine /Rotate, appearance stream.
-- **DOCX** → ✅ EDITOR VERO STILE WORD (DocxEditor, **TipTap/ProseMirror**): apri ed è
-  editabile, barra strumenti Atelier (titoli, B/I/U/barrato/codice, liste, citazione,
-  allineamenti, riga). Import Mammoth; **Salva** (Ctrl+S) SOVRASCRIVE il .docx via
-  `lib/htmlToDocx.ts` (libreria `docx`), backup `.bak`. Fedeltà "Mammoth" (lossy, dichiarato).
-  - Vista a **foglio A4** (pila di pagine bianche su sfondo grigio, stile Word/Docs) +
-    **zoom** (Ctrl+rotella, −/%/+). Modifiche nel buffer del store (pallino tree, non
-    perse cambiando file). `.bak` nascosti dal tree.
-  - Da rendere "quasi professionale": **paginazione vera** (oggi le pagine A4 sono solo
-    sfondo: il testo scorre continuo e può finire sul gap — la paginazione reale con
-    margini per-pagina e split del contenuto è il pezzo grosso); tabelle (inserisci/righe/
-    colonne), font/colore testo, UI link/immagini, "salva come nuovo file".
-  - Editor docx FEDELE "vero": solo SuperDoc (AGPL/commerciale) — valutare se serve.
+- **DOCX** → ✅ EDITOR STILE WORD CON PAGINE A4 VERE (DocxEditor + DocSettings + htmlToDocx
+  + lib/lineHeight; **TipTap** + **tiptap-pagination-plus** MIT/v3 + **docx**):
+  - Fogli A4 reali (paginazione automatica, fogli staccati, zoom). Barra = set Simple Editor
+    + pro (font, dimensione, **interlinea** nostra, colore+evidenziatore popover, task list,
+    apici/pedici, tabelle, immagine, link, typography, 5 tipi P/H1-H4).
+  - **⚙️ Impostazioni documento**: formato/orientamento/margini/page-gap/colore foglio +
+    intestazioni e piè (testo + **numero pagina** 3 stili col totale calcolato).
+  - **Salva** (Ctrl+S) SOVRASCRIVE il .docx: formattazione (colore/font/dimensione/
+    evidenziato/allineamento/interlinea/tabelle/immagini) + **sezione Word** (formato/
+    margini/orientamento) + **header/footer con campi numero pagina veri**. Backup `.bak`,
+    buffer non salvato.
+  - Da fare se serve: persistere colore foglio nel .docx, font Google bundlati, "salva come
+    nuovo file". Editor docx FEDELE byte-perfect = solo TipTap-Pro-Pages/SuperDoc (a pagamento).
 - pptx / xlsx → SheetJS / viewer dedicati ← PROSSIMO grande blocco formati
 
 ### 2. Stampa (trasversale)
@@ -116,8 +108,10 @@ git push                # Push su GitHub
 - src/components/ImageViewer/ImageViewer.tsx  (viewer + editing + annotazioni + selezione + regola + OCR)
 - src/components/ImageViewer/ImageInfoPanel.tsx (pannello Informazioni)
 - src/components/PdfViewer/PdfViewer.tsx      (viewer PDF: zoom, OCR, nav, ricerca, evidenziatore)
-- src/components/DocxEditor/DocxEditor.tsx    (editor DOCX TipTap: barra strumenti, import Mammoth, salva, export)
-- src/lib/htmlToDocx.ts                        (HTML→DOCX con la libreria `docx`, per salvare le modifiche)
+- src/components/DocxEditor/DocxEditor.tsx    (editor DOCX TipTap: barra, paginazione, import Mammoth, salva)
+- src/components/DocxEditor/DocSettings.tsx   (pannello ⚙️ formato/margini/header/footer)
+- src/lib/htmlToDocx.ts                        (HTML→DOCX con `docx`: formattazione + sezione + header/footer)
+- src/lib/lineHeight.ts                        (estensione interlinea per paragrafo, nostra)
 - src/components/Editor/Editor.tsx            (3 viste; marked + estensioni; immagini Lettura)
 - src/components/CodeMirror/CodeMirrorEditor.tsx (bridge React↔CM6)
 - src/components/CodeMirror/livePreview.ts    (decorazioni Ibrida)

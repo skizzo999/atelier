@@ -8,10 +8,12 @@ unificato, **pannello Informazioni**, copia immagine, apri in Explorer, **regola
 funzionali** e **OCR**. **Viewer PDF avanzato**: selezione testo (vero + OCR automatico
 sulle scansioni), zoom Ctrl+rotella fluido e centrato, navigazione laterale (miniature +
 indice), ricerca nel PDF (Ctrl+F) e globale (Ctrl+Shift+F entra in PDF e DOCX), **evidenziatore
-salvato dentro al PDF** (3 colori personalizzabili). **Viewer DOCX** (sola lettura,
-Mammoth): HTML semantico in stile Lettura, pannello Info, ricerca (Ctrl+F), export in
-Markdown. Pronti anche: sistema vault, file tree con watcher, gestione file, ricerca.
-Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
+salvato dentro al PDF** (3 colori personalizzabili). **Editor DOCX stile Word con PAGINE
+A4 VERE** (TipTap + tiptap-pagination-plus): barra ricca (font/dimensione/colore/interlinea/
+liste/tabelle/…), pannello Impostazioni documento (formato/orientamento/margini/header/piè
+coi numeri pagina), salvataggio che riscrive il .docx (formattazione + sezione Word +
+intestazioni/piè). Pronti anche: sistema vault, file tree con watcher, gestione file, ricerca.
+Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -64,18 +66,29 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
     catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
     di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
   - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
-- [x] **Editor DOCX vero, stile Word** (TipTap/ProseMirror + Mammoth + docx): apri un
-  .docx ed è **subito editabile** (no bottone), con **barra strumenti Atelier**:
-  annulla/ripeti, menu titoli (Paragrafo/H1-3), grassetto/corsivo/sottolineato/barrato/
-  codice, elenco puntato/numerato, citazione, allineamenti, riga orizzontale. Estensioni:
-  StarterKit (ha già Underline+Link) + TextAlign + Image + Table.
-  - **Import**: Mammoth (docx→HTML→TipTap, sanitizzato DOMPurify)
-  - **Salva** (Ctrl+S / 💾): **SOVRASCRIVE** il .docx convertendo l'HTML dell'editor in
-    docx (`lib/htmlToDocx.ts` con la libreria `docx`: titoli, B/I/U/barrato, apici/pedici,
-    liste annidate, citazioni, tabelle, immagini live). **Backup `.bak`** pristino la 1ª volta
-  - **Export in Markdown** (.md accanto), **Apri in Explorer**, indicatore "non salvato"
-  - Fedeltà "Mammoth" (import/export buono, non byte-perfect come Word): è il trade-off
-    scelto con l'utente. Solo .docx
+- [x] **Editor DOCX stile Word, con PAGINE VERE** (TipTap/ProseMirror): apri un .docx ed è
+  **subito editabile**, su **fogli A4 reali** (paginazione automatica con
+  **tiptap-pagination-plus**, MIT/v3 — il fai-da-te a decorazioni sfarfallava). Pagine
+  bianche centrate, staccate, **zoom** (Ctrl+rotella, −/%/+).
+  - **Barra** (set del TipTap Simple Editor + pro): annulla/ripeti, **5 tipi** (P, H1-H4),
+    **carattere**, **dimensione**, **interlinea** (nostra, `lib/lineHeight.ts`, per
+    paragrafo), liste (puntata/numerata/**attività**), blocco codice, citazione, B/I/
+    barrato/codice/sottolineato, **popover unico colore testo + evidenziatore**, link,
+    **apice/pedice**, allineamenti, immagine (da file), riga, Typography
+  - **⚙️ Impostazioni documento** (pannello 2 tab): formato (A4/Letter/Legal/A3/A5),
+    **orientamento**, **margini** (cm), spazio tra pagine, **colore foglio**; e
+    **intestazioni** (sx/dx con `{page}`) + **piè** (testo a sinistra, **numero pagina a
+    destra** in 3 stili: numero / n/tot / "Pagina n di tot"). Il **totale** lo calcoliamo
+    noi (l'estensione conosce solo {page})
+  - **Import**: Mammoth (docx→HTML→TipTap, DOMPurify)
+  - **Salva** (Ctrl+S / 💾): **SOVRASCRIVE** il .docx (`lib/htmlToDocx.ts`, libreria `docx`).
+    Preserva: titoli, B/I/U/barrato, apici/pedici, **colore/font/dimensione/evidenziato**,
+    **allineamento/interlinea**, liste annidate, citazioni, tabelle, immagini; e scrive la
+    **sezione Word** (formato/orientamento/margini) + **intestazioni/piè con campi numero
+    pagina veri** (corrente+totale calcolati da Word). **Backup `.bak`** la 1ª volta;
+    **buffer** non salvato (pallino tree, non perde uscendo)
+  - **Export in Markdown**, **Apri in Explorer**. Fedeltà "Mammoth" in import (non
+    byte-perfect). Solo .docx
 - [x] **Editor Markdown a 3 viste:**
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
@@ -173,13 +186,22 @@ Prossimi: **editing DOCX**, stampa trasversale, pptx/xlsx.
 - **PDF ricerca globale**: non OCR-izza le scansioni del vault (troppo pesante) → trova solo
   i PDF con testo vero; le scansioni si cercano aprendole (OCR + Ctrl+F)
 - **PDF OCR**: modello lingua scaricato dalla rete al 1° uso (come OCR immagini)
-- **DOCX editing (TipTap)**: salvando si SOVRASCRIVE il .docx riconvertendo l'HTML
-  dell'editor (fedeltà "Mammoth": stili/font/intestazioni non catturati in import vanno
-  persi). Mitigazione: backup `.bak` pristino + indicatore "non salvato". Da provare a
-  fondo: `htmlToDocx.ts` su immagini/tabelle/liste annidate. Possibili +: tasti tabella
-  (inserisci/righe), font/colore, link UI, "salva come nuovo". html-docx-js scartato
-  (usa `with`, Vite 7 non lo parsa) → libreria `docx`. Editor docx fedele "vero" = solo
-  SuperDoc (AGPL/commerciale) o costruirlo: scelto TipTap (nostro, permissivo)
+- **DOCX editor** (`DocxEditor.tsx`, `DocSettings.tsx`, `lib/htmlToDocx.ts`, `lib/lineHeight.ts`):
+  - **Paginazione**: la fai-da-te a decorazioni sfarfallava (loop misura↔modifica) → si usa
+    **tiptap-pagination-plus** (MIT, v3, mantenuta). html-docx-js scartato (usa `with`, Vite 7
+    non lo parsa) → libreria **docx** per la scrittura. SuperDoc/TipTap-Pro-Pages = a
+    pagamento/AGPL, non usati.
+  - **Salva** SOVRASCRIVE il .docx (backup `.bak` 1ª volta + buffer non salvato). Import via
+    Mammoth = semplificato → la formattazione non catturata in apertura si perde. Da provare
+    a fondo in Word: sezione (margini/orientamento), header/footer coi campi numero pagina,
+    tabelle/immagini/liste annidate.
+  - **Interlinea**: estensione nostra (`lib/lineHeight.ts`) — quella di TipTap la mette sul
+    mark inline e non funzionava sui nostri nodi. `@tiptap/core` aggiunto come dep diretta
+    (serviva per l'augmentation dei comandi).
+  - **Numero pagina totale**: pagination-plus conosce solo `{page}` → il totale lo calcoliamo
+    noi a schermo (conta le pagine); nel .docx invece si usano i campi Word veri (TOTAL_PAGES).
+  - Da fare se serve: persistere anche **colore foglio** e **font Google bundlati**;
+    intestazioni inline alla Word (estensione non le supporta, solo via pannello).
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:
