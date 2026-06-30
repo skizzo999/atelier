@@ -12,6 +12,7 @@ import {
   AlignmentType,
   LevelFormat,
   ShadingType,
+  LineRuleType,
 } from 'docx'
 
 // Converte l'HTML (semplificato, stile Mammoth) dell'editor in un .docx vero.
@@ -176,10 +177,21 @@ function hasBlockChildren(el: Element): boolean {
   return Array.from(el.children).some((c) => BLOCK.has(c.tagName) || c.tagName === 'DIV')
 }
 
+const ALIGN: Record<string, (typeof AlignmentType)[keyof typeof AlignmentType]> = {
+  left: AlignmentType.LEFT,
+  center: AlignmentType.CENTER,
+  right: AlignmentType.RIGHT,
+  justify: AlignmentType.JUSTIFIED,
+}
+
 function paragraphOf(el: HTMLElement, extra: Record<string, unknown> = {}): Paragraph {
   const runs: RunChild[] = []
   inlineRuns(el, {}, runs)
-  return new Paragraph({ children: runs, ...extra })
+  // Allineamento e interlinea dal CSS inline del paragrafo.
+  const align = ALIGN[el.style.textAlign]
+  const lh = parseFloat(el.style.lineHeight || '')
+  const spacing = lh > 0 ? { line: Math.round(lh * 240), lineRule: LineRuleType.AUTO } : undefined
+  return new Paragraph({ children: runs, alignment: align, spacing, ...extra })
 }
 
 function listToParagraphs(listEl: Element, ordered: boolean, level: number, ctx: Ctx, out: Paragraph[]) {

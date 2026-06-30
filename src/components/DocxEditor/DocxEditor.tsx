@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
 import Image from '@tiptap/extension-image'
@@ -7,6 +7,7 @@ import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
+import { TextStyle, Color, FontFamily, FontSize, LineHeight } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -35,7 +36,12 @@ const extensions = [
   TableRow,
   TableHeader,
   TableCell,
-  // Funzioni del Simple Editor di TipTap (tutte gratis/MIT).
+  // Stile testo: colore, font, dimensione, interlinea, evidenziatore (gratis/MIT).
+  TextStyle,
+  Color,
+  FontFamily,
+  FontSize,
+  LineHeight.configure({ types: ['paragraph', 'heading'] }),
   Highlight.configure({ multicolor: true }),
   TaskList,
   TaskItem.configure({ nested: true }),
@@ -88,6 +94,91 @@ function TBtn({
 }
 
 const Sep = () => <span className="w-px h-5 bg-zinc-700 mx-1" />
+
+const FONTS = ['Predefinito', 'Inter', 'Arial', 'Times New Roman', 'Georgia', 'Calibri', 'Verdana', 'Courier New', 'Garamond']
+const SIZES = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 48]
+const LINE_HEIGHTS = ['1', '1.15', '1.5', '2', '2.5']
+const TEXT_COLORS = ['#111827', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#0891b2']
+const HL_COLORS = ['#fde047', '#fca5a5', '#fdba74', '#bef264', '#6ee7b7', '#a5f3fc', '#a5b4fc', '#d8b4fe', '#f9a8d4', '#e5e7eb']
+
+const sel = 'h-7 bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-xs px-1'
+
+// Un unico tasto colore+evidenziatore (come il Docx editor di TipTap).
+function ColorPopover({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  const cur = editor.getAttributes('textStyle').color as string | undefined
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((o) => !o)}
+        title="Colore e evidenziatore"
+        className="min-w-7 h-7 px-1 rounded text-sm flex items-center gap-0.5 text-zinc-300 hover:bg-zinc-700"
+      >
+        <span className="font-bold" style={{ color: cur || undefined }}>
+          A
+        </span>
+        <span className="text-[8px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-8 left-0 w-56 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl p-3">
+          <div className="text-[11px] text-zinc-400 mb-1.5">Colore testo</div>
+          <div className="grid grid-cols-5 gap-2 mb-3">
+            {TEXT_COLORS.map((c) => (
+              <button
+                key={c}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => editor.chain().focus().setColor(c).run()}
+                className="h-6 w-6 rounded-full border border-zinc-600"
+                style={{ background: c }}
+                title={c}
+              />
+            ))}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().unsetColor().run()}
+              className="h-6 w-6 rounded-full border border-zinc-600 bg-white text-zinc-900 text-[10px] flex items-center justify-center"
+              title="Nessun colore"
+            >
+              ⌀
+            </button>
+          </div>
+          <div className="text-[11px] text-zinc-400 mb-1.5">Evidenziatore</div>
+          <div className="grid grid-cols-5 gap-2">
+            {HL_COLORS.map((c) => (
+              <button
+                key={c}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => editor.chain().focus().setHighlight({ color: c }).run()}
+                className="h-6 w-6 rounded border border-zinc-600"
+                style={{ background: c }}
+                title={c}
+              />
+            ))}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().unsetHighlight().run()}
+              className="h-6 w-6 rounded border border-zinc-600 bg-zinc-800 text-zinc-300 text-[10px] flex items-center justify-center"
+              title="Togli evidenziatore"
+            >
+              ⌫
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Editor DOCX (TipTap): apri il .docx ed è subito editabile, con barra strumenti
 // in stile Word ma con l'identità di Atelier. Salva = sovrascrive il .docx.
@@ -299,17 +390,51 @@ export function DocxEditor({ filePath }: { filePath: string }) {
             onChange={(e) => {
               const v = e.target.value
               if (v === 'p') editor.chain().focus().setParagraph().run()
-              else editor.chain().focus().toggleHeading({ level: Number(v) as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+              else editor.chain().focus().toggleHeading({ level: Number(v) as 1 | 2 | 3 | 4 }).run()
             }}
-            className="h-7 bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-sm px-1"
+            title="Tipo di testo"
+            className={sel + ' text-sm'}
           >
             <option value="p">Paragrafo</option>
             <option value="1">Titolo 1</option>
             <option value="2">Titolo 2</option>
             <option value="3">Titolo 3</option>
             <option value="4">Titolo 4</option>
-            <option value="5">Titolo 5</option>
-            <option value="6">Titolo 6</option>
+          </select>
+          {/* Carattere */}
+          <select
+            value={editor.getAttributes('textStyle').fontFamily || 'Predefinito'}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'Predefinito') editor.chain().focus().unsetFontFamily().run()
+              else editor.chain().focus().setFontFamily(v).run()
+            }}
+            title="Carattere"
+            className={sel + ' max-w-[7.5rem]'}
+          >
+            {FONTS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          {/* Dimensione */}
+          <select
+            value={String(editor.getAttributes('textStyle').fontSize || '').replace('px', '')}
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) editor.chain().focus().unsetFontSize().run()
+              else editor.chain().focus().setFontSize(`${v}px`).run()
+            }}
+            title="Dimensione"
+            className={sel}
+          >
+            <option value="">—</option>
+            {SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
           <Sep />
           {/* Liste */}
@@ -347,11 +472,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <TBtn title="Sottolineato (Ctrl+U)" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
             <span className="underline">U</span>
           </TBtn>
-          <TBtn title="Evidenziatore" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()}>
-            <span className="px-0.5 rounded" style={{ background: '#fde047', color: '#111827' }}>
-              H
-            </span>
-          </TBtn>
+          <ColorPopover editor={editor} />
           <TBtn
             title="Inserisci/Modifica link"
             active={editor.isActive('link')}
@@ -387,6 +508,24 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <TBtn title="Giustifica" active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
             ☰
           </TBtn>
+          {/* Interlinea */}
+          <select
+            value={(editor.getAttributes('paragraph').lineHeight as string) || (editor.getAttributes('heading').lineHeight as string) || ''}
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) editor.chain().focus().unsetLineHeight().run()
+              else editor.chain().focus().setLineHeight(v).run()
+            }}
+            title="Interlinea"
+            className={sel}
+          >
+            <option value="">↕</option>
+            {LINE_HEIGHTS.map((h) => (
+              <option key={h} value={h}>
+                {h}
+              </option>
+            ))}
+          </select>
           <Sep />
           {/* Immagine + riga */}
           <TBtn title="Inserisci immagine" onClick={() => imageInputRef.current?.click()}>
