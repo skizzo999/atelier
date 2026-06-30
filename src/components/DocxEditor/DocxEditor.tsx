@@ -38,6 +38,7 @@ const extensions = [
     marginRight: 76,
     pageGap: 30,
     pageGapBorderSize: 0,
+    pageGapBorderColor: PAGE_BG, // eventuale bordo gap = invisibile (no "stanghetta")
     pageBreakBackground: PAGE_BG, // gap = sfondo → pagine staccate
   }),
 ]

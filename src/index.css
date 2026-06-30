@@ -148,10 +148,27 @@ body {
   --tw-prose-hr: #d4d4d8;
   --tw-prose-links: #1d4ed8;
 }
-/* I fogli A4 (bianchi, margini, header/footer) li disegna tiptap-pagination-plus.
-   Qui solo il colore del testo sul foglio. */
+/* I fogli A4 li disegna tiptap-pagination-plus; qui li rendiamo bianchi, centrati
+   e togliamo la "stanghetta" (bordo) tra le pagine. */
 .docx-prose .ProseMirror {
   color: var(--tw-prose-body);
+  background: #ffffff; /* foglio bianco */
+  margin: 0 auto; /* pagina centrata */
+  border: none;
+}
+.docx-prose .rm-pages-wrapper {
+  margin: 0 auto;
+}
+/* gap tra le pagine: nessun bordo/linea (la "stanghetta") */
+.docx-prose .rm-pagination-gap,
+.docx-prose .rm-page-break {
+  border: none !important;
+  box-shadow: none !important;
+}
+/* intestazioni/piè di pagina: testo discreto */
+.docx-prose .rm-page-header,
+.docx-prose .rm-page-footer {
+  color: #9ca3af;
 }
 .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
 .ProseMirror td,
