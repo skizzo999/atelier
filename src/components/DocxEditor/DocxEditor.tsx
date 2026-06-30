@@ -7,7 +7,8 @@ import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import { TextStyle, Color, FontFamily, FontSize, LineHeight } from '@tiptap/extension-text-style'
+import { TextStyle, Color, FontFamily, FontSize } from '@tiptap/extension-text-style'
+import { ParagraphLineHeight } from '../../lib/lineHeight'
 import Highlight from '@tiptap/extension-highlight'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -41,7 +42,7 @@ const extensions = [
   Color,
   FontFamily,
   FontSize,
-  LineHeight.configure({ types: ['paragraph', 'heading'] }),
+  ParagraphLineHeight, // interlinea per paragrafo (la nostra, vedi lib/lineHeight)
   Highlight.configure({ multicolor: true }),
   TaskList,
   TaskItem.configure({ nested: true }),
