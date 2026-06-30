@@ -7,8 +7,12 @@ import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import { TextStyle, Color, FontFamily, FontSize } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
+import Typography from '@tiptap/extension-typography'
 import { readFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
@@ -22,23 +26,22 @@ import { useAppStore } from '../../store/appStore'
 // (bianchi) sembrano staccati l'uno dall'altro.
 const PAGE_BG = '#4b4f55'
 
-const FONTS = ['Predefinito', 'Arial', 'Calibri', 'Times New Roman', 'Georgia', 'Verdana', 'Courier New']
-const SIZES = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
-
 const extensions = [
   StarterKit,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Image,
+  // Tabelle: estensione attiva per fedeltà sui .docx importati.
   Table.configure({ resizable: true }),
   TableRow,
   TableHeader,
   TableCell,
-  // Stile testo: colore, font, dimensione, evidenziato (gratis, MIT).
-  TextStyle,
-  Color,
-  FontFamily,
-  FontSize,
+  // Funzioni del Simple Editor di TipTap (tutte gratis/MIT).
   Highlight.configure({ multicolor: true }),
+  TaskList,
+  TaskItem.configure({ nested: true }),
+  Subscript,
+  Superscript,
+  Typography,
   // Paginazione vera A4 (open-source, v3): fogli distinti, margini, header/footer.
   PaginationPlus.configure({
     pageWidth: 794,
@@ -102,6 +105,17 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [, setTick] = useState(0)
   const importingRef = useRef(true) // true mentre carico: ignora gli update
   const scrollRef = useRef<HTMLDivElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Inserisce un'immagine dal file system (come data URI, così resta nel documento).
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !editor) return
+    const reader = new FileReader()
+    reader.onload = () => editor.chain().focus().setImage({ src: String(reader.result) }).run()
+    reader.readAsDataURL(file)
+  }
 
   const editor = useEditor({
     extensions,
@@ -239,13 +253,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     /* nome con % non valido: tieni il grezzo */
   }
 
-  const headingValue = editor?.isActive('heading', { level: 1 })
-    ? '1'
-    : editor?.isActive('heading', { level: 2 })
-      ? '2'
-      : editor?.isActive('heading', { level: 3 })
-        ? '3'
-        : 'p'
+  const headingValue =
+    ([1, 2, 3, 4, 5, 6].find((l) => editor?.isActive('heading', { level: l }))?.toString() as string) || 'p'
 
   const btn = 'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
 
@@ -290,7 +299,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
             onChange={(e) => {
               const v = e.target.value
               if (v === 'p') editor.chain().focus().setParagraph().run()
-              else editor.chain().focus().toggleHeading({ level: Number(v) as 1 | 2 | 3 }).run()
+              else editor.chain().focus().toggleHeading({ level: Number(v) as 1 | 2 | 3 | 4 | 5 | 6 }).run()
             }}
             className="h-7 bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-sm px-1"
           >
@@ -298,34 +307,74 @@ export function DocxEditor({ filePath }: { filePath: string }) {
             <option value="1">Titolo 1</option>
             <option value="2">Titolo 2</option>
             <option value="3">Titolo 3</option>
+            <option value="4">Titolo 4</option>
+            <option value="5">Titolo 5</option>
+            <option value="6">Titolo 6</option>
           </select>
           <Sep />
-          <TBtn title="Grassetto (Ctrl+B)" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
-            <span className="font-bold">B</span>
-          </TBtn>
-          <TBtn title="Corsivo (Ctrl+I)" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
-            <span className="italic">I</span>
-          </TBtn>
-          <TBtn title="Sottolineato (Ctrl+U)" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
-            <span className="underline">U</span>
-          </TBtn>
-          <TBtn title="Barrato" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
-            <span className="line-through">S</span>
-          </TBtn>
-          <TBtn title="Codice" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
-            {'</>'}
-          </TBtn>
-          <Sep />
+          {/* Liste */}
           <TBtn title="Elenco puntato" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
             •☰
           </TBtn>
           <TBtn title="Elenco numerato" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
             1.
           </TBtn>
+          <TBtn title="Elenco di attività" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+            ☑
+          </TBtn>
+          <Sep />
+          {/* Blocchi */}
+          <TBtn title="Blocco di codice" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+            {'{ }'}
+          </TBtn>
           <TBtn title="Citazione" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
             ❝
           </TBtn>
           <Sep />
+          {/* Marchi */}
+          <TBtn title="Grassetto (Ctrl+B)" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+            <span className="font-bold">B</span>
+          </TBtn>
+          <TBtn title="Corsivo (Ctrl+I)" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            <span className="italic">I</span>
+          </TBtn>
+          <TBtn title="Barrato" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            <span className="line-through">S</span>
+          </TBtn>
+          <TBtn title="Codice in linea" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+            {'</>'}
+          </TBtn>
+          <TBtn title="Sottolineato (Ctrl+U)" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            <span className="underline">U</span>
+          </TBtn>
+          <TBtn title="Evidenziatore" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+            <span className="px-0.5 rounded" style={{ background: '#fde047', color: '#111827' }}>
+              H
+            </span>
+          </TBtn>
+          <TBtn
+            title="Inserisci/Modifica link"
+            active={editor.isActive('link')}
+            onClick={() => {
+              const prev = editor.getAttributes('link').href as string | undefined
+              const url = window.prompt('URL del link:', prev ?? 'https://')
+              if (url === null) return
+              if (url === '') editor.chain().focus().extendMarkRange('link').unsetLink().run()
+              else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+            }}
+          >
+            🔗
+          </TBtn>
+          <Sep />
+          {/* Apici/pedici */}
+          <TBtn title="Apice" active={editor.isActive('superscript')} onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+            x²
+          </TBtn>
+          <TBtn title="Pedice" active={editor.isActive('subscript')} onClick={() => editor.chain().focus().toggleSubscript().run()}>
+            x₂
+          </TBtn>
+          <Sep />
+          {/* Allineamenti */}
           <TBtn title="Allinea a sinistra" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
             ⬅
           </TBtn>
@@ -339,115 +388,13 @@ export function DocxEditor({ filePath }: { filePath: string }) {
             ☰
           </TBtn>
           <Sep />
+          {/* Immagine + riga */}
+          <TBtn title="Inserisci immagine" onClick={() => imageInputRef.current?.click()}>
+            🖼
+          </TBtn>
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
           <TBtn title="Riga orizzontale" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
             ―
-          </TBtn>
-          <Sep />
-          {/* Carattere */}
-          <select
-            value={editor.getAttributes('textStyle').fontFamily || 'Predefinito'}
-            onChange={(e) => {
-              const v = e.target.value
-              if (v === 'Predefinito') editor.chain().focus().unsetFontFamily().run()
-              else editor.chain().focus().setFontFamily(v).run()
-            }}
-            title="Carattere"
-            className="h-7 max-w-[7.5rem] bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-xs px-1"
-          >
-            {FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-          {/* Dimensione */}
-          <select
-            value={String(editor.getAttributes('textStyle').fontSize || '').replace('px', '')}
-            onChange={(e) => {
-              const v = e.target.value
-              if (!v) editor.chain().focus().unsetFontSize().run()
-              else editor.chain().focus().setFontSize(`${v}px`).run()
-            }}
-            title="Dimensione"
-            className="h-7 bg-zinc-800 border border-zinc-700 rounded text-zinc-200 text-xs px-1"
-          >
-            <option value="">—</option>
-            {SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          {/* Colore testo */}
-          <label className="h-7 px-1 rounded hover:bg-zinc-700 flex items-center cursor-pointer" title="Colore testo">
-            <span className="font-bold text-sm leading-none" style={{ color: editor.getAttributes('textStyle').color || '#e5e7eb' }}>
-              A
-            </span>
-            <input
-              type="color"
-              className="sr-only"
-              value={editor.getAttributes('textStyle').color || '#000000'}
-              onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-            />
-          </label>
-          {/* Evidenziato */}
-          <label className="h-7 px-1 rounded hover:bg-zinc-700 flex items-center cursor-pointer" title="Evidenziatore">
-            <span
-              className="text-sm leading-none px-0.5 rounded"
-              style={{ background: editor.getAttributes('highlight').color || '#fde047', color: '#111827' }}
-            >
-              H
-            </span>
-            <input
-              type="color"
-              className="sr-only"
-              value={editor.getAttributes('highlight').color || '#fde047'}
-              onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()}
-            />
-          </label>
-          <TBtn title="Togli evidenziato" onClick={() => editor.chain().focus().unsetHighlight().run()}>
-            ⌫
-          </TBtn>
-          <Sep />
-          {/* Tabella */}
-          <TBtn
-            title="Inserisci tabella 3×3"
-            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-          >
-            ▦
-          </TBtn>
-          {editor.isActive('table') && (
-            <>
-              <TBtn title="Aggiungi riga" onClick={() => editor.chain().focus().addRowAfter().run()}>
-                +R
-              </TBtn>
-              <TBtn title="Aggiungi colonna" onClick={() => editor.chain().focus().addColumnAfter().run()}>
-                +C
-              </TBtn>
-              <TBtn title="Elimina riga" onClick={() => editor.chain().focus().deleteRow().run()}>
-                −R
-              </TBtn>
-              <TBtn title="Elimina colonna" onClick={() => editor.chain().focus().deleteColumn().run()}>
-                −C
-              </TBtn>
-              <TBtn title="Elimina tabella" onClick={() => editor.chain().focus().deleteTable().run()}>
-                ✕▦
-              </TBtn>
-            </>
-          )}
-          {/* Link */}
-          <TBtn
-            title="Inserisci/Modifica link"
-            active={editor.isActive('link')}
-            onClick={() => {
-              const prev = editor.getAttributes('link').href as string | undefined
-              const url = window.prompt('URL del link:', prev ?? 'https://')
-              if (url === null) return
-              if (url === '') editor.chain().focus().extendMarkRange('link').unsetLink().run()
-              else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-            }}
-          >
-            🔗
           </TBtn>
           <div className="flex-1" />
           {/* Zoom della pagina */}
