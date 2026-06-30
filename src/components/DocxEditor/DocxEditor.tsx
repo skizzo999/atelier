@@ -22,8 +22,20 @@ import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { htmlToDocxBlob } from '../../lib/htmlToDocx'
 import { PaginationPlus } from 'tiptap-pagination-plus'
-import { DocSettings } from './DocSettings'
+import { DocSettings, type PageNumMode } from './DocSettings'
 import { useAppStore } from '../../store/appStore'
+
+// Numero totale di pagine (l'estensione conosce solo {page}, non il totale).
+function pageTotalOf(editor: Editor): number {
+  const f = editor.view.dom.querySelectorAll('.rm-page-footer').length
+  return f || editor.view.dom.querySelectorAll('.rm-page-break').length + 1
+}
+function footerTextFor(mode: PageNumMode, total: number): string {
+  if (mode === 'page') return '{page}'
+  if (mode === 'page-total') return `{page} / ${total}`
+  if (mode === 'page-of-total') return `Pagina {page} di ${total}`
+  return ''
+}
 
 // Sfondo dell'area documento = colore dei "gap" tra le pagine: così i fogli A4
 // (bianchi) sembrano staccati l'uno dall'altro.
@@ -197,7 +209,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [zoom, setZoom] = useState(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [paperColor, setPaperColor] = useState('#ffffff')
-  const [canvasColor, setCanvasColor] = useState(PAGE_BG)
+  const [pageNumMode, setPageNumMode] = useState<PageNumMode>('none')
+  const pageNumModeRef = useRef<PageNumMode>('none')
+  pageNumModeRef.current = pageNumMode
   const [, setTick] = useState(0)
   const importingRef = useRef(true) // true mentre carico: ignora gli update
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -299,6 +313,34 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, saving, filePath])
 
+  // Imposta il numero di pagina nel piè (con totale calcolato).
+  function changePageNumMode(mode: PageNumMode) {
+    setPageNumMode(mode)
+    if (editor) editor.commands.updateFooterContent('', footerTextFor(mode, pageTotalOf(editor)))
+  }
+
+  // Aggiorna il totale nel piè quando cambia il numero di pagine.
+  useEffect(() => {
+    if (!editor) return
+    let last = -1
+    let raf = 0
+    const onUpd = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        if (pageNumModeRef.current === 'none') return
+        const total = pageTotalOf(editor)
+        if (total === last) return
+        last = total
+        editor.commands.updateFooterContent('', footerTextFor(pageNumModeRef.current, total))
+      })
+    }
+    editor.on('update', onUpd)
+    return () => {
+      editor.off('update', onUpd)
+      cancelAnimationFrame(raf)
+    }
+  }, [editor])
+
   // Zoom della pagina con Ctrl+rotella.
   useEffect(() => {
     const el = scrollRef.current
@@ -394,8 +436,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           onClose={() => setSettingsOpen(false)}
           paper={paperColor}
           setPaper={setPaperColor}
-          canvas={canvasColor}
-          setCanvas={setCanvasColor}
+          pageNumMode={pageNumMode}
+          setPageNumMode={changePageNumMode}
         />
       )}
 
@@ -576,7 +618,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
 
       {/* Sfondo grigio; i fogli A4 (bianchi, con margini) e i salti pagina li
           gestisce il motore di paginazione. Zoom via CSS. */}
-      <div ref={scrollRef} className="flex-1 overflow-auto py-8 px-4" style={{ background: canvasColor }}>
+      <div ref={scrollRef} className="flex-1 overflow-auto py-8 px-4" style={{ background: PAGE_BG }}>
         {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Editor } from '@tiptap/react'
 
+export type PageNumMode = 'none' | 'page' | 'page-total' | 'page-of-total'
+
 // Formati foglio (px a 96dpi, ritratto).
 const FORMATS: Record<string, { w: number; h: number }> = {
   A4: { w: 794, h: 1123 },
@@ -20,34 +22,33 @@ export function DocSettings({
   onClose,
   paper,
   setPaper,
-  canvas,
-  setCanvas,
+  pageNumMode,
+  setPageNumMode,
 }: {
   editor: Editor
   onClose: () => void
   paper: string
   setPaper: (c: string) => void
-  canvas: string
-  setCanvas: (c: string) => void
+  pageNumMode: PageNumMode
+  setPageNumMode: (m: PageNumMode) => void
 }) {
   const [tab, setTab] = useState<'doc' | 'hf'>('doc')
   const [format, setFormat] = useState('A4')
   const [landscape, setLandscape] = useState(false)
   const [m, setM] = useState({ top: 2.5, bottom: 2.5, left: 2, right: 2 }) // cm
   const [gap, setGap] = useState(30)
-  const [hf, setHf] = useState({ hl: '', hr: '', fl: '', fr: '' })
+  const [hf, setHf] = useState({ hl: '', hr: '' })
 
   function applyPageSize(fmt: string, land: boolean) {
     const f = FORMATS[fmt]
     if (!f) return
     const w = land ? f.h : f.w
     const h = land ? f.w : f.h
-    editor.chain().focus().updatePageWidth(w).updatePageHeight(h).run()
+    editor.chain().updatePageWidth(w).updatePageHeight(h).run()
   }
   function applyMargins(next: typeof m) {
     editor
       .chain()
-      .focus()
       .updateMargins({ top: cmToPx(next.top), bottom: cmToPx(next.bottom), left: cmToPx(next.left), right: cmToPx(next.right) })
       .run()
   }
@@ -143,7 +144,7 @@ export function DocSettings({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 items-end">
+            <div className="grid grid-cols-2 gap-3 items-end">
               <div>
                 <label className={lab}>Spazio tra pagine (px)</label>
                 <input
@@ -154,37 +155,18 @@ export function DocSettings({
                   onChange={(e) => {
                     const g = parseInt(e.target.value) || 0
                     setGap(g)
-                    editor.chain().focus().updatePageGap(g).run()
+                    editor.chain().updatePageGap(g).run()
                   }}
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lab}>Colore foglio</label>
                 <input type="color" className="w-full h-8 bg-transparent rounded cursor-pointer" value={paper} onChange={(e) => setPaper(e.target.value)} />
-              </div>
-              <div>
-                <label className={lab}>Colore sfondo</label>
-                <input
-                  type="color"
-                  className="w-full h-8 bg-transparent rounded cursor-pointer"
-                  value={canvas}
-                  onChange={(e) => {
-                    setCanvas(e.target.value)
-                    editor.chain().focus().updatePageBreakBackground(e.target.value).run()
-                  }}
-                />
               </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <p className="text-[11px] text-zinc-500">
-              Usa <code className="text-zinc-300">{'{page}'}</code> per il numero di pagina e{' '}
-              <code className="text-zinc-300">{'{pages}'}</code> per il totale.
-            </p>
             <div>
               <label className={lab}>Intestazione (sinistra / destra)</label>
               <div className="grid grid-cols-2 gap-2">
@@ -195,7 +177,7 @@ export function DocSettings({
                   onChange={(e) => {
                     const next = { ...hf, hl: e.target.value }
                     setHf(next)
-                    editor.chain().focus().updateHeaderContent(next.hl, next.hr).run()
+                    editor.commands.updateHeaderContent(next.hl, next.hr)
                   }}
                 />
                 <input
@@ -205,46 +187,22 @@ export function DocSettings({
                   onChange={(e) => {
                     const next = { ...hf, hr: e.target.value }
                     setHf(next)
-                    editor.chain().focus().updateHeaderContent(next.hl, next.hr).run()
+                    editor.commands.updateHeaderContent(next.hl, next.hr)
                   }}
                 />
               </div>
             </div>
+
             <div>
-              <label className={lab}>Piè di pagina (sinistra / destra)</label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  className={field}
-                  placeholder="Sinistra"
-                  value={hf.fl}
-                  onChange={(e) => {
-                    const next = { ...hf, fl: e.target.value }
-                    setHf(next)
-                    editor.chain().focus().updateFooterContent(next.fl, next.fr).run()
-                  }}
-                />
-                <input
-                  className={field}
-                  placeholder="Destra"
-                  value={hf.fr}
-                  onChange={(e) => {
-                    const next = { ...hf, fr: e.target.value }
-                    setHf(next)
-                    editor.chain().focus().updateFooterContent(next.fl, next.fr).run()
-                  }}
-                />
-              </div>
+              <label className={lab}>Numero di pagina (piè)</label>
+              <select className={field} value={pageNumMode} onChange={(e) => setPageNumMode(e.target.value as PageNumMode)}>
+                <option value="none">Nessuno</option>
+                <option value="page">Solo numero — “3”</option>
+                <option value="page-total">Numero / totale — “3 / 8”</option>
+                <option value="page-of-total">Esteso — “Pagina 3 di 8”</option>
+              </select>
+              <p className="text-[11px] text-zinc-500 mt-1.5">Il totale è calcolato automaticamente.</p>
             </div>
-            <button
-              className="self-start text-xs px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 hover:bg-zinc-700"
-              onClick={() => {
-                const next = { ...hf, fr: 'Pagina {page} di {pages}' }
-                setHf(next)
-                editor.chain().focus().updateFooterContent(next.fl, next.fr).run()
-              }}
-            >
-              + Numero pagina nel piè (a destra)
-            </button>
           </div>
         )}
       </div>
