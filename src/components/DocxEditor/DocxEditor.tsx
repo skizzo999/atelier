@@ -22,6 +22,7 @@ import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { htmlToDocxBlob } from '../../lib/htmlToDocx'
 import { PaginationPlus } from 'tiptap-pagination-plus'
+import { DocSettings } from './DocSettings'
 import { useAppStore } from '../../store/appStore'
 
 // Sfondo dell'area documento = colore dei "gap" tra le pagine: così i fogli A4
@@ -194,6 +195,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [paperColor, setPaperColor] = useState('#ffffff')
+  const [canvasColor, setCanvasColor] = useState(PAGE_BG)
   const [, setTick] = useState(0)
   const importingRef = useRef(true) // true mentre carico: ignora gli update
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -367,6 +371,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           >
             {saving ? 'Salvataggio…' : '💾 Salva'}
           </button>
+          <button
+            className={settingsOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            title="Impostazioni documento"
+            disabled={loading || !!error}
+            onClick={() => setSettingsOpen((o) => !o)}
+          >
+            ⚙️ Documento
+          </button>
           <button className={btn} title="Esporta in Markdown" disabled={exporting || loading} onClick={exportMarkdown}>
             {exporting ? 'Esporto…' : '↧ .md'}
           </button>
@@ -375,6 +387,17 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           </button>
         </div>
       </div>
+
+      {settingsOpen && editor && (
+        <DocSettings
+          editor={editor}
+          onClose={() => setSettingsOpen(false)}
+          paper={paperColor}
+          setPaper={setPaperColor}
+          canvas={canvasColor}
+          setCanvas={setCanvasColor}
+        />
+      )}
 
       {/* Barra strumenti di formattazione */}
       {editor && !loading && !error && (
@@ -553,12 +576,15 @@ export function DocxEditor({ filePath }: { filePath: string }) {
 
       {/* Sfondo grigio; i fogli A4 (bianchi, con margini) e i salti pagina li
           gestisce il motore di paginazione. Zoom via CSS. */}
-      <div ref={scrollRef} className="flex-1 overflow-auto py-8 px-4" style={{ background: PAGE_BG }}>
+      <div ref={scrollRef} className="flex-1 overflow-auto py-8 px-4" style={{ background: canvasColor }}>
         {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
         )}
-        <div className={`docx-prose ${loading || error ? 'hidden' : ''}`} style={{ zoom }}>
+        <div
+          className={`docx-prose ${loading || error ? 'hidden' : ''}`}
+          style={{ zoom, ...({ '--docx-paper': paperColor } as React.CSSProperties) }}
+        >
           <EditorContent editor={editor} />
         </div>
       </div>

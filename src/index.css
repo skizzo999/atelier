@@ -152,7 +152,7 @@ body {
    e togliamo la "stanghetta" (bordo) tra le pagine. */
 .docx-prose .ProseMirror {
   color: var(--tw-prose-body);
-  background: #ffffff; /* foglio bianco */
+  background: var(--docx-paper, #ffffff); /* colore foglio (impostazioni documento) */
   margin: 0 auto; /* pagina centrata */
   border: none;
 }
