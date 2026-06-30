@@ -148,21 +148,10 @@ body {
   --tw-prose-hr: #d4d4d8;
   --tw-prose-links: #1d4ed8;
 }
-/* La colonna editabile È il foglio A4 (794px, margini, ombra); i salti pagina
-   (.docx-page-break) la "tagliano" in più fogli con un gap grigio. */
+/* I fogli A4 (bianchi, margini, header/footer) li disegna tiptap-pagination-plus.
+   Qui solo il colore del testo sul foglio. */
 .docx-prose .ProseMirror {
-  width: 794px;
-  min-height: 1123px;
-  margin: 0 auto;
-  padding: 76px;
-  background: #ffffff;
   color: var(--tw-prose-body);
-  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
-}
-.docx-page-break {
-  margin: 0 -76px; /* a tutta larghezza pagina */
-  user-select: none;
-  pointer-events: none;
 }
 .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
 .ProseMirror td,

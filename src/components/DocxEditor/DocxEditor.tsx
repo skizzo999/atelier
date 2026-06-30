@@ -13,8 +13,12 @@ import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { htmlToDocxBlob } from '../../lib/htmlToDocx'
-import { Pagination } from '../../lib/pagination'
+import { PaginationPlus } from 'tiptap-pagination-plus'
 import { useAppStore } from '../../store/appStore'
+
+// Sfondo dell'area documento = colore dei "gap" tra le pagine: così i fogli A4
+// (bianchi) sembrano staccati l'uno dall'altro.
+const PAGE_BG = '#4b4f55'
 
 const extensions = [
   StarterKit,
@@ -24,7 +28,18 @@ const extensions = [
   TableRow,
   TableHeader,
   TableCell,
-  Pagination, // fogli A4 distinti, salto pagina a livello di blocco
+  // Paginazione vera A4 (open-source, v3): fogli distinti, margini, header/footer.
+  PaginationPlus.configure({
+    pageWidth: 794,
+    pageHeight: 1123,
+    marginTop: 95,
+    marginBottom: 95,
+    marginLeft: 76,
+    marginRight: 76,
+    pageGap: 30,
+    pageGapBorderSize: 0,
+    pageBreakBackground: PAGE_BG, // gap = sfondo → pagine staccate
+  }),
 ]
 
 // Bottone della barra strumenti (stile Atelier: attivo = accento blu).
@@ -102,8 +117,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const buffered = useAppStore.getState().dirtyBuffers[filePath]
       if (buffered !== undefined) {
         editor.commands.setContent(buffered)
-        importingRef.current = false
         setLoading(false)
+        setTimeout(() => (importingRef.current = false), 400) // assorbi la ri-paginazione
         return
       }
       const bytes = await readFile(filePath)
@@ -111,8 +126,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
       editor.commands.setContent(DOMPurify.sanitize(result.value))
-      importingRef.current = false // setContent emette update in modo sincrono: ora basta
       setLoading(false)
+      setTimeout(() => (importingRef.current = false), 400) // assorbi la ri-paginazione
     })().catch((e) => {
       console.error('Errore apertura DOCX:', e)
       if (!cancelled) {
@@ -135,7 +150,10 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         const orig = await readFile(filePath)
         await writeFileBinaryAtomic(bak, orig)
       }
-      const blob = await htmlToDocxBlob(editor.view.dom as HTMLElement)
+      // HTML pulito del documento (no chrome di paginazione: header/footer/gap).
+      const container = document.createElement('div')
+      container.innerHTML = editor.getHTML()
+      const blob = await htmlToDocxBlob(container)
       const buf = new Uint8Array(await blob.arrayBuffer())
       await writeFileBinaryAtomic(filePath, buf)
       clearBuffer(filePath) // salvato → niente più "non salvato"
@@ -329,7 +347,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
 
       {/* Sfondo grigio; i fogli A4 (bianchi, con margini) e i salti pagina li
           gestisce il motore di paginazione. Zoom via CSS. */}
-      <div ref={scrollRef} className="flex-1 overflow-auto bg-neutral-700/60 py-8 px-4">
+      <div ref={scrollRef} className="flex-1 overflow-auto py-8 px-4" style={{ background: PAGE_BG }}>
         {error && <p className="text-zinc-400 text-sm text-center">Impossibile aprire il documento.</p>}
         {loading && !error && (
           <div className="mx-auto h-7 w-7 rounded-full border-2 border-neutral-500 border-t-neutral-200 animate-spin" />
