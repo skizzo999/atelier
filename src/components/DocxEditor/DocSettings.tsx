@@ -3,8 +3,17 @@ import type { Editor } from '@tiptap/react'
 
 export type PageNumMode = 'none' | 'page' | 'page-total' | 'page-of-total'
 
+// Impostazioni di impaginazione riportate a DocxEditor (per salvarle nel .docx).
+export interface DocLayout {
+  format: string
+  landscape: boolean
+  margins: { top: number; bottom: number; left: number; right: number } // cm
+  headerLeft: string
+  headerRight: string
+}
+
 // Formati foglio (px a 96dpi, ritratto).
-const FORMATS: Record<string, { w: number; h: number }> = {
+export const FORMATS: Record<string, { w: number; h: number }> = {
   A4: { w: 794, h: 1123 },
   Letter: { w: 816, h: 1056 },
   Legal: { w: 816, h: 1344 },
@@ -12,7 +21,7 @@ const FORMATS: Record<string, { w: number; h: number }> = {
   A5: { w: 559, h: 794 },
 }
 
-const cmToPx = (cm: number) => Math.round((cm / 2.54) * 96)
+export const cmToPx = (cm: number) => Math.round((cm / 2.54) * 96)
 
 const field = 'w-full h-8 bg-zinc-800 border border-zinc-700 rounded px-2 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500'
 const lab = 'text-xs text-zinc-400 mb-1 block'
@@ -26,6 +35,7 @@ export function DocSettings({
   setPageNumMode,
   footerLeft,
   setFooterLeft,
+  onLayout,
 }: {
   editor: Editor
   onClose: () => void
@@ -35,6 +45,7 @@ export function DocSettings({
   setPageNumMode: (m: PageNumMode) => void
   footerLeft: string
   setFooterLeft: (t: string) => void
+  onLayout: (patch: Partial<DocLayout>) => void
 }) {
   const [tab, setTab] = useState<'doc' | 'hf'>('doc')
   const [format, setFormat] = useState('A4')
@@ -94,6 +105,7 @@ export function DocSettings({
                   onChange={(e) => {
                     setFormat(e.target.value)
                     applyPageSize(e.target.value, landscape)
+                    onLayout({ format: e.target.value })
                   }}
                 >
                   {Object.keys(FORMATS).map((k) => (
@@ -112,6 +124,7 @@ export function DocSettings({
                     const land = e.target.value === 'l'
                     setLandscape(land)
                     applyPageSize(format, land)
+                    onLayout({ landscape: land })
                   }}
                 >
                   <option value="p">Verticale</option>
@@ -136,6 +149,7 @@ export function DocSettings({
                       const next = { ...m, [side]: parseFloat(e.target.value) || 0 }
                       setM(next)
                       applyMargins(next)
+                      onLayout({ margins: next })
                     }}
                   />
                 ))}
@@ -182,6 +196,7 @@ export function DocSettings({
                     const next = { ...hf, hl: e.target.value }
                     setHf(next)
                     editor.commands.updateHeaderContent(next.hl, next.hr)
+                    onLayout({ headerLeft: next.hl, headerRight: next.hr })
                   }}
                 />
                 <input
@@ -192,6 +207,7 @@ export function DocSettings({
                     const next = { ...hf, hr: e.target.value }
                     setHf(next)
                     editor.commands.updateHeaderContent(next.hl, next.hr)
+                    onLayout({ headerLeft: next.hl, headerRight: next.hr })
                   }}
                 />
               </div>

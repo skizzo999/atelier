@@ -13,7 +13,62 @@ import {
   LevelFormat,
   ShadingType,
   LineRuleType,
+  Header,
+  Footer,
+  PageNumber,
+  Tab,
+  TabStopType,
+  PageOrientation,
+  type ParagraphChild,
+  type ISectionOptions,
 } from 'docx'
+
+// Impostazioni di pagina da scrivere nel .docx (px schermo: i twip = px*15 a 96dpi).
+export interface DocxLayout {
+  pageWidthPx: number // larghezza foglio (orientamento già applicato)
+  pageHeightPx: number
+  marginsPx: { top: number; bottom: number; left: number; right: number }
+  headerLeft: string
+  headerRight: string // può contenere {page}
+  footerLeft: string
+  pageNum: 'none' | 'page' | 'page-total' | 'page-of-total'
+}
+
+const PX_TO_TWIP = 15 // 96px = 1 pollice = 1440 twip → 1px = 15 twip
+
+// Converte un testo con {page} in run docx (campo "numero pagina corrente").
+function textWithPageField(s: string): ParagraphChild[] {
+  const out: ParagraphChild[] = []
+  s.split('{page}').forEach((part, i) => {
+    if (i > 0) out.push(new TextRun({ children: [PageNumber.CURRENT] }))
+    if (part) out.push(new TextRun(part))
+  })
+  return out
+}
+
+// Run del numero di pagina per il piè (corrente + totale come campi Word veri).
+function footerNumRuns(mode: DocxLayout['pageNum']): ParagraphChild[] {
+  if (mode === 'page') return [new TextRun({ children: [PageNumber.CURRENT] })]
+  if (mode === 'page-total')
+    return [new TextRun({ children: [PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES] })]
+  if (mode === 'page-of-total')
+    return [new TextRun({ children: ['Pagina ', PageNumber.CURRENT, ' di ', PageNumber.TOTAL_PAGES] })]
+  return []
+}
+
+// Paragrafo header/footer: testo a sinistra + (tab) contenuto a destra.
+function hfParagraph(leftText: string, right: ParagraphChild[], contentWidthTwip: number): Paragraph {
+  const children: ParagraphChild[] = []
+  if (leftText) children.push(new TextRun(leftText))
+  if (right.length) {
+    children.push(new TextRun({ children: [new Tab()] }))
+    children.push(...right)
+  }
+  return new Paragraph({
+    tabStops: [{ type: TabStopType.RIGHT, position: contentWidthTwip }],
+    children,
+  })
+}
 
 // Converte l'HTML (semplificato, stile Mammoth) dell'editor in un .docx vero.
 // Copre i casi prodotti da Mammoth: titoli, paragrafi, grassetto/corsivo/sottolineato/
@@ -276,15 +331,49 @@ function convertBlocks(container: Node, ctx: Ctx, out: (Paragraph | Table)[]) {
   })
 }
 
-// Converte il contenuto live dell'editor (per avere le dimensioni immagini) in un Blob .docx.
-export async function htmlToDocxBlob(container: HTMLElement): Promise<Blob> {
+// Converte il contenuto dell'editor in un Blob .docx. Se passi `layout`, scrive
+// anche formato/orientamento/margini e intestazioni/piè (con numeri di pagina veri).
+export async function htmlToDocxBlob(container: HTMLElement, layout?: DocxLayout): Promise<Blob> {
   const ctx: Ctx = { numConfigs: [], counter: 0 }
   const children: (Paragraph | Table)[] = []
   convertBlocks(container, ctx, children)
   if (!children.length) children.push(new Paragraph({ children: [] }))
+
+  const extra: Record<string, unknown> = {}
+  if (layout) {
+    const landscape = layout.pageWidthPx > layout.pageHeightPx
+    const contentW = Math.round((layout.pageWidthPx - layout.marginsPx.left - layout.marginsPx.right) * PX_TO_TWIP)
+    extra.properties = {
+      page: {
+        size: {
+          width: Math.round(layout.pageWidthPx * PX_TO_TWIP),
+          height: Math.round(layout.pageHeightPx * PX_TO_TWIP),
+          orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT,
+        },
+        margin: {
+          top: Math.round(layout.marginsPx.top * PX_TO_TWIP),
+          bottom: Math.round(layout.marginsPx.bottom * PX_TO_TWIP),
+          left: Math.round(layout.marginsPx.left * PX_TO_TWIP),
+          right: Math.round(layout.marginsPx.right * PX_TO_TWIP),
+        },
+      },
+    }
+    if (layout.headerLeft || layout.headerRight) {
+      extra.headers = {
+        default: new Header({ children: [hfParagraph(layout.headerLeft, textWithPageField(layout.headerRight), contentW)] }),
+      }
+    }
+    const fnum = footerNumRuns(layout.pageNum)
+    if (layout.footerLeft || fnum.length) {
+      extra.footers = {
+        default: new Footer({ children: [hfParagraph(layout.footerLeft, fnum, contentW)] }),
+      }
+    }
+  }
+
   const doc = new Document({
     ...(ctx.numConfigs.length ? { numbering: { config: ctx.numConfigs } } : {}),
-    sections: [{ children }],
+    sections: [{ ...extra, children } as ISectionOptions],
   })
   return Packer.toBlob(doc)
 }

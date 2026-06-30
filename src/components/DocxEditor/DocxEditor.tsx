@@ -20,9 +20,9 @@ import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
-import { htmlToDocxBlob } from '../../lib/htmlToDocx'
+import { htmlToDocxBlob, type DocxLayout } from '../../lib/htmlToDocx'
 import { PaginationPlus } from 'tiptap-pagination-plus'
-import { DocSettings, type PageNumMode } from './DocSettings'
+import { DocSettings, type PageNumMode, type DocLayout, FORMATS, cmToPx } from './DocSettings'
 import { useAppStore } from '../../store/appStore'
 
 // Numero totale di pagine (l'estensione conosce solo {page}, non il totale).
@@ -215,6 +215,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [footerLeft, setFooterLeft] = useState('') // testo libero in basso a sinistra
   const footerLeftRef = useRef('')
   footerLeftRef.current = footerLeft
+  // Impostazioni di impaginazione (per scriverle nel .docx al salvataggio).
+  const layoutRef = useRef<DocLayout>({
+    format: 'A4',
+    landscape: false,
+    margins: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+    headerLeft: '',
+    headerRight: '',
+  })
   const [, setTick] = useState(0)
   const importingRef = useRef(true) // true mentre carico: ignora gli update
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -292,7 +300,24 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       // HTML pulito del documento (no chrome di paginazione: header/footer/gap).
       const container = document.createElement('div')
       container.innerHTML = editor.getHTML()
-      const blob = await htmlToDocxBlob(container)
+      // Impaginazione → sezione Word (formato/orientamento/margini/header/footer).
+      const lay = layoutRef.current
+      const f = FORMATS[lay.format] ?? FORMATS.A4
+      const docxLayout: DocxLayout = {
+        pageWidthPx: lay.landscape ? f.h : f.w,
+        pageHeightPx: lay.landscape ? f.w : f.h,
+        marginsPx: {
+          top: cmToPx(lay.margins.top),
+          bottom: cmToPx(lay.margins.bottom),
+          left: cmToPx(lay.margins.left),
+          right: cmToPx(lay.margins.right),
+        },
+        headerLeft: lay.headerLeft,
+        headerRight: lay.headerRight,
+        footerLeft: footerLeftRef.current,
+        pageNum: pageNumModeRef.current,
+      }
+      const blob = await htmlToDocxBlob(container, docxLayout)
       const buf = new Uint8Array(await blob.arrayBuffer())
       await writeFileBinaryAtomic(filePath, buf)
       clearBuffer(filePath) // salvato → niente più "non salvato"
@@ -450,6 +475,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           setPageNumMode={changePageNumMode}
           footerLeft={footerLeft}
           setFooterLeft={changeFooterLeft}
+          onLayout={(patch) => {
+            layoutRef.current = { ...layoutRef.current, ...patch }
+          }}
         />
       )}
 
