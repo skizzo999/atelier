@@ -15,12 +15,14 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Typography from '@tiptap/extension-typography'
-import { readFile, readTextFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
+import { readFile, writeTextFile, exists, remove } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { htmlToDocxBlob, type DocxLayout } from '../../lib/htmlToDocx'
+import { parseDocxSettings } from '../../lib/docxSectPr'
 import { PaginationPlus } from 'tiptap-pagination-plus'
 import { DocSettings, type PageNumMode, type DocLayout, FORMATS, cmToPx } from './DocSettings'
 import { useAppStore } from '../../store/appStore'
@@ -276,15 +278,27 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     setLoading(true)
     setError(false)
     ;(async () => {
-      // Impostazioni documento dal file affianco (margini, orientamento, header/piè, colore).
-      let settings = DEFAULT_SETTINGS
+      // Impostazioni pagina lette dalla "sezione" Word del .docx stesso: formato,
+      // orientamento, margini, colore foglio + intestazioni/piè (best-effort). Così
+      // ci ritroviamo l'impaginazione anche sui .docx creati fuori da Atelier.
+      const bytes = await readFile(filePath)
+      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+      let settings: FullSettings = DEFAULT_SETTINGS
       try {
-        if (await exists(`${filePath}.atelier`)) {
-          settings = { ...DEFAULT_SETTINGS, ...JSON.parse(await readTextFile(`${filePath}.atelier`)) }
-        }
-      } catch {
-        /* niente impostazioni salvate */
+        const parsed = parseDocxSettings(bytes)
+        if (parsed) settings = { ...DEFAULT_SETTINGS, ...parsed }
+      } catch (e) {
+        console.warn('Sezione DOCX non leggibile, uso i default:', e)
       }
+      // Il vecchio file affianco .atelier non serve più (le impostazioni stanno nel
+      // .docx): eliminalo se presente. E nascondi il .bak se già esiste.
+      try {
+        if (await exists(`${filePath}.atelier`)) await remove(`${filePath}.atelier`)
+      } catch {
+        /* ignora */
+      }
+      hideBakIfPresent()
+
       const buffered = useAppStore.getState().dirtyBuffers[filePath]
       if (buffered !== undefined) {
         editor.commands.setContent(buffered)
@@ -293,8 +307,6 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         setTimeout(() => (importingRef.current = false), 400)
         return
       }
-      const bytes = await readFile(filePath)
-      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
       editor.commands.setContent(DOMPurify.sanitize(result.value))
@@ -323,6 +335,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         const orig = await readFile(filePath)
         await writeFileBinaryAtomic(bak, orig)
       }
+      hideBakIfPresent() // il backup resta come sicurezza, ma nascosto da Esplora risorse
       // HTML pulito del documento (no chrome di paginazione: header/footer/gap).
       const container = document.createElement('div')
       container.innerHTML = editor.getHTML()
@@ -347,8 +360,6 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const blob = await htmlToDocxBlob(container, docxLayout)
       const buf = new Uint8Array(await blob.arrayBuffer())
       await writeFileBinaryAtomic(filePath, buf)
-      // Impostazioni documento nel file affianco, per ripristinarle alla riapertura.
-      await writeTextFile(`${filePath}.atelier`, JSON.stringify(gatherSettings())).catch(() => {})
       clearBuffer(filePath) // salvato → niente più "non salvato"
     } catch (e) {
       console.error('Salvataggio DOCX:', e)
@@ -413,12 +424,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       .updateFooterContent(s.footerLeft, footerTextFor(s.pageNum, pageTotalOf(editor)))
       .run()
   }
-  function gatherSettings(): FullSettings {
-    return {
-      ...layoutRef.current,
-      paper: paperColorRef.current,
-      footerLeft: footerLeftRef.current,
-      pageNum: pageNumModeRef.current,
+  // Nasconde il backup .bak (attributo Windows) se esiste: resta come sicurezza
+  // ma non ingombra Esplora risorse. Best-effort: se fallisce, il file resta visibile.
+  async function hideBakIfPresent() {
+    try {
+      const bak = `${filePath}.bak`
+      if (await exists(bak)) await invoke('set_hidden', { path: bak })
+    } catch {
+      /* best-effort */
     }
   }
 
