@@ -87,6 +87,10 @@ Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
     **sezione Word** (formato/orientamento/margini) + **intestazioni/piè con campi numero
     pagina veri** (corrente+totale calcolati da Word). **Backup `.bak`** la 1ª volta;
     **buffer** non salvato (pallino tree, non perde uscendo)
+  - **Persistenza impostazioni**: Mammoth in apertura legge solo il corpo → formato/
+    orientamento/margini/header/piè/numero pagina/colore foglio sono salvati in un **file
+    affianco `<nome>.docx.atelier`** (JSON, nascosto come il `.bak`) e **riletti+applicati
+    SUBITO all'apertura** (niente flash del foglio bianco). Il colore foglio va anche nel .docx
   - **Export in Markdown**, **Apri in Explorer**. Fedeltà "Mammoth" in import (non
     byte-perfect). Solo .docx
 - [x] **Editor Markdown a 3 viste:**
@@ -200,8 +204,14 @@ Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
     (serviva per l'augmentation dei comandi).
   - **Numero pagina totale**: pagination-plus conosce solo `{page}` → il totale lo calcoliamo
     noi a schermo (conta le pagine); nel .docx invece si usano i campi Word veri (TOTAL_PAGES).
-  - Da fare se serve: persistere anche **colore foglio** e **font Google bundlati**;
-    intestazioni inline alla Word (estensione non le supporta, solo via pannello).
+  - **Persistenza impostazioni**: file affianco `<nome>.docx.atelier` (JSON) scritto al
+    salvataggio e riletto+applicato all'apertura (prima di mostrare la pagina → no flash).
+    Colore foglio anche nel .docx (Document background). File `.atelier` nascosti dal tree.
+  - **Limite noto**: i .docx creati in Word (non da Atelier) → Atelier non ne rilegge la
+    sezione (margini/orientamento/header di Word); al 1° salvataggio vengono riscritti coi
+    default (il `.bak` protegge). Per leggerli servirebbe un parser dello `sectPr` (unzip XML).
+  - Da fare se serve: **font Google bundlati**; intestazioni inline alla Word (l'estensione
+    non le supporta, solo via pannello).
 
 ## Per riprendere
 Aprire nuova chat AI e incollare:
