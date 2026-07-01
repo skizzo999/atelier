@@ -36,6 +36,7 @@ export function DocSettings({
   footerLeft,
   setFooterLeft,
   onLayout,
+  initial,
 }: {
   editor: Editor
   onClose: () => void
@@ -46,13 +47,14 @@ export function DocSettings({
   footerLeft: string
   setFooterLeft: (t: string) => void
   onLayout: (patch: Partial<DocLayout>) => void
+  initial: DocLayout
 }) {
   const [tab, setTab] = useState<'doc' | 'hf'>('doc')
-  const [format, setFormat] = useState('A4')
-  const [landscape, setLandscape] = useState(false)
-  const [m, setM] = useState({ top: 2.5, bottom: 2.5, left: 2, right: 2 }) // cm
+  const [format, setFormat] = useState(initial.format)
+  const [landscape, setLandscape] = useState(initial.landscape)
+  const [m, setM] = useState(initial.margins) // cm
   const [gap, setGap] = useState(30)
-  const [hf, setHf] = useState({ hl: '', hr: '' })
+  const [hf, setHf] = useState({ hl: initial.headerLeft, hr: initial.headerRight })
 
   function applyPageSize(fmt: string, land: boolean) {
     const f = FORMATS[fmt]

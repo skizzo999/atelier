@@ -32,6 +32,7 @@ export interface DocxLayout {
   headerRight: string // può contenere {page}
   footerLeft: string
   pageNum: 'none' | 'page' | 'page-total' | 'page-of-total'
+  paper?: string // colore foglio (#rrggbb)
 }
 
 const PX_TO_TWIP = 15 // 96px = 1 pollice = 1440 twip → 1px = 15 twip
@@ -371,8 +372,10 @@ export async function htmlToDocxBlob(container: HTMLElement, layout?: DocxLayout
     }
   }
 
+  const paperHex = layout?.paper ? cssToHex(layout.paper) : undefined
   const doc = new Document({
     ...(ctx.numConfigs.length ? { numbering: { config: ctx.numConfigs } } : {}),
+    ...(paperHex && paperHex !== 'FFFFFF' ? { background: { color: paperHex } } : {}),
     sections: [{ ...extra, children } as ISectionOptions],
   })
   return Packer.toBlob(doc)

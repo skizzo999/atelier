@@ -15,7 +15,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Typography from '@tiptap/extension-typography'
-import { readFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
+import { readFile, readTextFile, writeTextFile, exists } from '@tauri-apps/plugin-fs'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
@@ -35,6 +35,19 @@ function footerTextFor(mode: PageNumMode, total: number): string {
   if (mode === 'page-total') return `{page} / ${total}`
   if (mode === 'page-of-total') return `Pagina {page} di ${total}`
   return ''
+}
+
+// Tutte le impostazioni documento (salvate in un file affianco al .docx).
+type FullSettings = DocLayout & { paper: string; footerLeft: string; pageNum: PageNumMode }
+const DEFAULT_SETTINGS: FullSettings = {
+  format: 'A4',
+  landscape: false,
+  margins: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+  headerLeft: '',
+  headerRight: '',
+  paper: '#ffffff',
+  footerLeft: '',
+  pageNum: 'none',
 }
 
 // Sfondo dell'area documento = colore dei "gap" tra le pagine: così i fogli A4
@@ -209,6 +222,8 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [zoom, setZoom] = useState(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [paperColor, setPaperColor] = useState('#ffffff')
+  const paperColorRef = useRef('#ffffff')
+  paperColorRef.current = paperColor
   const [pageNumMode, setPageNumMode] = useState<PageNumMode>('none')
   const pageNumModeRef = useRef<PageNumMode>('none')
   pageNumModeRef.current = pageNumMode
@@ -261,11 +276,21 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     setLoading(true)
     setError(false)
     ;(async () => {
+      // Impostazioni documento dal file affianco (margini, orientamento, header/piè, colore).
+      let settings = DEFAULT_SETTINGS
+      try {
+        if (await exists(`${filePath}.atelier`)) {
+          settings = { ...DEFAULT_SETTINGS, ...JSON.parse(await readTextFile(`${filePath}.atelier`)) }
+        }
+      } catch {
+        /* niente impostazioni salvate */
+      }
       const buffered = useAppStore.getState().dirtyBuffers[filePath]
       if (buffered !== undefined) {
         editor.commands.setContent(buffered)
+        applyAllSettings(settings) // subito, prima di mostrare: niente flash del bianco
         setLoading(false)
-        setTimeout(() => (importingRef.current = false), 400) // assorbi la ri-paginazione
+        setTimeout(() => (importingRef.current = false), 400)
         return
       }
       const bytes = await readFile(filePath)
@@ -273,8 +298,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       const result = await mammoth.convertToHtml({ arrayBuffer })
       if (cancelled) return
       editor.commands.setContent(DOMPurify.sanitize(result.value))
+      applyAllSettings(settings) // subito, prima di mostrare: niente flash del bianco
       setLoading(false)
-      setTimeout(() => (importingRef.current = false), 400) // assorbi la ri-paginazione
+      setTimeout(() => (importingRef.current = false), 400)
     })().catch((e) => {
       console.error('Errore apertura DOCX:', e)
       if (!cancelled) {
@@ -316,10 +342,13 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         headerRight: lay.headerRight,
         footerLeft: footerLeftRef.current,
         pageNum: pageNumModeRef.current,
+        paper: paperColorRef.current,
       }
       const blob = await htmlToDocxBlob(container, docxLayout)
       const buf = new Uint8Array(await blob.arrayBuffer())
       await writeFileBinaryAtomic(filePath, buf)
+      // Impostazioni documento nel file affianco, per ripristinarle alla riapertura.
+      await writeTextFile(`${filePath}.atelier`, JSON.stringify(gatherSettings())).catch(() => {})
       clearBuffer(filePath) // salvato → niente più "non salvato"
     } catch (e) {
       console.error('Salvataggio DOCX:', e)
@@ -352,6 +381,45 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   function changeFooterLeft(text: string) {
     setFooterLeft(text)
     applyFooter(text, pageNumModeRef.current)
+  }
+
+  // Applica tutte le impostazioni (es. all'apertura, dal file affianco).
+  function applyAllSettings(s: FullSettings) {
+    if (!editor) return
+    layoutRef.current = {
+      format: s.format,
+      landscape: s.landscape,
+      margins: s.margins,
+      headerLeft: s.headerLeft,
+      headerRight: s.headerRight,
+    }
+    footerLeftRef.current = s.footerLeft
+    pageNumModeRef.current = s.pageNum
+    setFooterLeft(s.footerLeft)
+    setPageNumMode(s.pageNum)
+    setPaperColor(s.paper)
+    const f = FORMATS[s.format] ?? FORMATS.A4
+    editor
+      .chain()
+      .updatePageWidth(s.landscape ? f.h : f.w)
+      .updatePageHeight(s.landscape ? f.w : f.h)
+      .updateMargins({
+        top: cmToPx(s.margins.top),
+        bottom: cmToPx(s.margins.bottom),
+        left: cmToPx(s.margins.left),
+        right: cmToPx(s.margins.right),
+      })
+      .updateHeaderContent(s.headerLeft, s.headerRight)
+      .updateFooterContent(s.footerLeft, footerTextFor(s.pageNum, pageTotalOf(editor)))
+      .run()
+  }
+  function gatherSettings(): FullSettings {
+    return {
+      ...layoutRef.current,
+      paper: paperColorRef.current,
+      footerLeft: footerLeftRef.current,
+      pageNum: pageNumModeRef.current,
+    }
   }
 
   // Aggiorna il totale nel piè quando cambia il numero di pagine.
@@ -478,6 +546,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           onLayout={(patch) => {
             layoutRef.current = { ...layoutRef.current, ...patch }
           }}
+          initial={layoutRef.current}
         />
       )}
 
