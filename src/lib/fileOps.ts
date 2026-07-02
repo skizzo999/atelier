@@ -1,4 +1,5 @@
 import { writeTextFile, writeFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
+import { htmlToDocxBlob } from './htmlToDocx'
 
 function joinPath(dir: string, name: string): string {
   return `${dir}\\${name}`
@@ -10,11 +11,38 @@ function parentDir(path: string): string {
 }
 
 // Crea un file vuoto in `dir`. Errore se esiste già (per non sovrascriverlo).
+// I .docx vengono creati come DOCX veri (documento vuoto): un file da 0 byte
+// non sarebbe apribile (il formato è uno ZIP con dentro gli XML di Word).
 export async function createFile(dir: string, name: string): Promise<string> {
   const path = joinPath(dir, name)
   if (await exists(path)) throw new Error('Esiste già un elemento con questo nome')
-  await writeTextFile(path, '')
+  if (name.toLowerCase().endsWith('.docx')) {
+    const blob = await htmlToDocxBlob(document.createElement('div'))
+    await writeFile(path, new Uint8Array(await blob.arrayBuffer()))
+  } else {
+    await writeTextFile(path, '')
+  }
   return path
+}
+
+// Importa nel vault un file esterno (contenuto già letto dal drop HTML5),
+// senza mai sovrascrivere: se il nome è occupato aggiunge un suffisso.
+export async function importFile(dir: string, name: string, bytes: Uint8Array): Promise<string> {
+  let dest = joinPath(dir, name)
+  if (await exists(dest)) dest = await uniquePathWithSuffix(dest, 'importato')
+  await writeFile(dest, bytes)
+  return dest
+}
+
+// Sposta un file/cartella dentro `newDir` mantenendo il nome (drag-and-drop).
+// Errore se nella destinazione esiste già un elemento con lo stesso nome.
+export async function moveEntry(oldPath: string, newDir: string): Promise<string> {
+  const name = oldPath.slice(oldPath.lastIndexOf('\\') + 1)
+  const dest = joinPath(newDir, name)
+  if (dest === oldPath) return oldPath
+  if (await exists(dest)) throw new Error(`Nella cartella c'è già "${name}"`)
+  await rename(oldPath, dest)
+  return dest
 }
 
 export async function createFolder(dir: string, name: string): Promise<string> {

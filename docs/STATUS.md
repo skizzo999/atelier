@@ -12,8 +12,10 @@ salvato dentro al PDF** (3 colori personalizzabili). **Editor DOCX stile Word co
 A4 VERE** (TipTap + tiptap-pagination-plus): barra ricca (font/dimensione/colore/interlinea/
 liste/tabelle/…), pannello Impostazioni documento (formato/orientamento/margini/header/piè
 coi numeri pagina), salvataggio che riscrive il .docx (formattazione + sezione Word +
-intestazioni/piè). Pronti anche: sistema vault, file tree con watcher, gestione file, ricerca.
-Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
+intestazioni/piè). Pronti anche: sistema vault, file tree con watcher, gestione file, **drag-and-drop
+nel tree**, **modale "Nuovo file"** (nome + tipo), ricerca. Sicurezza: **CSP di
+produzione** + **guardia chiusura** con modifiche non salvate (UI provvisoria).
+Prossimi: stampa trasversale, pptx/xlsx.
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
@@ -104,21 +106,36 @@ Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
     `![[file]]`, cercate per nome in tutto il vault)
   - **Vista ricordata**: l'ultima scelta (Codice/Ibrida/Lettura) è persistita nello
     store (`mdView`), l'app riapre come l'hai lasciata invece di tornare a Codice
+- [x] **Drag-and-drop nel tree**: sposti file/cartelle trascinandoli (react-arborist
+  `onMove` + `rename` su disco); buffer non salvati rimappati (anche interi sottoalberi,
+  via `movePathPrefix` nello store — vale pure per la rinomina), selezione aggiornata.
+  Collisione di nome in destinazione = spostamento saltato (log in console)
+- [x] **Import trascinando da fuori**: file trascinati da Explorer di Windows sull'albero
+  → **copiati nella radice del vault** (mai sovrascritti: suffisso "-importato") e aperti.
+  Overlay blu "Rilascia per importare". Le cartelle non arrivano dal drop HTML5 (saltate)
+- [x] **Modale "Nuovo file"** (bottone in sidebar + tasto destro explorer): nome a sinistra,
+  tipo a destra (md/docx/txt; placeholder disabilitati xlsx/pptx; cascata "Programmazione"
+  con html/css/js/ts/py/java/php/json). Estensione digitata a mano = tipo auto-selezionato.
+  I **.docx nuovi sono DOCX veri** (un file da 0 byte non era apribile — era il bug
+  "Impossibile aprire il documento")
+- [x] **Sicurezza**: CSP severa in produzione (script-src 'self'+wasm, whitelist IPC/OCR/blob)
+  con devCsp permissiva per Vite; **guardia chiusura** (`onCloseRequested` + confirm nativo,
+  UI provvisoria) se ci sono modifiche non salvate
 - [x] Salvataggio atomico (tmp+rename); `Ctrl+S`; indicatore "non salvato" (tree + editor);
   risync col disco al focus finestra
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Drag-and-drop file** nel tree (richiesto, da fare dopo i DOCX): react-arborist
-   `onMove` + `rename` su disco (lib/fileOps) + aggiorna i buffer.
-2. **Altri formati**: ✅ PDF e DOCX (view+edit) → **pptx/xlsx** (SheetJS / viewer dedicati).
-3. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
-4. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
+1. **Altri formati**: ✅ PDF e DOCX (view+edit) → **pptx/xlsx** (SheetJS / viewer dedicati).
+   Nella modale "Nuovo file" ci sono già i placeholder (disabilitati).
+2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
+3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).
-5. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
-6. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-7. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-8. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande)
+4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
+5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
+6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
+7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande);
+   **dialog chiusura** → modale custom in-app (il confirm nativo non piace)
 
 > L'**editor immagini è completo**: trasformazioni, ritaglio, annotazioni con
 > selezione/modifica/rotazione, **gomma a pixel**, regolazioni, info/copia/OCR/Explorer.
@@ -157,6 +174,11 @@ Prossimi: stampa trasversale, pptx/xlsx, drag-and-drop file nel tree.
 - Live preview: src/components/CodeMirror/livePreview.ts (decorazioni dall'albero
   sintattico + pass regex per `==`, `[[ ]]`, `![[ ]]`); tema in modalità Ibrida
   senza oneDark (aspetto "documento")
+- **IMPORTANTE (drag-and-drop)**: `dragDropEnabled: false` nella finestra (tauri.conf.json)
+  è OBBLIGATORIO — il gestore drag-drop nativo di Tauri su Windows/WebView2 intercetta
+  e rompe il drag HTML5 della pagina (react-arborist non partiva proprio). Con false:
+  il drag interno funziona e i file esterni arrivano come drop HTML5 (nome+contenuto,
+  niente path OS → per questo l'import COPIA il file invece di linkarlo)
 - **IMPORTANTE**: i ViewPlugin di CM6 **non** possono fornire decorazioni a blocco
   (block widget/replace multi-riga) → causano crash. Per le tabelle boxate serve uno StateField.
 - **IMPORTANTE (widget buffer)**: ogni `Decoration.replace` con widget viene avvolto da

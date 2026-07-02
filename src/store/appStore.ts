@@ -47,11 +47,12 @@ interface AppState {
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
   clearBuffersUnder: (prefix: string) => void
-  moveBuffer: (from: string, to: string) => void
   setImageBuffer: (path: string, blob: Blob) => void
   clearImageBuffer: (path: string) => void
   clearImageBuffersUnder: (prefix: string) => void
-  moveImageBuffer: (from: string, to: string) => void
+  // Rimappa TUTTI i buffer (testo e immagini) quando un file o una cartella
+  // cambia percorso (rinomina/spostamento): chiave esatta + intero sottoalbero.
+  movePathPrefix: (from: string, to: string) => void
 }
 
 // Stato globale. Solo vaultPath e mode vengono persistiti in localStorage
@@ -109,14 +110,6 @@ export const useAppStore = create<AppState>()(
           }
           return { dirtyBuffers: next }
         }),
-      moveBuffer: (from, to) =>
-        set((state) => {
-          if (state.dirtyBuffers[from] === undefined) return {}
-          const next = { ...state.dirtyBuffers }
-          next[to] = next[from]
-          delete next[from]
-          return { dirtyBuffers: next }
-        }),
       setImageBuffer: (path, blob) =>
         set((state) => ({ imageBuffers: { ...state.imageBuffers, [path]: blob } })),
       clearImageBuffer: (path) =>
@@ -133,13 +126,18 @@ export const useAppStore = create<AppState>()(
           }
           return { imageBuffers: next }
         }),
-      moveImageBuffer: (from, to) =>
+      movePathPrefix: (from, to) =>
         set((state) => {
-          if (state.imageBuffers[from] === undefined) return {}
-          const next = { ...state.imageBuffers }
-          next[to] = next[from]
-          delete next[from]
-          return { imageBuffers: next }
+          function remap<V>(m: Record<string, V>): Record<string, V> {
+            const next: Record<string, V> = {}
+            for (const [k, v] of Object.entries(m)) {
+              if (k === from) next[to] = v
+              else if (k.startsWith(from + '\\')) next[to + k.slice(from.length)] = v
+              else next[k] = v
+            }
+            return next
+          }
+          return { dirtyBuffers: remap(state.dirtyBuffers), imageBuffers: remap(state.imageBuffers) }
         }),
     }),
     {

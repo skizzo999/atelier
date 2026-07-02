@@ -3,7 +3,8 @@ import { Tree, NodeRendererProps } from 'react-arborist'
 import { readDir, exists, watch, type UnwatchFn } from '@tauri-apps/plugin-fs'
 import { useAppStore } from '../../store/appStore'
 import { openVaultDialog } from '../../lib/vault'
-import { createFile, createFolder, renameEntry, deleteEntry } from '../../lib/fileOps'
+import { createFolder, renameEntry, deleteEntry, moveEntry, importFile } from '../../lib/fileOps'
+import { NewFileModal } from './NewFileModal'
 
 interface FileNode {
   id: string
@@ -96,7 +97,7 @@ const TreeActionsContext = createContext<TreeActions>({
   openMenu: () => {},
 })
 
-function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
+function FileNodeComponent({ node, style, dragHandle }: NodeRendererProps<FileNode>) {
   const { data } = node
   const { requestLoad, selectFile, openMenu } = useContext(TreeActionsContext)
   const isDirty = useAppStore(
@@ -108,10 +109,11 @@ function FileNodeComponent({ node, style }: NodeRendererProps<FileNode>) {
 
   return (
     <div
+      ref={dragHandle}
       style={style}
       className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-zinc-800 rounded ${
         node.isSelected ? 'bg-zinc-700' : ''
-      }`}
+      } ${node.isDragging ? 'opacity-40' : ''} ${node.willReceiveDrop ? 'bg-zinc-700/70 ring-1 ring-zinc-500' : ''}`}
       onClick={() => {
         if (data.isFolder) {
           node.toggle()
@@ -280,6 +282,10 @@ export function FileTree() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<FileNode | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
+  // Cartella di destinazione della modale "Nuovo file" (null = chiusa).
+  const [newFileDir, setNewFileDir] = useState<string | null>(null)
+  // Un drag di file ESTERNI (da Explorer di Windows) è sopra l'albero.
+  const [dropActive, setDropActive] = useState(false)
 
   // Specchio sincrono di treeData, per leggerlo dentro il callback del watcher.
   const treeDataRef = useRef<FileNode[]>([])
@@ -364,6 +370,32 @@ export function FileTree() {
     if (path) setVaultPath(path)
   }, [setVaultPath])
 
+  // Drag-and-drop: sposta i nodi trascinati dentro la cartella di destinazione
+  // (parentId null = radice del vault). Il refresh visivo lo fa il watcher.
+  const handleMove = useCallback(
+    async ({ dragIds, parentId }: { dragIds: string[]; parentId: string | null }) => {
+      const st = useAppStore.getState()
+      const targetDir = parentId ?? st.vaultPath
+      if (!targetDir) return
+      for (const path of dragIds) {
+        // Niente spostamenti nello stesso posto o di una cartella dentro sé stessa.
+        if (path.slice(0, path.lastIndexOf('\\')) === targetDir) continue
+        if (targetDir === path || targetDir.startsWith(path + '\\')) continue
+        try {
+          const dest = await moveEntry(path, targetDir)
+          const s = useAppStore.getState()
+          s.movePathPrefix(path, dest) // buffer non salvati → nuovo percorso
+          const sel = s.selectedFile
+          if (sel === path) s.setSelectedFile(dest)
+          else if (sel && sel.startsWith(path + '\\')) s.setSelectedFile(dest + sel.slice(path.length))
+        } catch (err) {
+          console.error('Spostamento non riuscito:', err)
+        }
+      }
+    },
+    [],
+  )
+
   const treeActions = useMemo<TreeActions>(
     () => ({
       requestLoad,
@@ -373,19 +405,30 @@ export function FileTree() {
     [requestLoad, setSelectedFile],
   )
 
+  // Import di file esterni trascinati da fuori (Explorer di Windows): il drop
+  // HTML5 dà nome + contenuto (non il path) → li COPIAMO nel vault e apriamo
+  // l'ultimo. Le cartelle non arrivano dal drop HTML5 e vengono saltate.
+  async function importDropped(files: FileList) {
+    const root = useAppStore.getState().vaultPath
+    if (!root) return
+    let lastPath: string | null = null
+    for (const f of Array.from(files)) {
+      if (!f.name) continue
+      try {
+        const bytes = new Uint8Array(await f.arrayBuffer())
+        lastPath = await importFile(root, f.name, bytes)
+      } catch (err) {
+        console.error(`Import di "${f.name}" non riuscito (cartella?):`, err)
+      }
+    }
+    if (lastPath) setSelectedFile(lastPath) // il watcher aggiorna l'albero
+  }
+
   // --- Operazioni su file/cartelle (le modifiche al disco le riflette il watcher) ---
 
   function openNewFile(dir: string) {
     setMenu(null)
-    setModalError(null)
-    setNameModal({
-      title: 'Nuovo file',
-      initial: 'nuovo.md',
-      run: async (name) => {
-        const p = await createFile(dir, name)
-        setSelectedFile(p)
-      },
-    })
+    setNewFileDir(dir) // modale con nome + tipo (md/docx/txt/…)
   }
 
   function openNewFolder(dir: string) {
@@ -408,9 +451,9 @@ export function FileTree() {
       initial: node.name,
       run: async (name) => {
         const np = await renameEntry(node.path, name)
-        // Sposta l'eventuale buffer non salvato sul nuovo path (file rinominato).
-        useAppStore.getState().moveBuffer(node.path, np)
-        useAppStore.getState().moveImageBuffer(node.path, np)
+        // Rimappa i buffer non salvati sul nuovo path (anche il sottoalbero,
+        // se è stata rinominata una cartella con file sporchi dentro).
+        useAppStore.getState().movePathPrefix(node.path, np)
         // Aggiorna il file aperto se era questo (o se è dentro la cartella rinominata).
         const sel = useAppStore.getState().selectedFile
         if (sel === node.path) setSelectedFile(np)
@@ -463,10 +506,17 @@ export function FileTree() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-zinc-800">
+      <div className="px-3 py-2 border-b border-zinc-800 flex gap-1.5">
+        <button
+          onClick={() => vaultPath && setNewFileDir(vaultPath)}
+          className="flex-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          title="Crea un nuovo file nel vault"
+        >
+          ＋ Nuovo file
+        </button>
         <button
           onClick={handleChangeVault}
-          className="w-full px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          className="flex-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
         >
           Cambia vault
         </button>
@@ -474,18 +524,43 @@ export function FileTree() {
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden"
+        className={`flex-1 overflow-hidden relative ${dropActive ? 'ring-2 ring-inset ring-blue-500/70 bg-blue-500/5' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault()
           setMenu({ target: null, x: e.clientX, y: e.clientY })
         }}
+        // Drop di file ESTERNI (il drag interno di react-arborist non è di tipo 'Files').
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('Files')) {
+            e.preventDefault()
+            setDropActive(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropActive(false)
+        }}
+        onDrop={(e) => {
+          if (e.dataTransfer.files.length) {
+            e.preventDefault()
+            setDropActive(false)
+            importDropped(e.dataTransfer.files)
+          }
+        }}
       >
+        {dropActive && (
+          <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+            <span className="px-3 py-1.5 bg-zinc-900/90 border border-blue-500/50 rounded text-xs text-blue-300">
+              Rilascia per importare nel vault
+            </span>
+          </div>
+        )}
         {loading ? (
           <div className="text-sm text-zinc-500 p-2">Caricamento...</div>
         ) : (
           <TreeActionsContext.Provider value={treeActions}>
             <Tree
               data={treeData}
+              onMove={handleMove}
               openByDefault={false}
               width={size.width}
               height={size.height}
@@ -540,6 +615,17 @@ export function FileTree() {
             )}
           </div>
         </>
+      )}
+
+      {newFileDir && (
+        <NewFileModal
+          dir={newFileDir}
+          onClose={() => setNewFileDir(null)}
+          onCreated={(p) => {
+            setNewFileDir(null)
+            setSelectedFile(p)
+          }}
+        />
       )}
 
       {nameModal && (
