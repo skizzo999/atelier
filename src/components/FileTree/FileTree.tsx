@@ -512,7 +512,7 @@ export function FileTree() {
           className="flex-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
           title="Crea un nuovo file nel vault"
         >
-          ＋ Nuovo file
+          Nuovo file
         </button>
         <button
           onClick={handleChangeVault}

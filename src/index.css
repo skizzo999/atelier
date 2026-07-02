@@ -204,3 +204,55 @@ mark.docx-find-current {
   background: rgba(251, 146, 60, 0.9);
   color: #111827;
 }
+
+/* Menu contestuale delle tabelle markdown (DOM puro, appeso a <body>:
+   fuori dallo scope del tema CodeMirror, quindi lo stile vive qui). */
+.cm-tablemenu {
+  min-width: 13rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  font-size: 13px;
+}
+.cm-tablemenu-root {
+  position: fixed;
+  z-index: 60;
+}
+.cm-tablemenu-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  color: #e4e4e7;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.cm-tablemenu-item:hover { background: #3f3f46; }
+.cm-tablemenu-item:disabled { opacity: 0.4; cursor: default; }
+.cm-tablemenu-item:disabled:hover { background: none; }
+.cm-tablemenu-item.has-sub::after {
+  content: '▸';
+  position: absolute;
+  right: 10px;
+  color: #71717a;
+  font-size: 11px;
+}
+.cm-tablemenu-sub {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -5px;
+  margin-left: -2px;
+}
+/* Sottomenu ribaltato a sinistra quando sborda dal bordo destro. */
+.cm-tablemenu-sub.cm-tablemenu-flip {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: -2px;
+}
+.cm-tablemenu-item.has-sub:hover > .cm-tablemenu-sub { display: block; }

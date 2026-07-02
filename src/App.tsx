@@ -17,6 +17,7 @@ import { SearchPalette } from './components/SearchPalette/SearchPalette'
 
 function App() {
   const vaultPath = useAppStore((s) => s.vaultPath)
+  const selectedFile = useAppStore((s) => s.selectedFile)
   const clearVault = useAppStore((s) => s.clearVault)
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
@@ -160,8 +161,9 @@ function App() {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-12 flex items-center justify-between px-4 border-b border-zinc-800">
-          <span className="text-xs text-zinc-500 truncate" title={vaultPath}>
-            {vaultPath}
+          {/* Percorso completo del file aperto (o del vault se nessun file). */}
+          <span className="text-xs text-zinc-500 truncate" title={selectedFile ?? vaultPath}>
+            {selectedFile ?? vaultPath}
           </span>
           <button
             onClick={toggleMode}

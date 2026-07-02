@@ -103,7 +103,6 @@ const headings = [
 
 // Decorazioni di riga.
 const codeBlockLine = Decoration.line({ class: 'cm-lp-codeblock' })
-const tableLine = Decoration.line({ class: 'cm-lp-table' })
 const hrLine = Decoration.line({ class: 'cm-lp-hr' })
 const blockspace = Decoration.line({ class: 'cm-lp-blockspace' })
 
@@ -213,9 +212,8 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
             return false
           }
           if (name === 'Table') {
-            // Nota: le tabelle "boxate" servirebbero decorazioni a blocco, che
-            // CodeMirror non accetta da un plugin -> per ora allineamento monospazio.
-            eachLine(doc, node.from, node.to, (lf) => ranges.push(tableLine.range(lf)))
+            // Le tabelle le rende il widget di tableEditor.ts (StateField, blocco):
+            // qui non decoriamo nulla e non scendiamo nei figli.
             return false
           }
 
@@ -416,11 +414,14 @@ const livePreviewTheme = EditorView.theme({
     fontFamily: PROSE_FONT,
     fontSize: '16px',
     lineHeight: '1.9',
-    padding: '28px 36px',
+    // padding-bottom abbondante: spazio "arieggiato" tra il testo e la fine
+    // della nota (si può scrollare oltre l'ultima riga, come Obsidian).
+    padding: '28px 36px 30vh',
     caretColor: '#e4e4e7',
     color: '#dcddde',
   },
-  '.cm-lp-blockspace': { paddingTop: '1em' },
+  // Spazio sopra il titolo e tra il titolo e il testo che segue.
+  '.cm-lp-blockspace': { paddingTop: '1em', paddingBottom: '0.45em' },
   '.cm-lp-h1': { fontSize: '2em', fontWeight: '700', color: HEAD },
   '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '700', color: HEAD },
   '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
@@ -467,7 +468,6 @@ const livePreviewTheme = EditorView.theme({
     fontStyle: 'italic',
   },
   '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
-  '.cm-lp-table': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.03)' },
   '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
   '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
   '.cm-lp-imagemissing': {
@@ -484,17 +484,6 @@ const livePreviewTheme = EditorView.theme({
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
-  '.cm-lp-mdtable': {
-    borderCollapse: 'collapse',
-    margin: '0.5em 0',
-    fontSize: '0.95em',
-  },
-  '.cm-lp-mdtable th, .cm-lp-mdtable td': {
-    border: '1px solid #3f3f46',
-    padding: '0.35em 0.7em',
-    textAlign: 'left',
-  },
-  '.cm-lp-mdtable th': { background: 'rgba(255,255,255,0.05)', fontWeight: '700' },
   '.cm-cursor': { borderLeftColor: '#e4e4e7' },
   '.cm-gutters': { display: 'none' },
 }, { dark: true })

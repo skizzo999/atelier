@@ -99,13 +99,30 @@ Prossimi: stampa trasversale, pptx/xlsx.
   - **Codice**: CodeMirror 6 con syntax highlight markdown (oneDark)
   - **Lettura**: marked + DOMPurify (+ prose, allineato all'Ibrida)
   - **Ibrida** (live preview, CM6): titoli ATX+Setext, grassetto/corsivo/barrato,
-    evidenziato `==`, liste puntate/task ☑, citazioni (annidate), righe, tabelle
-    (monospazio), link, **wikilink navigabile**, **callout** (titolo = tipo + corpo,
+    evidenziato `==`, liste puntate/task ☑, citazioni (annidate), righe, **tabelle
+    vere editabili** (vedi bullet sotto), link, **wikilink navigabile**, **callout** (titolo = tipo + corpo,
     reso come `::before`, allineato alla Lettura), blocchi di codice (**syntax
     highlight** + label linguaggio + ``` nascosti), **immagini** (`![alt](path)` e
     `![[file]]`, cercate per nome in tutto il vault)
   - **Vista ricordata**: l'ultima scelta (Codice/Ibrida/Lettura) è persistita nello
     store (`mdView`), l'app riapre come l'hai lasciata invece di tornare a Codice
+- [x] **Tabelle stile Obsidian in Ibrida** (`CodeMirror/tableEditor.ts`): la tabella md è
+  un **widget a blocco da StateField** (unico modo in CM6) con **celle contentEditable**:
+  scrivi nel testo, la struttura resta; ogni battuta ri-serializza il markdown nel doc
+  (eco soppressa via `dataset.md` in `updateDOM` → il cursore non salta). **Tasto destro
+  sulla cella**: menu Riga (prima/dopo/sposta/duplica/elimina), Colonna (idem), Ordina
+  A→Z/Z→A. **Selezione multi-cella** trascinando (stile Excel): Ctrl+C = TSV, Canc = svuota.
+  Bottoni **+ riga** (sotto) e **+ colonna** (bordo destro) su hover. Tab/Invio navigano
+  (Tab su ultima cella = nuova riga), Esc esce dopo la tabella. Celle = testo semplice
+  (il md inline nelle celle non è renderizzato, v2)
+- [x] **Menu tasto destro nei .md** (Codice+Ibrida): Aggiungi collegamento `[[ ]]`/link
+  `[]()`, Formattazione (grassetto/corsivo/barrato/evidenziato/codice), Paragrafo
+  (titoli/liste/attività/citazione — toggle), Inserisci (tabella/blocco codice/callout/
+  riga), Taglia/Copia/Incolla/Seleziona tutto. Nota: Incolla usa `clipboard.readText`
+  (se il webview lo nega → Ctrl+V)
+- [x] **Aria in Ibrida**: spazio sotto i titoli (`blockspace` padding-bottom) e
+  `padding-bottom: 30vh` a fine nota (scroll oltre l'ultima riga, come Obsidian)
+- [x] **Header**: mostra il percorso completo del file aperto (prima solo il vault)
 - [x] **Drag-and-drop nel tree**: sposti file/cartelle trascinandoli (react-arborist
   `onMove` + `rename` su disco); buffer non salvati rimappati (anche interi sottoalberi,
   via `movePathPrefix` nello store — vale pure per la rinomina), selezione aggiornata.
@@ -132,9 +149,9 @@ Prossimi: stampa trasversale, pptx/xlsx.
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).
 4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
-5. **Tabelle boxate in Ibrida** (via StateField — i plugin CM6 non possono dare decorazioni a blocco)
-6. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link esterni
-7. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande);
+5. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link
+   esterni, md inline renderizzato dentro le celle tabella
+6. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande);
    **dialog chiusura** → modale custom in-app (il confirm nativo non piace)
 
 > L'**editor immagini è completo**: trasformazioni, ritaglio, annotazioni con
@@ -205,7 +222,7 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - Bundle > 500kB (CM6 + highlight.js): valutare code-split / lazy import
 - Indici immagini/note ricostruiti solo all'apertura del vault (una nota creata in
   sessione è apribile via fallback, ma entra nell'indice al riavvio)
-- Tabelle in Ibrida ancora monospazio (boxate = step futuro con StateField)
+- Tabelle in Ibrida: md inline nelle celle mostrato grezzo (render = step futuro)
 - **PDF evidenziatore**: pagine con `/Rotate` non gestite (coord potrebbero non combaciare);
   cross-reader senza appearance stream (Adobe sì, lettori minimali forse no); selezione che
   attraversa due pagine non gestita
