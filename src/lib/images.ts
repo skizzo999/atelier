@@ -1,16 +1,5 @@
 import { readFile } from '@tauri-apps/plugin-fs'
-
-const MIME: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  svg: 'image/svg+xml',
-  ico: 'image/x-icon',
-  avif: 'image/avif',
-}
+import { IMAGE_MIME as MIME } from './mime'
 
 // Indice immagini del vault: basename (minuscolo) -> path completo. Permette di
 // trovare un'immagine per nome ovunque nel vault (come Obsidian).

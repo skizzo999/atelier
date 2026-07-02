@@ -1,4 +1,4 @@
-import { writeTextFile, writeFile, mkdir, rename, exists } from '@tauri-apps/plugin-fs'
+import { writeTextFile, writeFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
 import { htmlToDocxBlob } from './htmlToDocx'
 
@@ -95,14 +95,24 @@ export async function deleteEntry(path: string): Promise<void> {
 export async function writeFileAtomic(path: string, content: string): Promise<void> {
   const tmp = `${path}.tmp`
   await writeTextFile(tmp, content)
-  await rename(tmp, path)
+  try {
+    await rename(tmp, path)
+  } catch (e) {
+    await remove(tmp).catch(() => {}) // niente .tmp orfani se il rename fallisce
+    throw e
+  }
 }
 
 // Variante binaria del salvataggio atomico (es. immagini ri-encodate da canvas).
 export async function writeFileBinaryAtomic(path: string, data: Uint8Array): Promise<void> {
   const tmp = `${path}.tmp`
   await writeFile(tmp, data)
-  await rename(tmp, path)
+  try {
+    await rename(tmp, path)
+  } catch (e) {
+    await remove(tmp).catch(() => {})
+    throw e
+  }
 }
 
 // Genera un path libero accanto all'originale, aggiungendo un suffisso (e un

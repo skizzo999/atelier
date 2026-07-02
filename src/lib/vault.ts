@@ -35,10 +35,11 @@ export async function createVaultDialog(name: string): Promise<string | null> {
   })
   if (typeof parent !== 'string') return null
 
-  // Serve l'accesso al parent per poter creare la sottocartella al suo interno.
-  await grantVaultAccess(parent)
+  // Scope SOLO sul vault, non sul genitore: mkdir controlla il path di
+  // destinazione (già autorizzato), quindi il permesso sul parent non serve
+  // e concederlo allargherebbe la superficie per tutta la sessione.
   const vaultPath = `${parent}\\${trimmed}`
-  await mkdir(vaultPath, { recursive: true })
   await grantVaultAccess(vaultPath)
+  await mkdir(vaultPath, { recursive: true })
   return vaultPath
 }

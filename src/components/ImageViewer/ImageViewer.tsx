@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { writeFileBinaryAtomic, uniquePathWithSuffix } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
-import { parseDpi } from '../../lib/imageMeta'
+import { parseDpi, applyDpi } from '../../lib/imageMeta'
+import { IMAGE_MIME as MIME } from '../../lib/mime'
 import { copyCanvasToClipboard, copyImageElementToClipboard, revealInExplorer } from '../../lib/imageActions'
 import { ImageInfoPanel } from './ImageInfoPanel'
 import {
@@ -24,18 +25,6 @@ import {
   type Shape,
   type ShapeKind,
 } from '../../lib/annotations'
-
-const MIME: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  svg: 'image/svg+xml',
-  ico: 'image/x-icon',
-  avif: 'image/avif',
-}
 
 // Formati raster ri-encodabili da canvas (toBlob): supportano l'editing.
 const EDITABLE = new Set(['png', 'jpg', 'jpeg', 'webp'])
@@ -431,7 +420,10 @@ function EditableImage({ filePath }: { filePath: string }) {
       async (blob) => {
         try {
           if (!blob) throw new Error('Encoding fallito')
-          const buf = new Uint8Array(await blob.arrayBuffer())
+          let buf = new Uint8Array(await blob.arrayBuffer())
+          // canvas.toBlob perde i metadati: reinietta il DPI originale
+          // (PNG pHYs / JPEG JFIF), se il file lo dichiarava.
+          if (dpi && dpi !== 96) buf = applyDpi(buf, ext, dpi)
           await writeFileBinaryAtomic(filePath, buf)
           clearImageBuffer(filePath)
           setDirty(false)
@@ -442,7 +434,9 @@ function EditableImage({ filePath }: { filePath: string }) {
         }
       },
       MIME[ext] ?? 'image/png',
-      0.92,
+      // 0.95: riduce il degrado generazionale dei formati lossy sui
+      // salvataggi ripetuti (eliminarlo del tutto non si può: è re-encoding).
+      0.95,
     )
   }
 
@@ -583,7 +577,8 @@ function EditableImage({ filePath }: { filePath: string }) {
       async (blob) => {
         try {
           if (!blob) throw new Error('Encoding fallito')
-          const buf = new Uint8Array(await blob.arrayBuffer())
+          let buf = new Uint8Array(await blob.arrayBuffer())
+          if (dpi && dpi !== 96) buf = applyDpi(buf, ext, dpi) // DPI come l'originale
           const newPath = await uniquePathWithSuffix(filePath, 'ritaglio')
           await writeFileBinaryAtomic(newPath, buf)
           cancelCrop()
@@ -593,7 +588,7 @@ function EditableImage({ filePath }: { filePath: string }) {
         }
       },
       MIME[ext] ?? 'image/png',
-      0.92,
+      0.95,
     )
   }
 

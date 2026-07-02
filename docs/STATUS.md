@@ -145,6 +145,11 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] **Sicurezza**: CSP severa in produzione (script-src 'self'+wasm, whitelist IPC/OCR/blob)
   con devCsp permissiva per Vite; **guardia chiusura** (`onCloseRequested` + confirm nativo,
   UI provvisoria) se ci sono modifiche non salvate
+- [x] **Igiene v0.2.2** (audit): DPI originale preservato nel salvataggio immagini
+  (`applyDpi`: PNG pHYs + JPEG JFIF; qualità lossy 0.92→0.95); evidenziatore PDF fa il
+  **backup `.bak`** (nascosto) alla 1ª scrittura; `.tmp` rimossi se il rename atomico
+  fallisce; worker OCR terminato dopo 90s di inattività; MIME immagini in `lib/mime.ts`;
+  la creazione vault non concede più lo scope sulla cartella genitore
 - [x] Salvataggio atomico (tmp+rename); `Ctrl+S`; indicatore "non salvato" (tree + editor);
   risync col disco al focus finestra
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)

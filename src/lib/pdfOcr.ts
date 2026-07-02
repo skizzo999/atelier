@@ -19,8 +19,28 @@ const MIN_CONFIDENCE = 40
 // resta caricato: ricrearlo a ogni pagina sarebbe lentissimo). I job vengono
 // accodati internamente, quindi va chiamato in sequenza.
 let workerPromise: Promise<Worker> | null = null
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+// Il worker trattiene decine di MB (modello lingua): dopo un po' di inattività
+// lo terminiamo; alla prossima richiesta si ricrea (modello già in cache disco).
+const IDLE_MS = 90_000
+
+function scheduleIdleTerminate() {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    const wp = workerPromise
+    workerPromise = null
+    idleTimer = null
+    wp?.then((w) => w.terminate()).catch(() => {})
+  }, IDLE_MS)
+}
 
 function getWorker(): Promise<Worker> {
+  // Sospendi il timer di inattività finché c'è lavoro in corso.
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
   if (!workerPromise) {
     // ita+eng come l'OCR immagini. Al primo uso scarica il modello (poi in cache).
     workerPromise = createWorker('ita+eng')
@@ -32,6 +52,7 @@ function getWorker(): Promise<Worker> {
 export async function ocrCanvasWords(canvas: HTMLCanvasElement): Promise<OcrWord[]> {
   const worker = await getWorker()
   const { data } = await worker.recognize(canvas, {}, { blocks: true })
+  scheduleIdleTerminate()
   const words: OcrWord[] = []
   for (const block of data.blocks ?? []) {
     for (const para of block.paragraphs ?? []) {

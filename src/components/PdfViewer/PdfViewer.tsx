@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { readFile } from '@tauri-apps/plugin-fs'
+import { readFile, exists } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { formatSize } from '../../lib/imageMeta'
@@ -304,6 +305,14 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setHlSaving(true)
     const t = setTimeout(async () => {
       try {
+        // Prima scrittura su questo PDF: backup dell'originale (.bak nascosto),
+        // come per i DOCX — l'evidenziatore riscrive il file su disco.
+        const bak = `${filePath}.bak`
+        if (!(await exists(bak))) {
+          const orig = await readFile(filePath)
+          await writeFileBinaryAtomic(bak, orig)
+          invoke('set_hidden', { path: bak }).catch(() => {})
+        }
         const out = await writeHighlights(base, highlights)
         if (!cancelled) await writeFileBinaryAtomic(filePath, out)
       } catch (e) {
