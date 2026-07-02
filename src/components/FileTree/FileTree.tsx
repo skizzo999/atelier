@@ -339,7 +339,10 @@ export function FileTree() {
           return
         }
         const refreshed = await reloadChildren(vaultPath!, treeDataRef.current)
-        if (!disposed) setTreeData(refreshed)
+        if (!disposed) {
+          setTreeData(refreshed)
+          useAppStore.getState().bumpFsRevision() // indici (immagini/note) al passo
+        }
       } catch (err) {
         console.error('Errore aggiornamento albero (watcher):', err)
       }

@@ -1,9 +1,4 @@
 import { readDir, readTextFile, readFile, stat } from '@tauri-apps/plugin-fs'
-import * as pdfjsLib from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import * as mammoth from 'mammoth'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
 export interface VaultFile {
   path: string
@@ -97,6 +92,13 @@ async function pdfPageTexts(path: string): Promise<string[]> {
   const mtime = await mtimeOf(path)
   const cached = pdfTextCache.get(path)
   if (cached && cached.mtime === mtime) return cached.pages
+  // pdf.js caricato solo alla prima ricerca in un PDF (code-split): questo
+  // modulo è importato da App, non deve pesare sul bundle principale.
+  const [pdfjsLib, { default: PdfWorker }] = await Promise.all([
+    import('pdfjs-dist'),
+    import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+  ])
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
   const bytes = await readFile(path)
   const task = pdfjsLib.getDocument({ data: bytes })
   const pdf = await task.promise
@@ -127,6 +129,7 @@ async function docxText(path: string): Promise<string> {
   const mtime = await mtimeOf(path)
   const cached = docxTextCache.get(path)
   if (cached && cached.mtime === mtime) return cached.text
+  const mammoth = await import('mammoth') // solo alla prima ricerca in un DOCX
   const bytes = await readFile(path)
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
   const r = await mammoth.extractRawText({ arrayBuffer })

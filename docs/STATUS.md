@@ -172,8 +172,8 @@ Prossimi: stampa trasversale, pptx/xlsx.
 4. (Opzionale) **Modifica ed esporta come PNG** per gif/svg/bmp/avif (oggi sola lettura).
 5. **Rifiniture Ibrida**: liste numerate/annidate, footnote, math (KaTeX), icona ↗ link
    esterni, md inline renderizzato dentro le celle tabella
-6. **Parte grafica**: token colore, tema unificato; code-split di CodeMirror (bundle grande);
-   **dialog chiusura** → modale custom in-app (il confirm nativo non piace)
+6. **Parte grafica**: token colore, tema unificato; **dialog chiusura** → modale
+   custom in-app (il confirm nativo non piace)
 
 > L'**editor immagini è completo**: trasformazioni, ritaglio, annotazioni con
 > selezione/modifica/rotazione, **gomma a pixel**, regolazioni, info/copia/OCR/Explorer.
@@ -240,9 +240,14 @@ Prossimi: stampa trasversale, pptx/xlsx.
     e **valida** l'output (riapre con pdf-lib) prima di sovrascrivere col file atomico
 
 ## Problemi aperti
-- Bundle > 500kB (CM6 + highlight.js): valutare code-split / lazy import
-- Indici immagini/note ricostruiti solo all'apertura del vault (una nota creata in
-  sessione è apribile via fallback, ma entra nell'indice al riavvio)
+- ~~Bundle > 500kB~~ **RISOLTO**: code-split — i 4 viewer sono `React.lazy` (chunk
+  separati con le loro librerie: CM6/hljs, TipTap/docx, pdf.js, annotazioni) e
+  pdf.js/mammoth/tesseract/docx sono import dinamici nei moduli sempre caricati
+  (search, fileOps, pdfOcr). Bundle principale: 3.514 → **490 kB**. I chunk lazy
+  grossi (Editor 747 kB, DocxEditor 526 kB) scaldano il warning di Vite ma si
+  scaricano solo alla prima apertura di quel tipo di file
+- ~~Indici solo all'apertura~~ **RISOLTO**: `fsRevision` nello store, bumpato dal
+  watcher → gli indici immagini/note si ricalcolano quando i file cambiano
 - Tabelle in Ibrida: md inline nelle celle mostrato grezzo (render = step futuro)
 - **PDF evidenziatore**: pagine con `/Rotate` non gestite (coord potrebbero non combaciare);
   cross-reader senza appearance stream (Adobe sì, lettori minimali forse no); selezione che

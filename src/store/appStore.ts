@@ -40,6 +40,9 @@ interface AppState {
   // Termine da evidenziare nell'editor al prossimo caricamento file (one-shot,
   // impostato quando si apre un file da una ricerca nel contenuto). Non persistito.
   pendingHighlight: string | null
+  // Contatore bumpato dal watcher filesystem: chi dipende dai file su disco
+  // (es. gli indici immagini/note) si ricalcola quando cambia. Non persistito.
+  fsRevision: number
   // Immagini con modifiche non salvate (path -> blob PNG dell'immagine editata).
   // Non persistito. Permette di cambiare file senza perdere le modifiche immagine.
   imageBuffers: Record<string, Blob>
@@ -57,6 +60,7 @@ interface AppState {
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
   setPendingHighlight: (term: string | null) => void
+  bumpFsRevision: () => void
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
   clearBuffersUnder: (prefix: string) => void
@@ -86,6 +90,7 @@ export const useAppStore = create<AppState>()(
       selectedFile: null,
       dirtyBuffers: {},
       pendingHighlight: null,
+      fsRevision: 0,
       imageBuffers: {},
       setVaultPath: (path) => set({ vaultPath: path }),
       clearVault: () =>
@@ -116,6 +121,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
       setSelectedFile: (path) => set({ selectedFile: path }),
       setPendingHighlight: (term) => set({ pendingHighlight: term }),
+      bumpFsRevision: () => set((state) => ({ fsRevision: state.fsRevision + 1 })),
       setBuffer: (path, content) =>
         set((state) => ({ dirtyBuffers: { ...state.dirtyBuffers, [path]: content } })),
       clearBuffer: (path) =>

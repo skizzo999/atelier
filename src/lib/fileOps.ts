@@ -1,6 +1,5 @@
 import { writeTextFile, writeFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
-import { htmlToDocxBlob } from './htmlToDocx'
 
 function joinPath(dir: string, name: string): string {
   return `${dir}\\${name}`
@@ -18,6 +17,9 @@ export async function createFile(dir: string, name: string): Promise<string> {
   const path = joinPath(dir, name)
   if (await exists(path)) throw new Error('Esiste già un elemento con questo nome')
   if (name.toLowerCase().endsWith('.docx')) {
+    // La libreria docx è pesante: caricata solo quando crei davvero un .docx
+    // (questo modulo è importato dal FileTree → bundle principale).
+    const { htmlToDocxBlob } = await import('./htmlToDocx')
     const blob = await htmlToDocxBlob(document.createElement('div'))
     await writeFile(path, new Uint8Array(await blob.arrayBuffer()))
   } else {

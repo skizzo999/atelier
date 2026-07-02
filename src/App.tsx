@@ -72,6 +72,8 @@ function App() {
   // Indice immagini del vault (nome -> path), per risolvere ![[img]] ovunque.
   // Aspetta la fine del boot (lo scope fs deve essere già concesso) e il
   // picker chiuso, altrimenti la scansione parte senza permessi e resta vuota.
+  // Si ricalcola quando il watcher segnala cambi su disco (fsRevision).
+  const fsRevision = useAppStore((s) => s.fsRevision)
   useEffect(() => {
     if (booting || forcePicker) return
     if (!vaultPath) {
@@ -95,7 +97,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [vaultPath, booting, forcePicker])
+  }, [vaultPath, booting, forcePicker, fsRevision])
 
   // Scorciatoie globali per la ricerca (solo con un vault aperto):
   // Ctrl/Cmd+P = quick-open per nome, Ctrl/Cmd+Shift+F = ricerca nel contenuto.

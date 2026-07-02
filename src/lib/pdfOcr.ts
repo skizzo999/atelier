@@ -1,4 +1,4 @@
-import { createWorker, type Worker } from 'tesseract.js'
+import type { Worker } from 'tesseract.js'
 
 // Una parola riconosciuta, con il box in pixel del canvas dato in pasto all'OCR.
 // `eol` = ultima parola della riga (per inserire un a-capo quando si copia).
@@ -42,8 +42,9 @@ function getWorker(): Promise<Worker> {
     idleTimer = null
   }
   if (!workerPromise) {
-    // ita+eng come l'OCR immagini. Al primo uso scarica il modello (poi in cache).
-    workerPromise = createWorker('ita+eng')
+    // ita+eng come l'OCR immagini. Al primo uso scarica il modello (poi in
+    // cache). tesseract.js è importato pigro: pesa solo quando serve l'OCR.
+    workerPromise = import('tesseract.js').then((m) => m.createWorker('ita+eng'))
   }
   return workerPromise
 }

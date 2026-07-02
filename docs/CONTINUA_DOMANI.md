@@ -11,7 +11,8 @@
   Obsidian** — `.atelier\vault.json` dentro ogni vault, **picker** all'avvio (lista vault
   conosciuti + Crea/Apri), picker anche quando apri una **seconda istanza** (heartbeat
   in localStorage). Testato dall'utente ✓.
-- **Audit codice**: 17/24 voci chiuse. Il file vive in
+- **Audit codice**: 19/24 voci chiuse (ultimi: PERF-1 code-split, bundle 3.5MB→490kB,
+  e BUG-5 indici live). Il file vive in
   `C:\Users\matte\Documents\Obsidian Vault\Atelier-analisi-codice.md` (fuori dal repo);
   le 6 aperte sono mappate a fasi future nella sezione "Voci ancora aperte" del file.
 - Editor completi: Markdown (3 viste, tabelle vere editabili in Ibrida), DOCX (pagine A4
@@ -21,10 +22,10 @@
 
 ## Cosa fare (in ordine)
 
-1. **"Ultimi fix che mancano"** prima della prossima release (parole dell'utente):
-   da confermare con lui quali intende — candidati naturali: le rifiniture piccole
-   rimaste (BUG-5 indici in sessione, PERF-2 watcher churn) e/o bug emersi dal suo uso.
-2. **Prossima release**: quando i fix sono chiusi ("poi lanciamo la .3").
+1. ~~Ultimi fix~~ ✅ fatti (PERF-1 code-split + BUG-5 indici, sera del 2026-07-02).
+   **Da testare a runtime**: apertura di md/PDF/DOCX/immagini dopo il code-split
+   (spinner alla 1ª apertura per tipo), OCR, creazione .docx, ricerca nei PDF/DOCX.
+2. **Prossima release ("la .3")**: la decide l'utente, quando ha testato.
 3. **Direzione v0.3.0 da scegliere** (utente ancora indeciso):
    - **Excel/PPT** ← raccomandata (completa l'identità "apri qualsiasi file di lavoro");
      reality check già dato: xlsx viewer fattibile (SheetJS), xlsx editor = progetto
