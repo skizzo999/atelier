@@ -1,4 +1,4 @@
-import { readDir, readTextFile, readFile } from '@tauri-apps/plugin-fs'
+import { readDir, readTextFile, readFile, stat } from '@tauri-apps/plugin-fs'
 import * as pdfjsLib from 'pdfjs-dist'
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import * as mammoth from 'mammoth'
@@ -20,15 +20,28 @@ export interface ContentMatch {
   preview: string
 }
 
+// Allineato al filtro del FileTree: file di servizio (tmp/backup) esclusi
+// anche da quick-open e ricerca nel contenuto.
 function skip(name: string): boolean {
-  return name.startsWith('.') || name === 'node_modules' || name.endsWith('.tmp')
+  return (
+    name.startsWith('.') ||
+    name === 'node_modules' ||
+    name.endsWith('.tmp') ||
+    name.endsWith('.bak') ||
+    name.endsWith('.atelier')
+  )
 }
 
 // Elenca ricorsivamente TUTTI i file del vault (qualsiasi tipo): serve al quick-open.
+// Le cartelle-symlink vengono saltate (un link a una cartella antenata creerebbe
+// un ciclo infinito); il limite di profondità è la seconda rete di sicurezza.
+const MAX_DEPTH = 64
+
 export async function walkFiles(root: string): Promise<VaultFile[]> {
   const out: VaultFile[] = []
 
-  async function walk(dir: string) {
+  async function walk(dir: string, depth: number) {
+    if (depth > MAX_DEPTH) return
     let entries
     try {
       entries = await readDir(dir)
@@ -39,14 +52,14 @@ export async function walkFiles(root: string): Promise<VaultFile[]> {
       if (!e.name || skip(e.name)) continue
       const full = `${dir}\\${e.name}`
       if (e.isDirectory) {
-        await walk(full)
+        if (!e.isSymlink) await walk(full, depth + 1)
       } else {
         out.push({ path: full, name: e.name, rel: full.slice(root.length + 1) })
       }
     }
   }
 
-  await walk(root)
+  await walk(root, 0)
   return out
 }
 
@@ -66,14 +79,24 @@ function isPdf(name: string): boolean {
   return name.toLowerCase().endsWith('.pdf')
 }
 
-// Testo per pagina di un PDF, in cache per sessione (i PDF cambiano di rado e
-// ri-estrarre a ogni tasto premuto sarebbe lentissimo). Solo testo "vero": le
-// scansioni senza testo non vengono trovate qui (vanno aperte e cercate con l'OCR).
-const pdfTextCache = new Map<string, string[]>()
+// Data di modifica del file: la cache vale finché il file non cambia.
+async function mtimeOf(path: string): Promise<number> {
+  try {
+    return (await stat(path)).mtime?.getTime() ?? 0
+  } catch {
+    return 0
+  }
+}
+
+// Testo per pagina di un PDF, in cache finché il file non cambia (ri-estrarre
+// a ogni tasto premuto sarebbe lentissimo). Solo testo "vero": le scansioni
+// senza testo non vengono trovate qui (vanno aperte e cercate con l'OCR).
+const pdfTextCache = new Map<string, { mtime: number; pages: string[] }>()
 
 async function pdfPageTexts(path: string): Promise<string[]> {
+  const mtime = await mtimeOf(path)
   const cached = pdfTextCache.get(path)
-  if (cached) return cached
+  if (cached && cached.mtime === mtime) return cached.pages
   const bytes = await readFile(path)
   const task = pdfjsLib.getDocument({ data: bytes })
   const pdf = await task.promise
@@ -84,7 +107,7 @@ async function pdfPageTexts(path: string): Promise<string[]> {
     pages.push(tc.items.map((it) => ('str' in it ? it.str : '')).join(' '))
   }
   task.destroy()
-  pdfTextCache.set(path, pages)
+  pdfTextCache.set(path, { mtime, pages })
   return pages
 }
 
@@ -97,16 +120,17 @@ function isDocx(name: string): boolean {
   return name.toLowerCase().endsWith('.docx')
 }
 
-// Testo grezzo di un DOCX (Mammoth), in cache per sessione.
-const docxTextCache = new Map<string, string>()
+// Testo grezzo di un DOCX (Mammoth), in cache finché il file non cambia.
+const docxTextCache = new Map<string, { mtime: number; text: string }>()
 
 async function docxText(path: string): Promise<string> {
+  const mtime = await mtimeOf(path)
   const cached = docxTextCache.get(path)
-  if (cached !== undefined) return cached
+  if (cached && cached.mtime === mtime) return cached.text
   const bytes = await readFile(path)
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
   const r = await mammoth.extractRawText({ arrayBuffer })
-  docxTextCache.set(path, r.value)
+  docxTextCache.set(path, { mtime, text: r.value })
   return r.value
 }
 

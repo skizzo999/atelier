@@ -487,7 +487,7 @@ export function FileTree() {
     if (!confirmTarget) return
     setConfirmBusy(true)
     try {
-      await deleteEntry(confirmTarget.path, confirmTarget.isFolder)
+      await deleteEntry(confirmTarget.path)
       // Scarta eventuali buffer non salvati del file/cartella eliminati.
       useAppStore.getState().clearBuffersUnder(confirmTarget.path)
       useAppStore.getState().clearImageBuffersUnder(confirmTarget.path)
@@ -644,9 +644,9 @@ export function FileTree() {
 
       {confirmTarget && (
         <ConfirmModal
-          message={`Eliminare "${confirmTarget.name}"${
+          message={`Spostare "${confirmTarget.name}"${
             confirmTarget.isFolder ? ' e tutto il suo contenuto' : ''
-          }?`}
+          } nel Cestino?`}
           busy={confirmBusy}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setConfirmTarget(null)}

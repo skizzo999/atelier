@@ -23,8 +23,15 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] Comando Rust `allow_path` (scope fs ricorsivo sulla cartella scelta)
 - [x] Store Zustand persistito: `vaultPath` + `mode`. Buffer non salvati (testo e immagini)
 - [x] Sistema vault: Welcome (Apri/Nuovo), auto-apertura ultimo vault, validazione al boot
-- [x] Gestione file: crea/rinomina/elimina (menu tasto destro su elemento o area vuota)
-- [x] Ricerca: quick-open per nome (Ctrl+P) + contenuto (Ctrl+Shift+F) con highlight
+- [x] Gestione file: crea/rinomina/elimina (menu tasto destro su elemento o area vuota).
+  **Eliminare = Cestino di Windows** (comando Rust `trash_path`, crate `trash`), non
+  cancellazione definitiva. I comandi Rust (`trash_path`, `set_hidden`) accettano solo
+  percorsi dentro lo scope del vault (`ensure_in_scope`). Il `.bak` dei .docx segue il
+  file su rinomina/spostamento e va nel Cestino con lui all'eliminazione
+- [x] Ricerca: quick-open per nome (Ctrl+P) + contenuto (Ctrl+Shift+F) con highlight.
+  File di servizio (`.tmp`/`.bak`/`.atelier`) esclusi come nel tree; cache testo PDF/DOCX
+  invalidata via mtime (`stat`); `walkFiles` salta le cartelle-symlink (anti-ciclo) con
+  limite di profondità 64
 - [x] Viewer per tipo (FileView): **immagini** con editing (ruota/capovolgi/ridimensiona/
   **ritaglio** con scelta "applica"/"crea nuova foto"), buffer, salvataggio binario atomico
 - [x] **Annotazioni immagini (fase 2)**: penna a mano libera (2 penne configurabili e

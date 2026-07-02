@@ -10,10 +10,29 @@ fn allow_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+// Un comando invocabile dalla webview non deve accettare path arbitrari:
+// accettiamo solo percorsi dentro lo scope fs concesso (il vault aperto).
+fn ensure_in_scope(app: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    if app.fs_scope().is_allowed(std::path::Path::new(path)) {
+        Ok(())
+    } else {
+        Err("Percorso fuori dallo scope consentito".into())
+    }
+}
+
+// Sposta un file/cartella nel Cestino di Windows (recuperabile), al posto
+// dell'eliminazione definitiva.
+#[tauri::command]
+fn trash_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    ensure_in_scope(&app, &path)?;
+    trash::delete(&path).map_err(|e| e.to_string())
+}
+
 // Imposta l'attributo "nascosto" su un file (Windows). Usato per i backup .bak,
 // così non ingombrano Esplora risorse pur restando come rete di sicurezza.
 #[tauri::command]
-fn set_hidden(path: String) -> Result<(), String> {
+fn set_hidden(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    ensure_in_scope(&app, &path)?;
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -36,7 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![allow_path, set_hidden])
+        .invoke_handler(tauri::generate_handler![allow_path, set_hidden, trash_path])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,4 +1,5 @@
-import { writeTextFile, writeFile, mkdir, rename, remove, exists } from '@tauri-apps/plugin-fs'
+import { writeTextFile, writeFile, mkdir, rename, exists } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import { htmlToDocxBlob } from './htmlToDocx'
 
 function joinPath(dir: string, name: string): string {
@@ -42,6 +43,7 @@ export async function moveEntry(oldPath: string, newDir: string): Promise<string
   if (dest === oldPath) return oldPath
   if (await exists(dest)) throw new Error(`Nella cartella c'è già "${name}"`)
   await rename(oldPath, dest)
+  await moveSidecar(oldPath, dest)
   return dest
 }
 
@@ -52,17 +54,39 @@ export async function createFolder(dir: string, name: string): Promise<string> {
   return path
 }
 
+// Il backup affiancato dei .docx (.bak, nascosto) segue il file quando viene
+// rinominato o spostato: senza, resterebbe orfano col vecchio nome.
+async function moveSidecar(oldPath: string, newPath: string): Promise<void> {
+  if (!/\.docx$/i.test(oldPath)) return
+  try {
+    if (await exists(`${oldPath}.bak`)) await rename(`${oldPath}.bak`, `${newPath}.bak`)
+  } catch {
+    /* best-effort: il .bak orfano non è un errore bloccante */
+  }
+}
+
 // Rinomina un file/cartella nello stesso parent. Ritorna il nuovo path.
 export async function renameEntry(oldPath: string, newName: string): Promise<string> {
   const newPath = joinPath(parentDir(oldPath), newName)
   if (newPath === oldPath) return oldPath
   if (await exists(newPath)) throw new Error('Esiste già un elemento con questo nome')
   await rename(oldPath, newPath)
+  await moveSidecar(oldPath, newPath)
   return newPath
 }
 
-export async function deleteEntry(path: string, isFolder: boolean): Promise<void> {
-  await remove(path, { recursive: isFolder })
+// Sposta nel CESTINO di Windows (recuperabile), non elimina definitivamente.
+// Il comando Rust accetta solo percorsi dentro lo scope del vault.
+export async function deleteEntry(path: string): Promise<void> {
+  await invoke('trash_path', { path })
+  // Anche l'eventuale backup affiancato del .docx.
+  if (/\.docx$/i.test(path)) {
+    try {
+      if (await exists(`${path}.bak`)) await invoke('trash_path', { path: `${path}.bak` })
+    } catch {
+      /* best-effort */
+    }
+  }
 }
 
 // Salvataggio atomico: scrive su file temporaneo e poi rinomina sul file finale.
