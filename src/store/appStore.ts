@@ -12,9 +12,18 @@ export interface PenPreset {
   opacity: number // 0..1
 }
 
+// Un vault conosciuto (per il picker stile Obsidian all'avvio).
+export interface KnownVault {
+  path: string
+  name: string
+  lastOpened: number // Date.now()
+}
+
 interface AppState {
   // Cartella radice del vault attualmente aperto (null = nessun vault).
   vaultPath: string | null
+  // Vault aperti in passato (persistito): alimenta la lista del picker.
+  knownVaults: KnownVault[]
   // Modalità dell'app: 'standard' (utente) o 'developer' (funzioni avanzate).
   mode: AppMode
   // Ultima vista markdown scelta (persistita, così l'app riapre come l'hai lasciata).
@@ -37,6 +46,10 @@ interface AppState {
 
   setVaultPath: (path: string) => void
   clearVault: () => void
+  // Aggiunge/aggiorna un vault nella lista dei conosciuti (ordinati per uso recente).
+  registerVault: (path: string) => void
+  // Toglie un vault dalla lista (NON tocca il disco).
+  forgetVault: (path: string) => void
   setMode: (mode: AppMode) => void
   setMdView: (view: MarkdownView) => void
   setPenPreset: (index: 0 | 1, patch: Partial<PenPreset>) => void
@@ -61,6 +74,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       vaultPath: null,
+      knownVaults: [],
       mode: 'standard',
       mdView: 'source',
       // Penna 1: tratto pieno rosso; Penna 2: evidenziatore giallo semitrasparente.
@@ -76,6 +90,14 @@ export const useAppStore = create<AppState>()(
       setVaultPath: (path) => set({ vaultPath: path }),
       clearVault: () =>
         set({ vaultPath: null, selectedFile: null, dirtyBuffers: {}, imageBuffers: {} }),
+      registerVault: (path) =>
+        set((state) => {
+          const name = path.split('\\').pop() || path
+          const rest = state.knownVaults.filter((v) => v.path !== path)
+          return { knownVaults: [{ path, name, lastOpened: Date.now() }, ...rest].slice(0, 20) }
+        }),
+      forgetVault: (path) =>
+        set((state) => ({ knownVaults: state.knownVaults.filter((v) => v.path !== path) })),
       setMode: (mode) => set({ mode }),
       setMdView: (view) => set({ mdView: view }),
       setPenPreset: (index, patch) =>
@@ -144,6 +166,7 @@ export const useAppStore = create<AppState>()(
       name: 'atelier-app',
       partialize: (state) => ({
         vaultPath: state.vaultPath,
+        knownVaults: state.knownVaults,
         mode: state.mode,
         mdView: state.mdView,
         penPresets: state.penPresets,

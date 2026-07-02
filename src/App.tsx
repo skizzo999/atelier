@@ -4,7 +4,7 @@ import { exists } from '@tauri-apps/plugin-fs'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from './store/appStore'
-import { grantVaultAccess } from './lib/vault'
+import { grantVaultAccess, initVaultMeta } from './lib/vault'
 import { walkFiles } from './lib/search'
 import { setVaultImageIndex } from './lib/images'
 import { setNoteIndex } from './lib/notes'
@@ -22,6 +22,9 @@ function App() {
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
   const [booting, setBooting] = useState(true)
+  // Un'altra istanza di Atelier è già aperta → mostra il picker dei vault
+  // (stile Obsidian) invece di auto-aprire l'ultimo, senza toccare il persist.
+  const [forcePicker, setForcePicker] = useState(false)
   const [palette, setPalette] = useState<'files' | 'content' | null>(null)
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
@@ -29,12 +32,21 @@ function App() {
   useEffect(() => {
     let cancelled = false
     async function boot() {
+      // Heartbeat di un'altra istanza (localStorage è condiviso): se è fresco,
+      // c'è già un Atelier aperto → questa finestra parte dal picker.
+      const hb = Number(localStorage.getItem('atelier-heartbeat') || 0)
+      const otherAlive = Date.now() - hb < 8000
+      if (otherAlive) setForcePicker(true)
       const saved = useAppStore.getState().vaultPath
-      if (saved) {
+      if (saved && !otherAlive) {
         try {
           await grantVaultAccess(saved)
           const ok = await exists(saved)
           if (!ok && !cancelled) clearVault()
+          else if (ok && !cancelled) {
+            await initVaultMeta(saved) // vault "vero": .atelier\vault.json
+            useAppStore.getState().registerVault(saved)
+          }
         } catch (err) {
           console.error('Errore apertura vault salvato:', err)
           if (!cancelled) clearVault()
@@ -48,8 +60,20 @@ function App() {
     }
   }, [clearVault])
 
-  // Indice immagini del vault (nome -> path), per risolvere ![[img]] ovunque.
+  // Heartbeat di QUESTA istanza (parte dopo la lettura del boot, gli effetti
+  // corrono in ordine di dichiarazione): le altre finestre lo vedono fresco.
   useEffect(() => {
+    const write = () => localStorage.setItem('atelier-heartbeat', String(Date.now()))
+    const t = setInterval(write, 3000)
+    write()
+    return () => clearInterval(t)
+  }, [])
+
+  // Indice immagini del vault (nome -> path), per risolvere ![[img]] ovunque.
+  // Aspetta la fine del boot (lo scope fs deve essere già concesso) e il
+  // picker chiuso, altrimenti la scansione parte senza permessi e resta vuota.
+  useEffect(() => {
+    if (booting || forcePicker) return
     if (!vaultPath) {
       setVaultImageIndex(new Map())
       return
@@ -71,7 +95,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [vaultPath])
+  }, [vaultPath, booting, forcePicker])
 
   // Scorciatoie globali per la ricerca (solo con un vault aperto):
   // Ctrl/Cmd+P = quick-open per nome, Ctrl/Cmd+Shift+F = ricerca nel contenuto.
@@ -146,8 +170,8 @@ function App() {
     )
   }
 
-  if (!vaultPath) {
-    return <Welcome />
+  if (!vaultPath || forcePicker) {
+    return <Welcome onOpened={() => setForcePicker(false)} />
   }
 
   return (

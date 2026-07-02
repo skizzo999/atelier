@@ -12,9 +12,11 @@ salvato dentro al PDF** (3 colori personalizzabili). **Editor DOCX stile Word co
 A4 VERE** (TipTap + tiptap-pagination-plus): barra ricca (font/dimensione/colore/interlinea/
 liste/tabelle/…), pannello Impostazioni documento (formato/orientamento/margini/header/piè
 coi numeri pagina), salvataggio che riscrive il .docx (formattazione + sezione Word +
-intestazioni/piè). Pronti anche: sistema vault, file tree con watcher, gestione file, **drag-and-drop
-nel tree**, **modale "Nuovo file"** (nome + tipo), ricerca. Sicurezza: **CSP di
-produzione** + **guardia chiusura** con modifiche non salvate (UI provvisoria).
+intestazioni/piè). Pronti anche: **vault stile Obsidian** (`.atelier\vault.json` + picker con lista vault,
+anche per la 2ª istanza), file tree con watcher, gestione file (**Cestino**),
+**drag-and-drop nel tree**, import da Explorer, **modale "Nuovo file"**, ricerca.
+Sicurezza: **CSP di produzione** + **guardia chiusura** (UI provvisoria).
+Release automatiche dai tag `v*` (ultima pubblicata: **v0.2.2**).
 Prossimi: stampa trasversale, pptx/xlsx.
 
 ## Cosa è fatto
@@ -22,7 +24,14 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] FileTree (react-arborist) con espansione lazy + **watcher filesystem** (live)
 - [x] Comando Rust `allow_path` (scope fs ricorsivo sulla cartella scelta)
 - [x] Store Zustand persistito: `vaultPath` + `mode`. Buffer non salvati (testo e immagini)
-- [x] Sistema vault: Welcome (Apri/Nuovo), auto-apertura ultimo vault, validazione al boot
+- [x] **Sistema vault "vero" stile Obsidian**: ogni vault ha `\.atelier\vault.json`
+  (nome/data, creato all'apertura; cartella-punto già nascosta da tree e ricerca).
+  **Picker dei vault** (Welcome): lista dei vault conosciuti a sinistra (persistita,
+  ✕ per toglierli dalla lista senza toccare il disco) + Crea/Apri a destra. Mostrato:
+  al primo avvio, se il vault sparisce, e quando apri una **seconda istanza** di
+  Atelier (heartbeat in localStorage condiviso, soglia 8s — la 2ª finestra parte dal
+  picker invece di auto-aprire l'ultimo vault). Auto-apertura ultimo vault + validazione
+  al boot come prima; l'indicizzazione parte solo a boot finito (scope fs già concesso)
 - [x] Gestione file: crea/rinomina/elimina (menu tasto destro su elemento o area vuota).
   **Eliminare = Cestino di Windows** (comando Rust `trash_path`, crate `trash`), non
   cancellazione definitiva. I comandi Rust (`trash_path`, `set_hidden`) accettano solo
@@ -265,8 +274,6 @@ Prossimi: stampa trasversale, pptx/xlsx.
     non le supporta, solo via pannello).
 
 ## Per riprendere
-Aprire nuova chat AI e incollare:
-1. Contenuto di docs/STATUS.md (questo file)
-2. Contenuto di docs/sessions/2026-06-24_annotatore-e-funzioni-foto.md
-3. Dire: "Continuiamo da dove abbiamo lasciato. Prossimo step: gomma a pixel
-   nell'annotatore, poi stampa trasversale."
+Leggere `docs/CONTINUA_DOMANI.md` (stato sintetico + prossimi passi in ordine) e,
+per il dettaglio delle funzioni, questo file. L'audit del codice con le voci
+aperte/chiuse sta in `C:\Users\matte\Documents\Obsidian Vault\Atelier-analisi-codice.md`.
