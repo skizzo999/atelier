@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { exists } from '@tauri-apps/plugin-fs'
+import { confirm } from '@tauri-apps/plugin-dialog'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess } from './lib/vault'
 import { walkFiles } from './lib/search'
@@ -86,6 +88,37 @@ function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Guardia chiusura: se ci sono modifiche non salvate (testo o immagini),
+  // chiedi conferma prima di chiudere la finestra — altrimenti si perdono in
+  // silenzio (i buffer vivono solo in memoria). Se il handler non chiama
+  // preventDefault, l'API Tauri chiude da sola con destroy().
+  useEffect(() => {
+    let disposed = false
+    let unlisten: (() => void) | undefined
+    getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        const s = useAppStore.getState()
+        const n = Object.keys(s.dirtyBuffers).length + Object.keys(s.imageBuffers).length
+        if (n === 0) return // niente di sporco: chiudi pure
+        const ok = await confirm(
+          n === 1
+            ? "C'è 1 file con modifiche non salvate: uscendo le perdi."
+            : `Ci sono ${n} file con modifiche non salvate: uscendo le perdi.`,
+          { title: 'Atelier', kind: 'warning', okLabel: 'Esci senza salvare', cancelLabel: 'Annulla' },
+        )
+        if (!ok) event.preventDefault()
+      })
+      .then((f) => {
+        if (disposed) f()
+        else unlisten = f
+      })
+      .catch((e) => console.error('Guardia chiusura non attiva:', e))
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
   }, [])
 
   // Rete di sicurezza: quando la finestra torna in primo piano, verifica che il

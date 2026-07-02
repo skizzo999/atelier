@@ -18,7 +18,20 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' blob: data: http: https:",
+        "font-src": "'self' data:",
+        "media-src": "'self' blob: data:",
+        "worker-src": "'self' blob:",
+        "frame-src": "'none'",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "connect-src": "ipc: http://ipc.localhost 'self' blob: https://cdn.jsdelivr.net https://tessdata.projectnaptha.com"
+      },
+      "devCsp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: ws: wss: http: https: ipc:"
     }
   },
   "bundle": {
