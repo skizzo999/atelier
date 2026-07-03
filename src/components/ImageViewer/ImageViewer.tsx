@@ -6,6 +6,7 @@ import { parseDpi, applyDpi } from '../../lib/imageMeta'
 import { IMAGE_MIME as MIME } from '../../lib/mime'
 import { copyCanvasToClipboard, copyImageElementToClipboard, revealInExplorer } from '../../lib/imageActions'
 import { ImageInfoPanel } from './ImageInfoPanel'
+import { ConvertButton } from '../Convert/ConvertButton'
 import {
   arrowParts,
   boundsOf,
@@ -1468,6 +1469,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           <button className={toolBtn} disabled={!canEdit} onClick={copyImage} title="Copia immagine">
             {copied ? 'Copiato ✓' : 'Copia'}
           </button>
+          <ConvertButton filePath={filePath} className={toolBtn} />
           <button className={toolBtn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
@@ -1837,6 +1839,7 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
           <button className={toolBtn} onClick={copyImage} title="Copia immagine">
             {copied ? 'Copiato ✓' : 'Copia'}
           </button>
+          <ConvertButton filePath={filePath} className={toolBtn} />
           <button className={toolBtn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>

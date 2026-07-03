@@ -26,7 +26,9 @@
    **Da testare a runtime**: apertura di md/PDF/DOCX/immagini dopo il code-split
    (spinner alla 1ª apertura per tipo), OCR, creazione .docx, ricerca nei PDF/DOCX.
 2. **Prossima release ("la .3")**: la decide l'utente, quando ha testato.
-3. **Direzione v0.3.0 da scegliere** (utente ancora indeciso):
+3. **Direzione v0.3.0 DECISA: pacchetto Office (xlsx+pptx)** → scaletta completa,
+   librerie e licenze verificate in **`docs/PIANO_OFFICE.md`** (partire dalla Fase 0,
+   lo spike SheetJS vs ExcelJS). Le alternative scartate per ora erano:
    - **Excel/PPT** ← raccomandata (completa l'identità "apri qualsiasi file di lavoro");
      reality check già dato: xlsx viewer fattibile (SheetJS), xlsx editor = progetto
      grosso a tappe, pptx = viewer best-effort (nessun renderer OSS maturo)

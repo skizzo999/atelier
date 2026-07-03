@@ -62,11 +62,19 @@ function App() {
 
   // Heartbeat di QUESTA istanza (parte dopo la lettura del boot, gli effetti
   // corrono in ordine di dichiarazione): le altre finestre lo vedono fresco.
+  // Alla chiusura va RIMOSSO, altrimenti riaprendo l'app entro 8s si vede il
+  // proprio heartbeat stantio e compare il picker invece dell'ultimo vault.
   useEffect(() => {
     const write = () => localStorage.setItem('atelier-heartbeat', String(Date.now()))
+    const clear = () => localStorage.removeItem('atelier-heartbeat')
     const t = setInterval(write, 3000)
     write()
-    return () => clearInterval(t)
+    window.addEventListener('beforeunload', clear)
+    return () => {
+      clearInterval(t)
+      window.removeEventListener('beforeunload', clear)
+      clear()
+    }
   }, [])
 
   // Indice immagini del vault (nome -> path), per risolvere ![[img]] ovunque.
@@ -128,7 +136,10 @@ function App() {
       .onCloseRequested(async (event) => {
         const s = useAppStore.getState()
         const n = Object.keys(s.dirtyBuffers).length + Object.keys(s.imageBuffers).length
-        if (n === 0) return // niente di sporco: chiudi pure
+        if (n === 0) {
+          localStorage.removeItem('atelier-heartbeat') // beforeunload può non scattare con destroy()
+          return // niente di sporco: chiudi pure
+        }
         const ok = await confirm(
           n === 1
             ? "C'è 1 file con modifiche non salvate: uscendo le perdi."
@@ -136,6 +147,7 @@ function App() {
           { title: 'Atelier', kind: 'warning', okLabel: 'Esci senza salvare', cancelLabel: 'Annulla' },
         )
         if (!ok) event.preventDefault()
+        else localStorage.removeItem('atelier-heartbeat')
       })
       .then((f) => {
         if (disposed) f()

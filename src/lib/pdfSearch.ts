@@ -30,7 +30,24 @@ export async function tokensForPage(page: PDFPageProxy, ocrWords?: OcrWord[]): P
     const h = Math.hypot(tx[2], tx[3]) // altezza font in px viewport (scala 1)
     const x0 = tx[4]
     const y1 = tx[5]
-    tokens.push({ text: item.str, x0, y0: y1 - h, x1: x0 + item.width, y1 })
+    // Un item può essere una riga intera (anche 100+ caratteri): spezzato in
+    // PAROLE con posizioni interpolate sulla larghezza, così la ricerca
+    // evidenzia il punto preciso e non l'intero blocco di testo.
+    const str = item.str
+    const len = str.length
+    const re = /\S+/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(str))) {
+      const sFrac = m.index / len
+      const eFrac = (m.index + m[0].length) / len
+      tokens.push({
+        text: m[0],
+        x0: x0 + item.width * sFrac,
+        y0: y1 - h,
+        x1: x0 + item.width * eFrac,
+        y1,
+      })
+    }
   }
   return tokens
 }

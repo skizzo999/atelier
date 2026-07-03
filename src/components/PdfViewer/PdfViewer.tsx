@@ -10,6 +10,7 @@ import { tokensForPage, searchTokens, type Box, type Token } from '../../lib/pdf
 import { prepareHighlights, writeHighlights, type Highlight } from '../../lib/pdfHighlights'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
+import { ConvertButton } from '../Convert/ConvertButton'
 // Worker bundlato localmente (niente CDN: resta tutto offline).
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -17,6 +18,25 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
 const btn =
   'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+
+// Valori dei campi modulo NON ancora salvati, per file: vivono qui (a livello
+// modulo) così sopravvivono al cambio file, come i buffer degli editor.
+const pdfFormBuffers = new Map<string, Map<string, string | boolean>>()
+
+// Un campo compilabile (widget AcroForm) posizionato in coordinate viewport a
+// scala 1 (già y-verso-il-basso, pronte da moltiplicare per la renderScale).
+interface FieldWidget {
+  key: string
+  name: string
+  kind: 'text' | 'check'
+  left: number
+  top: number
+  w: number
+  h: number
+  value: string
+  checked: boolean
+  multiLine: boolean
+}
 
 interface OutlineNode {
   title: string
@@ -70,6 +90,13 @@ export function PdfViewer({ filePath }: { filePath: string }) {
   const [removePopup, setRemovePopup] = useState<{ id: string; x: number; y: number } | null>(null)
   const baseRef = useRef<Uint8Array | null>(null) // PDF "pulito" da cui ripartono i salvataggi
   const hlDirty = useRef(false) // evita di risalvare le evidenziazioni appena caricate
+  // Moduli compilabili (AcroForm): campi mostrati come input sopra la pagina.
+  const [hasForm, setHasForm] = useState(false)
+  const [formDirty, setFormDirty] = useState(false)
+  const [formSaving, setFormSaving] = useState(false)
+  const formValuesRef = useRef<Map<string, string | boolean>>(new Map())
+  const setBuffer = useAppStore((s) => s.setBuffer)
+  const clearBuffer = useAppStore((s) => s.clearBuffer)
   const containerRef = useRef<HTMLDivElement>(null)
   const baseWidthRef = useRef(0) // larghezza pagina 1 a scala 1 (per "Adatta")
   const scaleRef = useRef(scale)
@@ -116,6 +143,10 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setRemovePopup(null)
     baseRef.current = null
     hlDirty.current = false
+    // Modulo: riparti dagli eventuali valori non salvati di questo file.
+    formValuesRef.current = pdfFormBuffers.get(filePath) ?? new Map()
+    setHasForm(false)
+    setFormDirty(formValuesRef.current.size > 0)
     ;(async () => {
       const bytes = await readFile(filePath)
       setSizeBytes(bytes.length)
@@ -145,6 +176,13 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           if (!cancelled) setOutline((o as OutlineNode[] | null) ?? null)
         })
         .catch(() => setOutline(null))
+      // C'è un modulo AcroForm? Allora mostriamo i campi compilabili.
+      pdf
+        .getFieldObjects()
+        .then((f) => {
+          if (!cancelled) setHasForm(!!f && Object.keys(f).length > 0)
+        })
+        .catch(() => {})
     })().catch((e) => {
       console.error('Errore apertura PDF:', e)
       if (!cancelled) {
@@ -296,23 +334,30 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, query, searchOpen, numPages, ocrPages])
 
+  // Prima scrittura su questo PDF: backup dell'originale (.bak nascosto),
+  // come per i DOCX — evidenziatore e modulo riscrivono il file su disco.
+  async function ensureBak() {
+    const bak = `${filePath}.bak`
+    if (!(await exists(bak))) {
+      const orig = await readFile(filePath)
+      await writeFileBinaryAtomic(bak, orig)
+      invoke('set_hidden', { path: bak }).catch(() => {})
+    }
+  }
+
   // Scrive le evidenziazioni nel PDF (debounce), ripartendo sempre dalla base
   // pulita: niente duplicati. Non salva al caricamento iniziale (hlDirty=false).
+  // La base è letta DENTRO il timeout: se nel frattempo un salvataggio del
+  // modulo l'ha aggiornata, le evidenziazioni non cancellano i campi compilati.
   useEffect(() => {
     if (!hlDirty.current || !baseRef.current) return
-    const base = baseRef.current
     let cancelled = false
     setHlSaving(true)
     const t = setTimeout(async () => {
       try {
-        // Prima scrittura su questo PDF: backup dell'originale (.bak nascosto),
-        // come per i DOCX — l'evidenziatore riscrive il file su disco.
-        const bak = `${filePath}.bak`
-        if (!(await exists(bak))) {
-          const orig = await readFile(filePath)
-          await writeFileBinaryAtomic(bak, orig)
-          invoke('set_hidden', { path: bak }).catch(() => {})
-        }
+        const base = baseRef.current
+        if (!base) return
+        await ensureBak()
         const out = await writeHighlights(base, highlights)
         if (!cancelled) await writeFileBinaryAtomic(filePath, out)
       } catch (e) {
@@ -325,7 +370,60 @@ export function PdfViewer({ filePath }: { filePath: string }) {
       cancelled = true
       clearTimeout(t)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlights, filePath])
+
+  // Un campo del modulo è stato modificato: buffer + pallino "non salvato".
+  function onFormChange(name: string, v: string | boolean) {
+    formValuesRef.current.set(name, v)
+    pdfFormBuffers.set(filePath, formValuesRef.current)
+    setFormDirty(true)
+    setBuffer(filePath, '⟨modulo PDF non salvato⟩') // tree + guardia chiusura
+  }
+
+  // Salva i campi compilati DENTRO il PDF. Si usa pdf.js (annotationStorage +
+  // saveDocument, incrementale): tollera anche i PDF con oggetti corrotti su
+  // cui pdf-lib si rompe (verificato sul file reale del feedback).
+  async function saveForm() {
+    if (!doc || formSaving || formValuesRef.current.size === 0) return
+    setFormSaving(true)
+    try {
+      const fobjs = (await doc.getFieldObjects()) as Record<string, { id?: string }[]> | null
+      if (!fobjs) throw new Error('Campi del modulo non disponibili')
+      for (const [name, val] of formValuesRef.current) {
+        const id = fobjs[name]?.[0]?.id
+        if (id) doc.annotationStorage.setValue(id, { value: val })
+      }
+      const out = await doc.saveDocument()
+      // prepareHighlights valida i byte (pdf-lib li riapre) E dà la base pulita:
+      // i prossimi salvataggi dell'evidenziatore non perdono il modulo compilato.
+      const prepared = await prepareHighlights(out)
+      await ensureBak()
+      await writeFileBinaryAtomic(filePath, out)
+      baseRef.current = prepared.base
+      setFormDirty(false)
+      clearBuffer(filePath)
+    } catch (e) {
+      console.error('Salvataggio modulo PDF:', e)
+    } finally {
+      setFormSaving(false)
+    }
+  }
+
+  // Ctrl+S salva il modulo (solo se c'è e ha modifiche).
+  const saveFormRef = useRef(saveForm)
+  saveFormRef.current = saveForm
+  useEffect(() => {
+    if (!hasForm) return
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        saveFormRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hasForm])
 
   function fitWidth() {
     if (!baseWidthRef.current) return
@@ -448,9 +546,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
     setRemovePopup(null)
   }
 
-  // Click (modalità spenta) su un'evidenziazione → popup "Rimuovi".
+  // Click su un'evidenziazione → popup "Rimuovi" (anche con l'evidenziatore
+  // acceso: era poco scopribile che servisse spegnerlo prima).
   function onPagesClick(e: React.MouseEvent) {
-    if (hlMode) return
     const sel = window.getSelection()
     if (sel && !sel.isCollapsed) return // era una selezione, non un click
     const pageEl = (e.target as Element).closest?.('[id^="pdfp-"]') as HTMLElement | null
@@ -582,11 +680,21 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           </button>
           <button
             className={hlMode ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
-            title="Evidenziatore: attiva e seleziona il testo da evidenziare"
+            title="Evidenziatore: attiva e seleziona il testo; click su un'evidenziazione per rimuoverla"
             onClick={() => setHlMode((o) => !o)}
           >
             🖍️ Evidenzia
           </button>
+          {hasForm && (
+            <button
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+              onClick={saveForm}
+              disabled={formSaving || !formDirty}
+              title="Salva i campi compilati dentro il PDF (Ctrl+S)"
+            >
+              {formSaving ? 'Salvataggio…' : '💾 Salva modulo'}
+            </button>
+          )}
           {hlMode && (
             <div className="flex items-center gap-1 pl-1">
               {pdfHlColors.map((c, i) => (
@@ -610,6 +718,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
             </div>
           )}
           {hlSaving && <span className="text-xs text-zinc-500 px-1">Salvataggio…</span>}
+          <ConvertButton filePath={filePath} className={btn} />
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
@@ -677,6 +786,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
                 finds={findsByPage.get(n)}
                 currents={cur && cur.page === n ? cur.boxes : undefined}
                 highlights={hlByPage.get(n)}
+                formEnabled={hasForm}
+                formValues={formValuesRef.current}
+                onFormChange={onFormChange}
               />
             )
           })}
@@ -738,6 +850,9 @@ function PdfPage({
   finds,
   currents,
   highlights,
+  formEnabled,
+  formValues,
+  onFormChange,
 }: {
   doc: PDFDocumentProxy
   pageNumber: number
@@ -746,12 +861,17 @@ function PdfPage({
   finds?: Box[]
   currents?: Box[]
   highlights?: Highlight[]
+  formEnabled?: boolean
+  formValues?: Map<string, string | boolean>
+  onFormChange?: (name: string, v: string | boolean) => void
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
   // Segnaposto alla scala TARGET (layout/scroll immediati).
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  // Campi modulo della pagina (coordinate viewport a scala 1).
+  const [fields, setFields] = useState<FieldWidget[] | null>(null)
   // Scala a cui il contenuto è davvero rasterizzato (in ritardo = debounce).
   const [renderScale, setRenderScale] = useState(scale)
   // Dimensioni del contenuto alla renderScale (per lo scale CSS dello zoom).
@@ -787,6 +907,52 @@ function PdfPage({
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
+
+  // Campi modulo (widget AcroForm) della pagina: input sovrapposti al canvas.
+  useEffect(() => {
+    if (!formEnabled || !visible) return
+    let cancelled = false
+    doc.getPage(pageNumber).then(async (page) => {
+      const annots = await page.getAnnotations()
+      if (cancelled) return
+      const vp = page.getViewport({ scale: 1 })
+      const out: FieldWidget[] = []
+      annots.forEach((a, i) => {
+        if (a.subtype !== 'Widget' || !a.fieldName || a.readOnly || a.hidden) return
+        // convertToViewportRectangle gestisce origine/rotazione della pagina.
+        const [vx0, vy0, vx1, vy1] = vp.convertToViewportRectangle(a.rect)
+        const base = {
+          key: `${a.fieldName}#${i}`,
+          name: a.fieldName as string,
+          left: Math.min(vx0, vx1),
+          top: Math.min(vy0, vy1),
+          w: Math.abs(vx1 - vx0),
+          h: Math.abs(vy1 - vy0),
+        }
+        if (a.fieldType === 'Tx') {
+          out.push({
+            ...base,
+            kind: 'text',
+            value: typeof a.fieldValue === 'string' ? a.fieldValue : '',
+            checked: false,
+            multiLine: !!a.multiLine,
+          })
+        } else if (a.checkBox) {
+          out.push({
+            ...base,
+            kind: 'check',
+            value: '',
+            checked: !!a.fieldValue && a.fieldValue !== 'Off',
+            multiLine: false,
+          })
+        }
+      })
+      setFields(out)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [formEnabled, visible, doc, pageNumber])
 
   // Rasterizza il canvas alla renderScale (HiDPI).
   useEffect(() => {
@@ -922,6 +1088,61 @@ function PdfPage({
           />
         ))}
         <div ref={textLayerRef} className="textLayer" />
+        {/* Campi modulo: input reali sopra la pagina (il wrapper non intercetta
+            gli eventi: selezione testo ed evidenziatore continuano a funzionare). */}
+        {fields && fields.length > 0 && (
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+            {fields.map((f) => {
+              const st: React.CSSProperties = {
+                position: 'absolute',
+                left: f.left * renderScale,
+                top: f.top * renderScale,
+                width: f.w * renderScale,
+                height: f.h * renderScale,
+                pointerEvents: 'auto',
+              }
+              const stop = {
+                onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+                onClick: (e: React.MouseEvent) => e.stopPropagation(),
+              }
+              if (f.kind === 'check') {
+                return (
+                  <input
+                    key={f.key}
+                    type="checkbox"
+                    className="pdf-field-check"
+                    style={st}
+                    defaultChecked={(formValues?.get(f.name) as boolean | undefined) ?? f.checked}
+                    onChange={(e) => onFormChange?.(f.name, e.target.checked)}
+                    {...stop}
+                  />
+                )
+              }
+              const cur = (formValues?.get(f.name) as string | undefined) ?? f.value
+              const fontSize = Math.max(9, Math.min(f.h * renderScale * 0.62, 15 * renderScale))
+              return f.multiLine ? (
+                <textarea
+                  key={f.key}
+                  className="pdf-field"
+                  style={{ ...st, fontSize: Math.max(9, 10 * renderScale) }}
+                  defaultValue={cur}
+                  onChange={(e) => onFormChange?.(f.name, e.target.value)}
+                  {...stop}
+                />
+              ) : (
+                <input
+                  key={f.key}
+                  type="text"
+                  className="pdf-field"
+                  style={{ ...st, fontSize }}
+                  defaultValue={cur}
+                  onChange={(e) => onFormChange?.(f.name, e.target.value)}
+                  {...stop}
+                />
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

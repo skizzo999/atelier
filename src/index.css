@@ -205,6 +205,33 @@ mark.docx-find-current {
   color: #111827;
 }
 
+/* Campi modulo dei PDF (AcroForm): input sovrapposti alla pagina. Leggera
+   tinta blu per rendere visibili le zone compilabili; testo scuro (foglio bianco). */
+.pdf-field {
+  background: rgba(122, 162, 247, 0.08);
+  border: 1px solid rgba(122, 162, 247, 0.35);
+  border-radius: 2px;
+  color: #111827;
+  padding: 0 2px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.pdf-field:focus {
+  background: #fff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+textarea.pdf-field {
+  resize: none;
+  line-height: 1.25;
+}
+.pdf-field-check {
+  accent-color: #2563eb;
+  cursor: pointer;
+  margin: 0;
+}
+
 /* Menu contestuale delle tabelle markdown (DOM puro, appeso a <body>:
    fuori dallo scope del tema CodeMirror, quindi lo stile vive qui). */
 .cm-tablemenu {

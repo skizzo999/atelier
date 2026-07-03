@@ -30,7 +30,10 @@ Prossimi: stampa trasversale, pptx/xlsx.
   ✕ per toglierli dalla lista senza toccare il disco) + Crea/Apri a destra. Mostrato:
   al primo avvio, se il vault sparisce, e quando apri una **seconda istanza** di
   Atelier (heartbeat in localStorage condiviso, soglia 8s — la 2ª finestra parte dal
-  picker invece di auto-aprire l'ultimo vault). Auto-apertura ultimo vault + validazione
+  picker invece di auto-aprire l'ultimo vault). Il heartbeat viene RIMOSSO alla
+  chiusura (beforeunload + guardia chiusura): senza, riaprire l'app entro 8s mostrava
+  il picker al posto dell'ultimo vault (bug segnalato dall'utente, fixato).
+  Auto-apertura ultimo vault + validazione
   al boot come prima; l'indicizzazione parte solo a boot finito (scope fs già concesso)
 - [x] Gestione file: crea/rinomina/elimina (menu tasto destro su elemento o area vuota).
   **Eliminare = Cestino di Windows** (comando Rust `trash_path`, crate `trash`), non
@@ -79,10 +82,21 @@ Prossimi: stampa trasversale, pptx/xlsx.
   - **Ricerca globale** (Ctrl+Shift+F) ora entra anche nei PDF di testo (estrazione in
     cache); aprendo un risultato salta al match dentro al PDF
   - **Evidenziatore** (modalità a tasto): selezioni il testo → evidenzi; 3 colori
-    personalizzabili (persistiti); rimozione con click (modalità spenta) → "Rimuovi";
-    **salvataggio automatico DENTRO il PDF** come annotazioni /Highlight + JSON nel
-    catalog per ricaricarle con coordinate esatte (riparte da base pulita, valida prima
-    di sovrascrivere). Canvas renderizzato con annotationMode DISABLE (niente doppione)
+    personalizzabili (persistiti); rimozione con click sull'evidenziazione → "Rimuovi"
+    (funziona anche con l'evidenziatore acceso); **salvataggio automatico DENTRO il
+    PDF** come annotazioni /Highlight + JSON nel catalog per ricaricarle con coordinate
+    esatte (riparte da base pulita, valida prima di sovrascrivere; `.bak` alla 1ª
+    scrittura). Canvas con annotationMode DISABLE (niente doppione)
+  - **Moduli compilabili (AcroForm)**: i campi testo/checkbox sono input veri sopra la
+    pagina (tinta blu = zone compilabili); **💾 Salva modulo** (o Ctrl+S) scrive i valori
+    DENTRO il PDF via pdf.js `annotationStorage`+`saveDocument` (incrementale: regge
+    anche i PDF con oggetti corrotti dove pdf-lib si rompe — verificato su un file
+    reale). Valori non salvati = buffer per file (pallino tree + guardia chiusura);
+    dopo il salvataggio la base dell'evidenziatore si riallinea (i due flussi di
+    scrittura non si pestano). Radio button non supportati (v1)
+  - **Ricerca precisa**: i text-item del PDF (anche righe intere da 100+ caratteri)
+    sono spezzati in parole con posizioni interpolate → l'evidenziazione indica il
+    punto esatto, non l'intero blocco
   - **Pannello Informazioni** (nome/pagine/peso/percorso+copia), **Apri in Explorer**
 - [x] **Editor DOCX stile Word, con PAGINE VERE** (TipTap/ProseMirror): apri un .docx ed è
   **subito editabile**, su **fogli A4 reali** (paginazione automatica con
@@ -146,6 +160,25 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] **Import trascinando da fuori**: file trascinati da Explorer di Windows sull'albero
   → **copiati nella radice del vault** (mai sovrascritti: suffisso "-importato") e aperti.
   Overlay blu "Rilascia per importare". Le cartelle non arrivano dal drop HTML5 (saltate)
+- [x] **⇄ Converti** (tasto unico in ogni viewer; mostra SOLO le conversioni possibili
+  per quel file; il convertito nasce accanto all'originale — mai sovrascritture — e si
+  apre subito; motore in `lib/convert.ts`, tutto offline, librerie in import dinamico):
+  **immagini** → PDF / PNG / JPEG / WebP (esporta anche i formati sola-lettura tipo
+  gif/svg/bmp); **PDF** → **DOCX (solo testo, righe ricostruite dalle coordinate;
+  scansioni → errore chiaro)** / PNG per pagina (~192 DPI) / TXT; **DOCX** → **PDF** /
+  MD / HTML / TXT (assorbe il vecchio "↧ .md"); **MD** → DOCX / **PDF** / HTML / TXT;
+  **TXT** → MD. docx→PDF e md→PDF usano il motore nostro `lib/htmlToPdf.ts` (pdf-lib,
+  Helvetica, a-capo/paginazione con metriche vere; titoli/grassetto/liste/citazioni/
+  codice/immagini; **tabelle a griglia vera** con bordi/testata/a-capo in cella;
+  caratteri fuori da Latin-1 rimossi). docx→PDF **rispetta la sezione Word**
+  (via `parseDocxSettings`): formato/orientamento, margini, **colore foglio**,
+  **intestazioni e piè col numero di pagina**. Il freeze "md→docx"
+  era in realtà l'APERTURA di docx con tabelle enormi (più alte di una pagina →
+  loop di misura di tiptap-pagination-plus, riprodotto col file audit dell'utente):
+  ora quei documenti si aprono in **vista continua** (senza paginazione, chip
+  "• vista continua" nell'header, ⚙ Documento disabilitato; euristica
+  `hasHugeTables`: tabella con >1200 caratteri o >12 righe). Vale anche per i
+  Word veri con tabelloni. I ref della sezione restano validi per il salvataggio
 - [x] **Modale "Nuovo file"** (bottone in sidebar + tasto destro explorer): nome a sinistra,
   tipo a destra (md/docx/txt; placeholder disabilitati xlsx/pptx; cascata "Programmazione"
   con html/css/js/ts/py/java/php/json). Estensione digitata a mano = tipo auto-selezionato.

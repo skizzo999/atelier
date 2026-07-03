@@ -11,6 +11,7 @@ import { writeFileAtomic } from '../../lib/fileOps'
 import { loadImage } from '../../lib/images'
 import { resolveOrCreateNote } from '../../lib/notes'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
+import { ConvertButton } from '../Convert/ConvertButton'
 
 // Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
 marked.use(
@@ -305,6 +306,10 @@ export function Editor() {
               </button>
             </div>
           )}
+          <ConvertButton
+            filePath={filePath}
+            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-300 disabled:opacity-40"
+          />
           <button
             onClick={handleSave}
             disabled={!dirty || saving}

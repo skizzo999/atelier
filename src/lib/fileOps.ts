@@ -117,6 +117,22 @@ export async function writeFileBinaryAtomic(path: string, data: Uint8Array): Pro
   }
 }
 
+// Path libero accanto all'originale CAMBIANDO estensione: "foto.png" → "foto.pdf",
+// con contatore se il nome è occupato ("foto-1.pdf"). Usato dalle conversioni.
+export async function uniquePathWithExt(originalPath: string, newExt: string): Promise<string> {
+  const dir = parentDir(originalPath)
+  const file = originalPath.slice(dir.length + 1)
+  const dot = file.lastIndexOf('.')
+  const base = dot >= 0 ? file.slice(0, dot) : file
+  let candidate = joinPath(dir, `${base}.${newExt}`)
+  let n = 1
+  while (await exists(candidate)) {
+    candidate = joinPath(dir, `${base}-${n}.${newExt}`)
+    n++
+  }
+  return candidate
+}
+
 // Genera un path libero accanto all'originale, aggiungendo un suffisso (e un
 // contatore se necessario). Es: foto.png -> foto-ritaglio.png / foto-ritaglio-1.png
 export async function uniquePathWithSuffix(originalPath: string, suffix: string): Promise<string> {

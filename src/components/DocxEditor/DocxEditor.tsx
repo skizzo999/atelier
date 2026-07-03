@@ -15,8 +15,9 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Typography from '@tiptap/extension-typography'
-import { readFile, writeTextFile, exists, remove } from '@tauri-apps/plugin-fs'
+import { readFile, exists, remove } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
+import { ConvertButton } from '../Convert/ConvertButton'
 import DOMPurify from 'dompurify'
 import * as mammoth from 'mammoth'
 import { revealInExplorer } from '../../lib/imageActions'
@@ -56,7 +57,18 @@ const DEFAULT_SETTINGS: FullSettings = {
 // (bianchi) sembrano staccati l'uno dall'altro.
 const PAGE_BG = '#4b4f55'
 
-const extensions = [
+// Le tabelle molto grandi (più alte di una pagina) mandano in loop il motore
+// di paginazione (misura↔sposta senza fine → app bloccata): quei documenti
+// si aprono in VISTA CONTINUA, cioè senza PaginationPlus.
+function hasHugeTables(html: string): boolean {
+  const probe = document.createElement('div')
+  probe.innerHTML = html
+  return Array.from(probe.querySelectorAll('table')).some(
+    (t) => (t.textContent?.length ?? 0) > 1200 || t.querySelectorAll('tr').length > 12,
+  )
+}
+
+const buildExtensions = (paginated: boolean) => [
   StarterKit,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
   Image,
@@ -78,18 +90,22 @@ const extensions = [
   Superscript,
   Typography,
   // Paginazione vera A4 (open-source, v3): fogli distinti, margini, header/footer.
-  PaginationPlus.configure({
-    pageWidth: 794,
-    pageHeight: 1123,
-    marginTop: 95,
-    marginBottom: 95,
-    marginLeft: 76,
-    marginRight: 76,
-    pageGap: 30,
-    pageGapBorderSize: 0,
-    pageGapBorderColor: PAGE_BG, // eventuale bordo gap = invisibile (no "stanghetta")
-    pageBreakBackground: PAGE_BG, // gap = sfondo → pagine staccate
-  }),
+  ...(paginated
+    ? [
+        PaginationPlus.configure({
+          pageWidth: 794,
+          pageHeight: 1123,
+          marginTop: 95,
+          marginBottom: 95,
+          marginLeft: 76,
+          marginRight: 76,
+          pageGap: 30,
+          pageGapBorderSize: 0,
+          pageGapBorderColor: PAGE_BG, // eventuale bordo gap = invisibile (no "stanghetta")
+          pageBreakBackground: PAGE_BG, // gap = sfondo → pagine staccate
+        }),
+      ]
+    : []),
 ]
 
 // Bottone della barra strumenti (stile Atelier: attivo = accento blu).
@@ -212,7 +228,6 @@ function ColorPopover({ editor }: { editor: Editor }) {
 // Editor DOCX (TipTap): apri il .docx ed è subito editabile, con barra strumenti
 // in stile Word ma con l'identità di Atelier. Salva = sovrascrive il .docx.
 export function DocxEditor({ filePath }: { filePath: string }) {
-  const setSelectedFile = useAppStore((s) => s.setSelectedFile)
   const setBuffer = useAppStore((s) => s.setBuffer)
   const clearBuffer = useAppStore((s) => s.clearBuffer)
   // "Non salvato" = c'è un buffer per questo file (mostra anche il pallino nel tree).
@@ -220,7 +235,10 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  // Vista continua = senza paginazione (documenti con tabelle enormi).
+  const [continuous, setContinuous] = useState(false)
+  const continuousRef = useRef(false)
+  continuousRef.current = continuous
   const [zoom, setZoom] = useState(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [paperColor, setPaperColor] = useState('#ffffff')
@@ -255,10 +273,11 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     reader.readAsDataURL(file)
   }
 
-  const editor = useEditor({
-    extensions,
-    content: '',
-    immediatelyRender: false, // evita problemi col doppio mount di StrictMode
+  const editor = useEditor(
+    {
+      extensions: buildExtensions(!continuous),
+      content: '',
+      immediatelyRender: false, // evita problemi col doppio mount di StrictMode
     editorProps: {
       attributes: { class: 'prose max-w-none focus:outline-none' },
     },
@@ -267,7 +286,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       setBuffer(filePath, editor.getHTML()) // modifica → buffer (persiste tra i file)
     },
     onTransaction: () => setTick((t) => (t + 1) % 1_000_000), // barra riflette lo stato
-  })
+    },
+    [continuous], // ricrea l'editor quando cambia la modalità di paginazione
+  )
 
   // Apre il .docx: se ci sono modifiche non salvate (buffer) le ripristina,
   // altrimenti importa dal file (Mammoth → HTML).
@@ -300,16 +321,16 @@ export function DocxEditor({ filePath }: { filePath: string }) {
       hideBakIfPresent()
 
       const buffered = useAppStore.getState().dirtyBuffers[filePath]
-      if (buffered !== undefined) {
-        editor.commands.setContent(buffered)
-        applyAllSettings(settings) // subito, prima di mostrare: niente flash del bianco
-        setLoading(false)
-        setTimeout(() => (importingRef.current = false), 400)
+      const html = buffered !== undefined ? buffered : DOMPurify.sanitize((await mammoth.convertToHtml({ arrayBuffer })).value)
+      if (cancelled) return
+      // Tabelle enormi → la paginazione andrebbe in loop: passa alla vista
+      // continua PRIMA di inserire il contenuto (l'editor si ricrea e questo
+      // effetto riparte già nella modalità giusta).
+      if (!continuousRef.current && hasHugeTables(html)) {
+        setContinuous(true)
         return
       }
-      const result = await mammoth.convertToHtml({ arrayBuffer })
-      if (cancelled) return
-      editor.commands.setContent(DOMPurify.sanitize(result.value))
+      editor.commands.setContent(html)
       applyAllSettings(settings) // subito, prima di mostrare: niente flash del bianco
       setLoading(false)
       setTimeout(() => (importingRef.current = false), 400)
@@ -381,9 +402,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, saving, filePath])
 
+  // Cambio file: si riparte in modalità paginata (la vista continua è per-documento).
+  useEffect(() => {
+    setContinuous(false)
+  }, [filePath])
+
   // Piè di pagina = testo libero a sinistra + numero di pagina a destra (col totale).
   function applyFooter(left: string, mode: PageNumMode) {
-    if (editor) editor.commands.updateFooterContent(left, footerTextFor(mode, pageTotalOf(editor)))
+    if (editor && !continuousRef.current) editor.commands.updateFooterContent(left, footerTextFor(mode, pageTotalOf(editor)))
   }
   function changePageNumMode(mode: PageNumMode) {
     setPageNumMode(mode)
@@ -409,6 +435,9 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     setFooterLeft(s.footerLeft)
     setPageNumMode(s.pageNum)
     setPaperColor(s.paper)
+    // Vista continua: niente comandi di paginazione (l'estensione non c'è),
+    // ma i ref sopra restano validi per il salvataggio della sezione Word.
+    if (continuousRef.current) return
     const f = FORMATS[s.format] ?? FORMATS.A4
     editor
       .chain()
@@ -443,6 +472,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     const onUpd = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
+        if (continuousRef.current) return // niente piè senza paginazione
         if (pageNumModeRef.current === 'none') return
         const total = pageTotalOf(editor)
         if (total === last) return
@@ -470,34 +500,6 @@ export function DocxEditor({ filePath }: { filePath: string }) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  async function exportMarkdown() {
-    if (exporting) return
-    setExporting(true)
-    try {
-      const bytes = await readFile(filePath)
-      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-      const toMd = (
-        mammoth as unknown as {
-          convertToMarkdown: (i: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
-        }
-      ).convertToMarkdown
-      const md = await toMd({ arrayBuffer })
-      const dir = filePath.slice(0, filePath.lastIndexOf('\\'))
-      const base = fileName.replace(/\.docx$/i, '')
-      let dest = `${dir}\\${base}.md`
-      let i = 2
-      while (await exists(dest)) {
-        dest = `${dir}\\${base} (${i}).md`
-        i++
-      }
-      await writeTextFile(dest, md.value)
-      setSelectedFile(dest)
-    } catch (e) {
-      console.error('Export DOCX→MD:', e)
-    } finally {
-      setExporting(false)
-    }
-  }
 
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
@@ -519,6 +521,14 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         <span className="text-sm text-zinc-300 truncate flex items-center gap-2 min-w-0">
           <span className="truncate">{fileName}</span>
           {dirty && <span className="text-xs text-amber-400 shrink-0">• non salvato</span>}
+          {continuous && (
+            <span
+              className="text-xs text-sky-400 shrink-0"
+              title="Documento con tabelle molto grandi: vista senza pagine (la paginazione andrebbe in blocco)"
+            >
+              • vista continua
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button
@@ -531,15 +541,13 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           </button>
           <button
             className={settingsOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
-            title="Impostazioni documento"
-            disabled={loading || !!error}
+            title={continuous ? 'Non disponibile in vista continua' : 'Impostazioni documento'}
+            disabled={loading || !!error || continuous}
             onClick={() => setSettingsOpen((o) => !o)}
           >
             ⚙️ Documento
           </button>
-          <button className={btn} title="Esporta in Markdown" disabled={exporting || loading} onClick={exportMarkdown}>
-            {exporting ? 'Esporto…' : '↧ .md'}
-          </button>
+          <ConvertButton filePath={filePath} className={btn} />
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
