@@ -9,16 +9,18 @@ const ImageViewer = lazy(() => import('../ImageViewer/ImageViewer').then((m) => 
 const PdfViewer = lazy(() => import('../PdfViewer/PdfViewer').then((m) => ({ default: m.PdfViewer })))
 const DocxEditor = lazy(() => import('../DocxEditor/DocxEditor').then((m) => ({ default: m.DocxEditor })))
 const Editor = lazy(() => import('../Editor/Editor').then((m) => ({ default: m.Editor })))
+const XlsxViewer = lazy(() => import('../XlsxViewer/XlsxViewer').then((m) => ({ default: m.XlsxViewer })))
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 
-type FileKind = 'image' | 'pdf' | 'docx' | 'text'
+type FileKind = 'image' | 'pdf' | 'docx' | 'sheet' | 'text'
 
 function kindOf(path: string): FileKind {
   const ext = path.split('.').pop()?.toLowerCase()
   if (ext && IMAGE_EXT.has(ext)) return 'image'
   if (ext === 'pdf') return 'pdf'
   if (ext === 'docx') return 'docx'
+  if (ext === 'xlsx' || ext === 'xlsm' || ext === 'csv') return 'sheet'
   return 'text'
 }
 
@@ -50,6 +52,8 @@ export function FileView() {
         <PdfViewer key={filePath} filePath={filePath} />
       ) : kind === 'docx' ? (
         <DocxEditor key={filePath} filePath={filePath} />
+      ) : kind === 'sheet' ? (
+        <XlsxViewer key={filePath} filePath={filePath} />
       ) : (
         <Editor />
       )}

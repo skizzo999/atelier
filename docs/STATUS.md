@@ -197,8 +197,11 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Altri formati**: ✅ PDF e DOCX (view+edit) → **pptx/xlsx** (SheetJS / viewer dedicati).
-   Nella modale "Nuovo file" ci sono già i placeholder (disabilitati).
+1. **Pacchetto Office** (piano in docs/PIANO_OFFICE.md): ✅ Fase 0 (spike → ExcelJS)
+   e Fase 1 (**XLSX/CSV viewer**: griglia virtualizzata, tab fogli, celle unite,
+   stili base, formati it-IT, formule = valore cached; nuovo file xlsx; ricerca
+   globale; Converti xlsx↔CSV) → prossime: **Fase 2 editing xlsx**, **Fase 3 pptx
+   viewer** (parser nostro), Fase 4 convertitori restanti.
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).

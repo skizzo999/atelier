@@ -22,6 +22,12 @@ export async function createFile(dir: string, name: string): Promise<string> {
     const { htmlToDocxBlob } = await import('./htmlToDocx')
     const blob = await htmlToDocxBlob(document.createElement('div'))
     await writeFile(path, new Uint8Array(await blob.arrayBuffer()))
+  } else if (name.toLowerCase().endsWith('.xlsx')) {
+    // Come i .docx: un .xlsx vuoto da 0 byte non sarebbe apribile.
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.addWorksheet('Foglio 1')
+    await writeFile(path, new Uint8Array(await wb.xlsx.writeBuffer()))
   } else {
     await writeTextFile(path, '')
   }

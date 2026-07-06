@@ -12,14 +12,12 @@ interface FileType {
 const MAIN_TYPES: FileType[] = [
   { ext: 'md', label: 'Markdown', icon: '📝' },
   { ext: 'docx', label: 'Word', icon: '📄' },
+  { ext: 'xlsx', label: 'Excel', icon: '📊' },
   { ext: 'txt', label: 'Testo', icon: '🗒️' },
 ]
 
 // In arrivo: mostrati ma non selezionabili (promemoria di cosa manca).
-const FUTURE_TYPES: FileType[] = [
-  { ext: 'xlsx', label: 'Excel', icon: '📊', disabled: true },
-  { ext: 'pptx', label: 'PowerPoint', icon: '📽️', disabled: true },
-]
+const FUTURE_TYPES: FileType[] = [{ ext: 'pptx', label: 'PowerPoint', icon: '📽️', disabled: true }]
 
 // Programmazione (lista a cascata): qualche esempio, si estende in futuro.
 const CODE_TYPES: FileType[] = [

@@ -122,6 +122,38 @@ function isDocx(name: string): boolean {
   return name.toLowerCase().endsWith('.docx')
 }
 
+function isXlsx(name: string): boolean {
+  return /\.(xlsx|xlsm)$/i.test(name)
+}
+
+// Testo delle celle di un xlsx (tutti i fogli), in cache finché il file non cambia.
+const xlsxTextCache = new Map<string, { mtime: number; text: string }>()
+
+async function xlsxText(path: string): Promise<string> {
+  const mtime = await mtimeOf(path)
+  const cached = xlsxTextCache.get(path)
+  if (cached && cached.mtime === mtime) return cached.text
+  const ExcelJS = (await import('exceljs')).default // pigra: non pesa sul bundle
+  const bytes = await readFile(path)
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+  let out = ''
+  for (const ws of wb.worksheets) {
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const parts: string[] = []
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        const t = cell.text // ExcelJS: testo "visibile" (formule → risultato)
+        if (t) parts.push(String(t))
+      })
+      if (parts.length) out += parts.join(' ') + '\n'
+      return out.length < 500_000 // limite di sicurezza sui fogli enormi
+    })
+    if (out.length >= 500_000) break
+  }
+  xlsxTextCache.set(path, { mtime, text: out })
+  return out
+}
+
 // Testo grezzo di un DOCX (Mammoth), in cache finché il file non cambia.
 const docxTextCache = new Map<string, { mtime: number; text: string }>()
 
@@ -172,10 +204,10 @@ export async function searchContent(
       if (results.length >= limit) break
       continue
     }
-    if (isDocx(f.name)) {
+    if (isDocx(f.name) || isXlsx(f.name)) {
       let text: string
       try {
-        text = await docxText(f.path)
+        text = isDocx(f.name) ? await docxText(f.path) : await xlsxText(f.path)
       } catch {
         continue
       }

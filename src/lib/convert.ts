@@ -327,6 +327,39 @@ async function mdToTxt(path: string): Promise<string> {
   return dest
 }
 
+// ---------- fogli di calcolo ----------
+
+// xlsx → CSV del PRIMO foglio (';' come l'Excel italiano).
+async function xlsxToCsv(path: string): Promise<string> {
+  const [{ default: ExcelJS }, { toCsv }] = await Promise.all([import('exceljs'), import('./csv')])
+  const bytes = await readFile(path)
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+  const ws = wb.worksheets[0]
+  if (!ws) throw new Error('Cartella di lavoro vuota')
+  const rows: string[][] = []
+  ws.eachRow({ includeEmpty: true }, (row) => {
+    const cells: string[] = []
+    for (let c = 1; c <= (ws.columnCount || 1); c++) cells.push(row.getCell(c).text ?? '')
+    rows.push(cells)
+  })
+  const dest = await uniquePathWithExt(path, 'csv')
+  await writeTextFile(dest, toCsv(rows))
+  return dest
+}
+
+async function csvToXlsx(path: string): Promise<string> {
+  const [{ default: ExcelJS }, { parseCsv }] = await Promise.all([import('exceljs'), import('./csv')])
+  const rows = parseCsv(await readTextFile(path))
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Foglio 1')
+  for (const r of rows) {
+    // Numeri riconosciuti come numeri (virgola italiana inclusa).
+    ws.addRow(r.map((v) => (v !== '' && !Number.isNaN(Number(v.replace(',', '.'))) ? Number(v.replace(',', '.')) : v)))
+  }
+  return writeBlobAs(path, 'xlsx', new Blob([await wb.xlsx.writeBuffer()]))
+}
+
 // ---------- testo semplice ----------
 
 async function txtToMd(path: string): Promise<string> {
@@ -372,6 +405,15 @@ export function optionsFor(path: string): ConvertOption[] {
       { id: 'pdf', label: 'PDF (.pdf) — layout semplice', run: mdToPdf },
       { id: 'html', label: 'Pagina HTML (.html)', run: mdToHtml },
       { id: 'txt', label: 'Testo (.txt)', run: mdToTxt },
+    ]
+  }
+  if (ext === 'xlsx' || ext === 'xlsm') {
+    return [{ id: 'csv', label: 'CSV (primo foglio)', run: xlsxToCsv }]
+  }
+  if (ext === 'csv') {
+    return [
+      { id: 'xlsx', label: 'Excel (.xlsx)', run: csvToXlsx },
+      { id: 'md', label: 'Markdown (.md)', run: txtToMd },
     ]
   }
   if (ext === 'txt') {

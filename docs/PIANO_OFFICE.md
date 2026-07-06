@@ -20,13 +20,31 @@ abbiamo già tutta l'esperienza (fflate + DOMParser, vedi `docxSectPr.ts`).
 
 ## Scaletta
 
-### Fase 0 — Spike decisionale (30 min, PRIMA di scrivere codice)
-Caricare 2-3 xlsx veri (con stili) sia con SheetJS CE sia con ExcelJS e decidere:
-- **A**: SheetJS legge + ExcelJS scrive (best di entrambi, 2 dipendenze)
-- **B**: solo ExcelJS (1 dipendenza MIT, legge+scrive stili, ma inattiva)
-- Verificare: valori calcolati delle formule, celle unite, larghezze colonne, date.
+### Fase 0 — Spike decisionale ✅ FATTA (2026-07-03)
+**Scelta: B — solo ExcelJS 4.4.0** (MIT, 1 dipendenza). Verificato su file generato
+con stili: legge valori, formule col risultato cached, date, numFmt (€/%/decimali),
+grassetto/corsivo/colori/fill, celle unite (con `master.address` per le coperte),
+larghezze colonne, più fogli — e il **round-trip di modifica preserva tutto**.
+SheetJS rimandata a quando serviranno .xls (BIFF) / .ods.
 
-### Fase 1 — XLSX Viewer (chiude la promessa "apri tutto")
+### Fase 1 — XLSX Viewer ✅ FATTA (2026-07-03, da testare dall'utente)
+Implementato `XlsxViewer.tsx` (chunk lazy, ExcelJS 915 kB caricata solo qui):
+griglia virtualizzata nostra (finestra di righe, header A-Z e numeri riga sticky),
+tab dei fogli in basso (costruzione pigra + cache per foglio), celle unite
+(colSpan; rowspan solo visivamente parziale), stili base (grassetto/corsivo/
+colori/sfondo/allineamento), date e numeri in formato italiano, formule = valore
+cached, tetto 10.000 righe con avviso "troncato". CSV → stesso viewer (parser
+nostro `lib/csv.ts`, separatore auto ; o ,). Modale Nuovo file: xlsx attivo
+(workbook vero, non 0 byte). Ricerca globale dentro gli xlsx (cache mtime).
+Converti: xlsx→CSV (primo foglio), CSV→xlsx/md.
+Rifinito sui 5 file reali dell'utente (template Google Sheets): colori a tema
+(palette da theme1.xml + tint), altezze riga vere (virtualizzazione a prefissi),
+dimensioni font per cella, unioni orizzontali (colSpan) e verticali (niente
+rowSpan vero ma sfondo del master propagato — no buchi bianchi), checkbox ☑/☐,
+CSV con celle multiriga quotate. **Limiti dichiarati**: niente grafici embedded
+(nessuna lib JS li renderizza), niente formattazione condizionale (andrebbe
+valutata), numFmt custom con abbreviazioni (es. 4.363.599M) resi come numero
+pieno. Piano originale:
 1. `XlsxViewer` lazy (code-split come gli altri), routing FileView per xlsx/xls/csv
 2. Griglia **nostra** virtualizzata (solo righe visibili, come PdfViewer): niente
    librerie griglia — è un viewer, non serve AG Grid. Intestazioni A-Z/1-n fisse
@@ -51,7 +69,23 @@ Caricare 2-3 xlsx veri (con stili) sia con SheetJS CE sia con ExcelJS e decidere
 12. (Dopo) PptxGenJS: creare pptx dalla modale Nuovo file + export
 
 ### Fase 4 — Convertitori Office (chiusura del cerchio)
-13. xlsx → CSV, CSV → xlsx (banali con le lib scelte); pptx → testo/PNG per slide
+13. xlsx → CSV, CSV → xlsx ✅ (fatti con la Fase 1); pptx → testo/PNG per slide
+
+### Fase 5 — Verso l'Office "vero" (richiesto dall'utente il 2026-07-03)
+Ambizione dichiarata: pacchetto Office completo dentro Atelier. Livelli, in ordine
+di fattibilità/valore:
+14. **Formattazione condizionale base**: valutare le regole semplici (cellIs
+    greaterThan/lessThan/between, colorScale a 2-3 colori) lette da ExcelJS →
+    applicare i colori nel viewer. Copre il rosso/verde del Tracker.
+15. **Grafici in lettura**: parse di `chart1.xml` (linee/barre/torta base) →
+    ridisegnati con SVG nostro nella posizione dell'ancora. Progetto da 2-3
+    sessioni; niente interattività (il dropdown "12 Months" del template Google
+    è data-validation + ricalcolo → dipende dal punto 16).
+16. **Motore formule SUBSET nostro** (il limite strutturale): HyperFormula è
+    GPL → niente. Scrivere un subset MIT-nostro: aritmetica, SUM/AVERAGE/COUNT/
+    MIN/MAX/IF/percentuali — copre l'80% dei fogli reali. Ricalcolo su modifica
+    (Fase 2 editing) invece del solo valore cached. Le formule esotiche
+    (GOOGLEFINANCE ecc.) restano cached, com'è giusto offline.
 
 ## Punti d'attenzione
 - **Peso**: SheetJS/ExcelJS in import dinamico dentro il chunk del viewer (il
