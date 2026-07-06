@@ -55,8 +55,19 @@ pieno. Piano originale:
 6. Modale "Nuovo file": attivare xlsx (workbook vuoto 1 foglio)
 
 ### Fase 2 — XLSX Editing (a tappe, come fu per il DOCX)
-7. Edit del valore cella (doppio click), buffer non salvato, Salva = riscrive
-   il file (round-trip che preserva stili → dipende dallo spike), `.bak` 1ª volta
+7. ✅ FATTO e testato dall'utente (2026-07-03): CLICK SINGOLO → input a cella
+   piena (altezza/font veri); capisce numeri it (1.234,56), VERO/FALSO, vuoto;
+   booleane = checkbox cliccabili; **MINI-MOTORE FORMULE nostro** (niente eval,
+   CSP intatta: parser a discesa ricorsiva) — aritmetica con riferimenti,
+   SUM/SOMMA, MEDIA/AVERAGE, CONTA/COUNT, MIN, MAX su range; il risultato va
+   nel file come cached (lo vede anche Excel); 11/11 test sul file reale.
+   Formule fuori dal subset salvate senza risultato. Modifiche SUBITO nel
+   workbook ExcelJS in memoria → Salva/Ctrl+S = writeBuffer che preserva
+   stili/formati/merge, `.bak` nascosto 1ª volta, buffer per-file che
+   sopravvive al cambio file, pallino + guardia chiusura. Celle orario (date
+   1899) mostrate come ore. CSV in sola lettura per ora.
+   → Il motore è il SEME della Fase 16: estenderlo lì (IF, ricalcolo a catena
+   delle celle dipendenti — oggi ricalcola solo la cella editata).
 8. Tasto destro: aggiungi/elimina righe/colonne, rinomina/aggiungi foglio
    (riuso pattern menu delle tabelle md)
 9. Selezione multi-cella + copia TSV (pattern già scritto in tableEditor)

@@ -1,6 +1,20 @@
 # Prossimi step - Continuità
 
-> Aggiornato al 2026-07-02, sera. Per il dettaglio completo di ogni funzione vedi `docs/STATUS.md`.
+> Aggiornato al 2026-07-03, pomeriggio (si riprende STASERA). Dettaglio funzioni
+> in `docs/STATUS.md`; piano Office in `docs/PIANO_OFFICE.md`.
+
+## ⚡ Ripresa rapida (stasera)
+Siamo dentro il **pacchetto Office**: Fasi 0+1+2-core FATTE e testate (viewer
+Excel/CSV fedele + editing celle con mini-motore formule). Prossimo, in ordine:
+1. **Fase 2 restante**: menu tasto destro (aggiungi/elimina righe/colonne,
+   rinomina/aggiungi foglio — riusare il pattern menu di tableEditor) +
+   selezione multi-cella con copia TSV
+2. **Fase 14**: formattazione condizionale base (cellIs greaterThan/lessThan →
+   colori; è il rosso/verde del Tracker che l'utente vuole)
+3. **Fase 3**: pptx viewer (parser nostro fflate+DOMParser, pattern docxSectPr)
+4. Poi release (versione la decide l'utente) e Fase 15/16 (grafici, motore esteso)
+
+---
 
 ## Dove siamo arrivati
 

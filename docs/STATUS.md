@@ -197,11 +197,14 @@ Prossimi: stampa trasversale, pptx/xlsx.
 - [x] Navigazione wikilink: click su `[[nota]]` apre la nota (o la crea)
 
 ## Prossimi step (in ordine di priorità)
-1. **Pacchetto Office** (piano in docs/PIANO_OFFICE.md): ✅ Fase 0 (spike → ExcelJS)
-   e Fase 1 (**XLSX/CSV viewer**: griglia virtualizzata, tab fogli, celle unite,
-   stili base, formati it-IT, formule = valore cached; nuovo file xlsx; ricerca
-   globale; Converti xlsx↔CSV) → prossime: **Fase 2 editing xlsx**, **Fase 3 pptx
-   viewer** (parser nostro), Fase 4 convertitori restanti.
+1. **Pacchetto Office** (piano in docs/PIANO_OFFICE.md): ✅ Fase 0 (spike → ExcelJS),
+   ✅ Fase 1 (**XLSX/CSV viewer** fedele: griglia virtualizzata, tab fogli, celle
+   unite, colori a tema, altezze/bordi/gridlines veri, wrap, font per cella;
+   rifinito sui 5 file reali), ✅ Fase 2 core (**editing celle** a click singolo,
+   checkbox, **mini-motore formule** SUM/MEDIA/CONTA/MIN/MAX + aritmetica, salva
+   con stili intatti e .bak) → restano: menu tasto destro righe/colonne + multi-
+   cella TSV (Fase 2), **formattazione condizionale base** (Fase 14), **Fase 3
+   pptx viewer** (parser nostro), motore formule esteso (Fase 16).
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).

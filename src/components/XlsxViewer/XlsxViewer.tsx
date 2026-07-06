@@ -1,9 +1,48 @@
 import { useEffect, useRef, useState } from 'react'
-import { readFile, readTextFile } from '@tauri-apps/plugin-fs'
+import { readFile, readTextFile, exists } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import type { Workbook, Worksheet, Cell, CellValue } from 'exceljs'
 import { revealInExplorer } from '../../lib/imageActions'
+import { writeFileBinaryAtomic } from '../../lib/fileOps'
+import { useAppStore } from '../../store/appStore'
 import { ConvertButton } from '../Convert/ConvertButton'
 import { parseCsv } from '../../lib/csv'
+
+// Modifiche non salvate per file (chiave "foglio:riga:col" → valore): vivono a
+// livello modulo così sopravvivono al cambio file, come gli altri buffer.
+const xlsxEditBuffers = new Map<string, Map<string, CellValue>>()
+
+// Interpreta l'input dell'utente: numero (virgola italiana), booleano,
+// formula (=...; senza motore di ricalcolo il risultato arriverà da Excel),
+// vuoto → null, altrimenti testo.
+function parseInput(raw: string): CellValue {
+  const s = raw.trim()
+  if (s === '') return null
+  if (s.startsWith('=')) return { formula: s.slice(1) } as CellValue
+  const low = s.toLowerCase()
+  if (low === 'true' || low === 'vero') return true
+  if (low === 'false' || low === 'falso') return false
+  if (/^-?\d{1,3}(\.\d{3})*(,\d+)?$/.test(s) || /^-?\d+([.,]\d+)?$/.test(s)) {
+    const n = Number(s.replace(/\./g, '').replace(',', '.'))
+    if (!Number.isNaN(n)) return n
+  }
+  return s
+}
+
+// Valore "grezzo" da mostrare nell'input quando si edita una cella.
+function rawOf(cell: Cell): string {
+  const v = cell.value
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'number') return String(v).replace('.', ',')
+  if (typeof v === 'boolean') return v ? 'VERO' : 'FALSO'
+  if (v instanceof Date) return v.toLocaleDateString('it-IT')
+  if (typeof v === 'object') {
+    if ('formula' in v) return `=${(v as { formula: string }).formula}`
+    if ('richText' in v) return v.richText.map((r) => r.text).join('')
+    if ('text' in v) return String((v as { text: unknown }).text)
+  }
+  return String(v)
+}
 
 // Viewer Excel/CSV (Fase 1 del piano Office, sola lettura): griglia virtualizzata
 // nostra (solo le righe visibili), tab dei fogli, celle unite, larghezze colonne,
@@ -28,6 +67,7 @@ interface CellData {
   cs?: number // colSpan (celle unite in orizzontale)
   skip?: boolean // coperta da una cella unita
   wrap?: boolean // testo a capo (alignment.wrapText)
+  chk?: boolean // cella booleana → checkbox cliccabile
   bt?: string // bordi espliciti della cella (css)
   br?: string
   bb?: string
@@ -107,9 +147,16 @@ const btn = 'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 roun
 // Misura testo col font reale: se la parola più lunga di una cella (a capo,
 // font grande) non sta nella colonna, il font si riduce quanto basta — i file
 // nascono con font che noi non abbiamo (es. "Hind") e i fallback sono più larghi.
-const measureCtx = document.createElement('canvas').getContext('2d')
+let measureCtxCache: CanvasRenderingContext2D | null | undefined
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+  if (measureCtxCache === undefined) {
+    measureCtxCache = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null
+  }
+  return measureCtxCache
+}
 
 function fitFontSize(cell: CellData, colW: number): number | undefined {
+  const measureCtx = getMeasureCtx()
   if (!cell.fs || !cell.wrap || !measureCtx) return cell.fs
   const avail = colW - 14 // padding orizzontale
   if (avail <= 0) return cell.fs
@@ -163,7 +210,123 @@ function fmtNum(n: number, fmt?: string): string {
 }
 
 function fmtDate(d: Date, fmt?: string): string {
-  return fmt && /h/i.test(fmt) ? d.toLocaleString('it-IT') : d.toLocaleDateString('it-IT')
+  const hasTime = fmt ? /h/i.test(fmt) : false
+  const hasDate = fmt ? /[dmy]/i.test(fmt.replace(/\[.*?\]/g, '')) : true
+  // Celle SOLO orario (es. 8:00): Excel le salva come date del 1899 → mostra l'ora.
+  if (hasTime && (!hasDate || d.getFullYear() <= 1900)) {
+    return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+  }
+  return hasTime ? d.toLocaleString('it-IT') : d.toLocaleDateString('it-IT')
+}
+
+// ---- Mini-motore formule (subset, Fase 16 in embrione): aritmetica con
+// riferimenti (D6+D5*2), SUM/SOMMA, AVERAGE/MEDIA, COUNT/CONTA, MIN, MAX su
+// range. Niente eval/new Function (bloccati dalla CSP): parser nostro.
+
+function numOf(v: CellValue): number | undefined {
+  if (typeof v === 'number') return v
+  if (v && typeof v === 'object' && 'result' in v && typeof (v as { result?: unknown }).result === 'number') {
+    return (v as { result: number }).result
+  }
+  if (v === null || v === undefined || v === '') return 0 // vuoto = 0, come Excel
+  return undefined
+}
+
+function rangeNums(ws: Worksheet, a: string, b: string): number[] | undefined {
+  const m1 = /^([A-Z]+)(\d+)$/.exec(a)
+  const m2 = /^([A-Z]+)(\d+)$/.exec(b)
+  if (!m1 || !m2) return undefined
+  const c1 = colIndex(m1[1])
+  const r1 = Number(m1[2])
+  const c2 = colIndex(m2[1])
+  const r2 = Number(m2[2])
+  if ((r2 - r1 + 1) * (c2 - c1 + 1) > 10_000) return undefined
+  const out: number[] = []
+  for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+    for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+      const v = ws.getRow(r).getCell(c).value
+      if (typeof v === 'number') out.push(v)
+      else {
+        const n = numOf(v)
+        if (n !== undefined && v !== null && v !== undefined && v !== '') out.push(n)
+      }
+    }
+  return out
+}
+
+// Espressione aritmetica (discesa ricorsiva): + - * / ( ) e numeri col punto.
+function evalArith(s: string): number | undefined {
+  let i = 0
+  const peek = () => s[i]
+  function expr(): number {
+    let v = term()
+    while (peek() === '+' || peek() === '-') {
+      const op = s[i++]
+      const t = term()
+      v = op === '+' ? v + t : v - t
+    }
+    return v
+  }
+  function term(): number {
+    let v = factor()
+    while (peek() === '*' || peek() === '/') {
+      const op = s[i++]
+      const f = factor()
+      v = op === '*' ? v * f : v / f
+    }
+    return v
+  }
+  function factor(): number {
+    if (peek() === '-') {
+      i++
+      return -factor()
+    }
+    if (peek() === '(') {
+      i++
+      const v = expr()
+      if (peek() !== ')') throw new Error('parentesi')
+      i++
+      return v
+    }
+    const m = /^\d+(\.\d+)?/.exec(s.slice(i))
+    if (!m) throw new Error('numero atteso')
+    i += m[0].length
+    return Number(m[0])
+  }
+  try {
+    const v = expr()
+    return i === s.length && Number.isFinite(v) ? v : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function evalFormula(ws: Worksheet, formula: string): number | undefined {
+  let s = formula.toUpperCase().replace(/\s+/g, '').replace(/;/g, ',')
+  // Funzioni su range → numero.
+  s = s.replace(/(SUM|SOMMA|AVERAGE|MEDIA|COUNT|CONTA(?:\.NUMERI)?|MIN|MAX)\(([A-Z]+\d+):([A-Z]+\d+)\)/g, (_m, name, a, b) => {
+    const vals = rangeNums(ws, a, b)
+    if (!vals) return 'ERR'
+    if (name === 'SUM' || name === 'SOMMA') return String(vals.reduce((x, y) => x + y, 0))
+    if (name === 'AVERAGE' || name === 'MEDIA') return vals.length ? String(vals.reduce((x, y) => x + y, 0) / vals.length) : 'ERR'
+    if (name.startsWith('COUNT') || name.startsWith('CONTA')) return String(vals.length)
+    if (name === 'MIN') return vals.length ? String(Math.min(...vals)) : 'ERR'
+    return vals.length ? String(Math.max(...vals)) : 'ERR'
+  })
+  if (s.includes('ERR')) return undefined
+  // Riferimenti singoli → valore numerico.
+  let bad = false
+  s = s.replace(/[A-Z]+\d+/g, (ref) => {
+    const m = /^([A-Z]+)(\d+)$/.exec(ref)!
+    const n = numOf(ws.getRow(Number(m[2])).getCell(colIndex(m[1])).value)
+    if (n === undefined) {
+      bad = true
+      return '0'
+    }
+    return String(n)
+  })
+  if (bad || /[A-Z]/.test(s)) return undefined // funzioni/riferimenti non supportati
+  return evalArith(s)
 }
 
 // Valore cella → testo mostrato (formule = risultato salvato nel file).
@@ -178,7 +341,13 @@ function cellText(v: CellValue, numFmt?: string): { text: string; num: boolean }
     if ('error' in v) return { text: String(v.error), num: false }
     if ('formula' in v || 'sharedFormula' in v) {
       const res = (v as { result?: CellValue }).result
-      return res === undefined ? { text: '', num: false } : cellText(res, numFmt)
+      // Senza risultato cached mostriamo la formula stessa (niente motore di
+      // ricalcolo per ora: Excel/Sheets la calcoleranno alla prossima apertura).
+      if (res === undefined) {
+        const f = (v as { formula?: string }).formula
+        return { text: f ? `=${f}` : '', num: false }
+      }
+      return cellText(res, numFmt)
     }
     if ('text' in v) return { text: String((v as { text: unknown }).text), num: false } // hyperlink
   }
@@ -188,6 +357,7 @@ function cellText(v: CellValue, numFmt?: string): { text: string; num: boolean }
 function toCellData(cell: Cell, palette: string[]): CellData {
   const { text, num } = cellText(cell.value, cell.numFmt)
   const out: CellData = { t: text, num }
+  if (typeof cell.value === 'boolean') out.chk = true
   const f = cell.font
   if (f?.bold) out.b = true
   if (f?.italic) out.i = true
@@ -325,6 +495,12 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const [error, setError] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewH, setViewH] = useState(600)
+  // Editing (Fase 2): cella in modifica + stato "non salvato".
+  const [editing, setEditing] = useState<{ r: number; c: number } | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const setBuffer = useAppStore((s) => s.setBuffer)
+  const clearBuffer = useAppStore((s) => s.clearBuffer)
   const cacheRef = useRef(new Map<number, SheetData>())
   const paletteRef = useRef<string[]>([]) // colori del tema del workbook
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -354,6 +530,19 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       const book = new ExcelJS.Workbook()
       await book.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
       if (cancelled) return
+      // Riapplica al workbook le modifiche non ancora salvate di questo file.
+      const edits = xlsxEditBuffers.get(filePath)
+      if (edits) {
+        for (const [key, val] of edits) {
+          const [si, r, c] = key.split(':').map(Number)
+          const ws = book.worksheets[si]
+          if (ws) ws.getRow(r + 1).getCell(c + 1).value = val
+        }
+        setDirty(true)
+      } else {
+        setDirty(false)
+      }
+      setEditing(null)
       setWb(book)
       setSheetNames(book.worksheets.map((w) => w.name))
       // Palette del tema (per i fill/font con {theme: n} degli export Google).
@@ -382,6 +571,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
 
   // Cambio foglio: costruzione pigra + cache.
   function selectSheet(i: number) {
+    setEditing(null) // niente input orfano sul foglio nuovo
     setActive(i)
     setScrollTop(0)
     scrollRef.current?.scrollTo({ top: 0 })
@@ -405,6 +595,82 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     obs.observe(el)
     return () => obs.disconnect()
   }, [loading])
+
+  // ---- Editing (Fase 2): la modifica va SUBITO nel workbook in memoria; il
+  // salvataggio è un writeBuffer che preserva stili/formati (spike verificato).
+
+  function commitEdit(r: number, c: number, raw: string) {
+    setEditing(null)
+    const ws = wb?.worksheets[active]
+    if (!ws || !sheet) return
+    const cellRef = ws.getRow(r + 1).getCell(c + 1)
+    const before = rawOf(cellRef)
+    if (raw === before) return // nessun cambiamento
+    let value = parseInput(raw)
+    // Formula: prova a calcolarla col mini-motore (aritmetica + SUM/MEDIA/…):
+    // il risultato va anche nel file come cached, così ogni app lo mostra.
+    if (value && typeof value === 'object' && 'formula' in value) {
+      const result = evalFormula(ws, (value as { formula: string }).formula)
+      if (result !== undefined) value = { formula: (value as { formula: string }).formula, result } as CellValue
+    }
+    cellRef.value = value
+    // Aggiorna il modello di render della sola cella (stili invariati).
+    const rebuilt = cellText(cellRef.value, cellRef.numFmt)
+    const cd = sheet.rows[r][c]
+    cd.t = rebuilt.text
+    cd.num = rebuilt.num
+    cd.chk = typeof cellRef.value === 'boolean'
+    setSheet({ ...sheet })
+    // Buffer per-file (sopravvive al cambio file) + pallino non salvato.
+    const key = `${active}:${r}:${c}`
+    const m = xlsxEditBuffers.get(filePath) ?? new Map<string, CellValue>()
+    m.set(key, cellRef.value)
+    xlsxEditBuffers.set(filePath, m)
+    setDirty(true)
+    setBuffer(filePath, '⟨foglio con modifiche non salvate⟩')
+  }
+
+  // Backup nascosto dell'originale prima della PRIMA scrittura (come PDF/DOCX).
+  async function ensureBak() {
+    const bak = `${filePath}.bak`
+    if (!(await exists(bak))) {
+      const orig = await readFile(filePath)
+      await writeFileBinaryAtomic(bak, orig)
+      invoke('set_hidden', { path: bak }).catch(() => {})
+    }
+  }
+
+  async function save() {
+    if (!wb || saving || !dirty) return
+    setSaving(true)
+    try {
+      const out = new Uint8Array(await wb.xlsx.writeBuffer())
+      await ensureBak()
+      await writeFileBinaryAtomic(filePath, out)
+      xlsxEditBuffers.delete(filePath)
+      setDirty(false)
+      clearBuffer(filePath)
+    } catch (e) {
+      console.error('Salvataggio xlsx:', e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Ctrl+S salva (solo xlsx: il CSV per ora è in sola lettura).
+  const saveRef = useRef(save)
+  saveRef.current = save
+  useEffect(() => {
+    if (isCsv) return
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        saveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isCsv])
 
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
@@ -432,6 +698,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0">
         <span className="text-sm text-zinc-300 truncate flex items-center gap-2 min-w-0">
           <span className="truncate">{fileName}</span>
+          {dirty && <span className="text-xs text-amber-400 shrink-0">• non salvato</span>}
           {sheet && (
             <span className="text-xs text-zinc-500 shrink-0">
               · {rows.length}×{widths.length}
@@ -440,6 +707,16 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           )}
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
+          {!isCsv && (
+            <button
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+              onClick={save}
+              disabled={saving || !dirty || loading}
+              title="Salva (Ctrl+S) — riscrive il file preservando stili e formule"
+            >
+              {saving ? 'Salvataggio…' : '💾 Salva'}
+            </button>
+          )}
           <ConvertButton filePath={filePath} className={btn} />
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
@@ -532,8 +809,42 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                               textAlign: (cell.align as 'left' | 'center' | 'right') ?? (cell.num ? 'right' : 'left'),
                             }}
                             title={!cell.wrap && cell.t.length > 40 ? cell.t : undefined}
+                            onClick={() => {
+                              // click singolo = modifica (le booleane hanno la checkbox)
+                              if (!isCsv && wb && !cell.chk) setEditing({ r, c })
+                            }}
                           >
-                            {cell.t}
+                            {cell.chk ? (
+                              <input
+                                type="checkbox"
+                                checked={cell.t === '☑'}
+                                disabled={isCsv}
+                                className="align-middle cursor-pointer"
+                                style={{ accentColor: '#2563eb' }}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => commitEdit(r, c, cell.t === '☑' ? 'FALSO' : 'VERO')}
+                              />
+                            ) : editing && editing.r === r && editing.c === c && wb ? (
+                              <input
+                                autoFocus
+                                defaultValue={rawOf(wb.worksheets[active].getRow(r + 1).getCell(c + 1))}
+                                className="block w-full h-full outline-none bg-white px-1.5 -mx-1.5"
+                                style={{
+                                  boxShadow: 'inset 0 0 0 2px #3b82f6',
+                                  color: '#1f2937',
+                                  fontSize: fs ?? 13,
+                                  minHeight: (heights[r] ?? DEFAULT_ROW_PX) - 1,
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitEdit(r, c, e.currentTarget.value)
+                                  else if (e.key === 'Escape') setEditing(null)
+                                  e.stopPropagation()
+                                }}
+                                onBlur={(e) => commitEdit(r, c, e.currentTarget.value)}
+                              />
+                            ) : (
+                              cell.t
+                            )}
                           </td>
                         )
                       })}
