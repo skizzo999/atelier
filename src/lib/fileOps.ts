@@ -28,6 +28,13 @@ export async function createFile(dir: string, name: string): Promise<string> {
     const wb = new ExcelJS.Workbook()
     wb.addWorksheet('Foglio 1')
     await writeFile(path, new Uint8Array(await wb.xlsx.writeBuffer()))
+  } else if (name.toLowerCase().endsWith('.pptx')) {
+    // Presentazione vera con una slide vuota (PptxGenJS, MIT).
+    const PptxGenJS = (await import('pptxgenjs')).default
+    const gen = new PptxGenJS()
+    gen.addSlide()
+    const blob = (await gen.write({ outputType: 'blob' })) as Blob
+    await writeFile(path, new Uint8Array(await blob.arrayBuffer()))
   } else {
     await writeTextFile(path, '')
   }

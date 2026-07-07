@@ -54,6 +54,7 @@
     "marked-highlight": "^2.2.4",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.0.227",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.1.0",
     "react-arborist": "^3.10.1",
     "react-dom": "^19.1.0",

@@ -410,6 +410,20 @@ export function optionsFor(path: string): ConvertOption[] {
   if (ext === 'xlsx' || ext === 'xlsm') {
     return [{ id: 'csv', label: 'CSV (primo foglio)', run: xlsxToCsv }]
   }
+  if (ext === 'pptx') {
+    return [
+      {
+        id: 'txt',
+        label: 'Testo (.txt)',
+        run: async (p) => {
+          const { pptxText } = await import('./pptx')
+          const dest = await uniquePathWithExt(p, 'txt')
+          await writeTextFile(dest, pptxText(await readFile(p)))
+          return dest
+        },
+      },
+    ]
+  }
   if (ext === 'csv') {
     return [
       { id: 'xlsx', label: 'Excel (.xlsx)', run: csvToXlsx },

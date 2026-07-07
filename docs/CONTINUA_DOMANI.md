@@ -3,16 +3,19 @@
 > Aggiornato al 2026-07-03, pomeriggio (si riprende STASERA). Dettaglio funzioni
 > in `docs/STATUS.md`; piano Office in `docs/PIANO_OFFICE.md`.
 
-## ⚡ Ripresa rapida (stasera)
-Siamo dentro il **pacchetto Office**: Fasi 0+1+2-core FATTE e testate (viewer
-Excel/CSV fedele + editing celle con mini-motore formule). Prossimo, in ordine:
-1. **Fase 2 restante**: menu tasto destro (aggiungi/elimina righe/colonne,
-   rinomina/aggiungi foglio — riusare il pattern menu di tableEditor) +
-   selezione multi-cella con copia TSV
-2. **Fase 14**: formattazione condizionale base (cellIs greaterThan/lessThan →
-   colori; è il rosso/verde del Tracker che l'utente vuole)
-3. **Fase 3**: pptx viewer (parser nostro fflate+DOMParser, pattern docxSectPr)
-4. Poi release (versione la decide l'utente) e Fase 15/16 (grafici, motore esteso)
+## ⚡ Ripresa rapida (post-compact 2026-07-04)
+**Pacchetto Office quasi completo**: Excel = viewer fedele + editor (celle,
+formule subset, fill handle, undo, sposta-selezione, righe/colonne, fogli,
+condizionale); PowerPoint = viewer + creazione. Tutto committato fino al blocco
+xlsx incluso. Prossimi, in ordine (deciso dall'utente):
+1. **"Funzioni pro" Excel** (suo screenshot del menu Excel): Ordina, Filtro,
+   Cancella contenuto, Formato celle/mini-toolbar (grassetto/colori/formati),
+   Taglia/Copia/Incolla nel menu tasto destro → vedi PIANO_OFFICE.md "PROSSIMO"
+2. **Blocco presentazioni**: tasto **Presenta** (fullscreen, frecce, Esc) +
+   **editor slide** — PRIMA fare ricerca librerie (regola reuse-first:
+   Fabric.js/Konva per canvas editing vs DOM nostro; confronto da portare
+   all'utente)
+3. Release quando lo dice lui.
 
 ---
 

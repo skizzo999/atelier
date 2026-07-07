@@ -200,11 +200,16 @@ Prossimi: stampa trasversale, pptx/xlsx.
 1. **Pacchetto Office** (piano in docs/PIANO_OFFICE.md): ✅ Fase 0 (spike → ExcelJS),
    ✅ Fase 1 (**XLSX/CSV viewer** fedele: griglia virtualizzata, tab fogli, celle
    unite, colori a tema, altezze/bordi/gridlines veri, wrap, font per cella;
-   rifinito sui 5 file reali), ✅ Fase 2 core (**editing celle** a click singolo,
-   checkbox, **mini-motore formule** SUM/MEDIA/CONTA/MIN/MAX + aritmetica, salva
-   con stili intatti e .bak) → restano: menu tasto destro righe/colonne + multi-
-   cella TSV (Fase 2), **formattazione condizionale base** (Fase 14), **Fase 3
-   pptx viewer** (parser nostro), motore formule esteso (Fase 16).
+   rifinito sui 5 file reali), ✅ Fase 2 COMPLETA (**editing celle** a click
+   singolo, checkbox, **mini-motore formule** SUM/MEDIA/CONTA/MIN/MAX +
+   aritmetica, menu tasto destro righe/colonne/fogli, selezione multi-cella
+   con Ctrl+C TSV e Canc, salva con stili intatti e .bak), ✅ Fase 14
+   (**formattazione condizionale**: cellIs + espressioni con AND/OR e shift
+   riferimenti — il rosso/verde del Tracker, verificato), ✅ Fase 3 (**PPTX
+   viewer** best-effort: parser nostro `lib/pptx.ts`, slide con testo stilato/
+   immagini/sfondi/theme, miniature, zoom; **Nuovo file → PowerPoint** via
+   PptxGenJS; ricerca globale nelle slide; Converti pptx→TXT) → restano:
+   grafici in lettura (Fase 15) e motore formule esteso (Fase 16).
 2. **Stampa** trasversale (a tutti i tipi di file, non solo immagini).
 3. (Opzionale) **OCR nativo Windows** (Windows.Media.Ocr) per OCR 100% offline.
    - Vale anche per il PDF: oggi l'OCR scarica il modello al 1° uso (rete).

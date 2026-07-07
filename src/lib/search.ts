@@ -126,6 +126,23 @@ function isXlsx(name: string): boolean {
   return /\.(xlsx|xlsm)$/i.test(name)
 }
 
+function isPptx(name: string): boolean {
+  return /\.pptx$/i.test(name)
+}
+
+// Testo delle slide di un pptx, in cache finché il file non cambia.
+const pptxTextCache = new Map<string, { mtime: number; text: string }>()
+
+async function pptxTextOf(path: string): Promise<string> {
+  const mtime = await mtimeOf(path)
+  const cached = pptxTextCache.get(path)
+  if (cached && cached.mtime === mtime) return cached.text
+  const { pptxText } = await import('./pptx') // pigra
+  const text = pptxText(await readFile(path))
+  pptxTextCache.set(path, { mtime, text })
+  return text
+}
+
 // Testo delle celle di un xlsx (tutti i fogli), in cache finché il file non cambia.
 const xlsxTextCache = new Map<string, { mtime: number; text: string }>()
 
@@ -204,10 +221,10 @@ export async function searchContent(
       if (results.length >= limit) break
       continue
     }
-    if (isDocx(f.name) || isXlsx(f.name)) {
+    if (isDocx(f.name) || isXlsx(f.name) || isPptx(f.name)) {
       let text: string
       try {
-        text = isDocx(f.name) ? await docxText(f.path) : await xlsxText(f.path)
+        text = isDocx(f.name) ? await docxText(f.path) : isXlsx(f.name) ? await xlsxText(f.path) : await pptxTextOf(f.path)
       } catch {
         continue
       }

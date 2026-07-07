@@ -68,26 +68,83 @@ pieno. Piano originale:
    1899) mostrate come ore. CSV in sola lettura per ora.
    → Il motore è il SEME della Fase 16: estenderlo lì (IF, ricalcolo a catena
    delle celle dipendenti — oggi ricalcola solo la cella editata).
-8. Tasto destro: aggiungi/elimina righe/colonne, rinomina/aggiungi foglio
-   (riuso pattern menu delle tabelle md)
-9. Selezione multi-cella + copia TSV (pattern già scritto in tableEditor)
+8. ✅ FATTO (2026-07-03 sera): menu tasto destro sulla griglia (aggiungi riga
+   sopra/sotto, duplica, elimina; colonna sx/dx, elimina; svuota selezione);
+   fogli: ＋ nuovo, doppio click sul tab = rinomina, ✕ elimina (con conferma).
+   Refactor buffer: ora si bufferizza l'INTERO workbook per file (regge le
+   operazioni strutturali, dove il buffer per-cella si rompeva)
+9. ✅ FATTO: selezione multi-cella col drag (tinta blu sopra i fill), Ctrl+C
+   = TSV incollabile in Excel, Canc = svuota, Esc = deseleziona; il click
+   singolo resta editing (drag ≠ click, come tableEditor)
+9b. ✅ Rifiniture dal test utente (2026-07-03 sera): **incolla multi-cella**
+   (TSV → distribuito dalle celle di destinazione, sia con selezione sia
+   incollando dentro l'editor di cella); **fogli nuovi con griglia vera**
+   (60×26 minimo, +30 righe oltre l'usato — prima erano vuoti e ineditabili);
+   **ridimensionamento colonne/righe** trascinando i bordi delle intestazioni
+   (persistito nel file: px→chars e px→pt); **formattazione condizionale con
+   semantica Excel corretta** (priorità crescente, primo-vince per proprietà,
+   stopIfTrue) — riverificata sul Tracker: max/min/148 rialzi, font bianco
+   del massimo preservato
 
-### Fase 3 — PPTX Viewer (best-effort dichiarato)
-10. Parser: unzip → `ppt/slides/slideN.xml` → shape con testo (posizione/corpo/
-    dimensioni in EMU), immagini da `ppt/media/`, sfondi solidi → render HTML/SVG
-    scalato per slide. Navigazione: miniature laterali (pattern PdfViewer)
-11. Ricerca globale nel testo delle slide
-12. (Dopo) PptxGenJS: creare pptx dalla modale Nuovo file + export
+### Fase 3 — PPTX Viewer (best-effort dichiarato) ✅ FATTA (2026-07-03 sera)
+10. ✅ Parser nostro `lib/pptx.ts` (fflate + DOMParser): slide in ordine dalla
+    presentazione, forme con posizione/dimensione EMU→px (ereditarietà dei
+    placeholder dal layout, 1 livello), testo con run stilati (sz/b/i/colore/
+    allineamento/bullet), sfondi e riempimenti pieni (srgbClr + schemeClr via
+    theme1.xml), immagini da ppt/media. Gli r:id letti dal DOM con fallback
+    regex (i DOM non-browser perdono gli attributi namespaced). Verificato su
+    un deck reale generato con PptxGenJS: 8/8 asserzioni. `PptxViewer.tsx`:
+    slide impilate con zoom/adatta, miniature laterali, testo bianco di
+    default sugli sfondi scuri. FUORI (dichiarato): gruppi trasformati,
+    gradienti, tabelle, grafici, animazioni, master (solo layout)
+11. ✅ Ricerca globale nel testo delle slide (regex sugli <a:t>, cache mtime)
+12. ✅ PptxGenJS 4.0.1 (MIT): "Nuovo file → PowerPoint" crea un deck vero con
+    una slide vuota — VIA l'ultimo placeholder "presto" dalla modale.
+    Converti: pptx → TXT
 
 ### Fase 4 — Convertitori Office (chiusura del cerchio)
 13. xlsx → CSV, CSV → xlsx ✅ (fatti con la Fase 1); pptx → testo/PNG per slide
 
+### Fase 2.6 — Editing avanzato (chiusura blocco xlsx, 2026-07-03 notte)
+9c. ✅ **Fill handle** (quadratino blu sull'angolo della selezione): trascina e
+    continua la serie — numeri con passo, date con passo in giorni, testo+numero
+    ("Voce 1"→"Voce 2"), altrimenti copia ciclica; anteprima durante il drag;
+    logica testata 8/8. ✅ **Ctrl+Z / Ctrl+Y** (annulla/ripeti, max 100 op):
+    copre edit di cella, incolla multi-cella, svuota, fill; le operazioni
+    STRUTTURALI (righe/colonne) azzerano la cronologia (gli indici slittano).
+    ✅ Selezione senza testo nativo di disturbo; click su lettera/numero =
+    seleziona colonna/riga intera.
+    **Decisione reuse-first (verificata via web)**: FortuneSheet/Luckysheet =
+    archiviati; il successore attivo è Univer, MA l'import/export xlsx è nel
+    tier Pro a pagamento e il round-trip perderebbe ciò che il suo modello non
+    rappresenta → si resta su ExcelJS + griglia nostra. Toolbar formattazione/
+    ordina/filtra/blocca riquadri = Fase 2.5 dopo le presentazioni.
+
+9d. ✅ Rifiniture UX Excel (2026-07-04): **editing in place** — click e scrivi,
+    niente casella di testo visibile (input trasparente che eredita font/
+    colore/allineamento della cella; la cella attiva ha solo il bordo blu 2px);
+    **bordo di selezione spesso** disegnato come overlay sul range (2px #1a73e8)
+    col **fill handle** sull'angolo; **trascina il bordo per SPOSTARE le celle**
+    (anteprima tratteggiata, clamp ai bordi del foglio, una sola op in
+    cronologia → Ctrl+Z la annulla; sposta i VALORI, non gli stili — v1).
+
+### PROSSIMO (dopo il compact del 2026-07-04): "funzioni pro"
+L'utente vuole le funzioni del menu tasto destro di Excel (suo screenshot):
+Taglia/Copia/Incolla nel menu, Inserisci/Elimina righe-colonne (già fatte),
+**Cancella contenuto**, **Filtro**, **Ordina** (per colonna), **Formato celle**
+(grassetto/corsivo/colori/formati numero — ExcelJS li scrive), eventuale
+mini-toolbar di formattazione sopra la griglia. Da fare sull'architettura
+attuale, voce per voce; reuse-first check già fatto (Univer scartata).
+
 ### Fase 5 — Verso l'Office "vero" (richiesto dall'utente il 2026-07-03)
 Ambizione dichiarata: pacchetto Office completo dentro Atelier. Livelli, in ordine
 di fattibilità/valore:
-14. **Formattazione condizionale base**: valutare le regole semplici (cellIs
-    greaterThan/lessThan/between, colorScale a 2-3 colori) lette da ExcelJS →
-    applicare i colori nel viewer. Copre il rosso/verde del Tracker.
+14. ✅ FATTA (2026-07-03 sera): regole **cellIs** (>, <, >=, <=, =, <>, between)
+    ed **espressioni** nel subset del motore (confronti, AND/OR, shift dei
+    riferimenti relativi con semantica Excel, $ assoluti) con memoizzazione.
+    Verificata sul Tracker reale: max/min evidenziati + 148 rialzi in 82 ms.
+    Fuori: colorScale/dataBar/iconSet (rare nei file utente, eventualmente poi).
+    ⚠ Statica: si ricalcola al load/rebuild del foglio, non a ogni edit di cella.
 15. **Grafici in lettura**: parse di `chart1.xml` (linee/barre/torta base) →
     ridisegnati con SVG nostro nella posizione dell'ancora. Progetto da 2-3
     sessioni; niente interattività (il dropdown "12 Months" del template Google

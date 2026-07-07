@@ -13,11 +13,9 @@ const MAIN_TYPES: FileType[] = [
   { ext: 'md', label: 'Markdown', icon: '📝' },
   { ext: 'docx', label: 'Word', icon: '📄' },
   { ext: 'xlsx', label: 'Excel', icon: '📊' },
+  { ext: 'pptx', label: 'PowerPoint', icon: '📽️' },
   { ext: 'txt', label: 'Testo', icon: '🗒️' },
 ]
-
-// In arrivo: mostrati ma non selezionabili (promemoria di cosa manca).
-const FUTURE_TYPES: FileType[] = [{ ext: 'pptx', label: 'PowerPoint', icon: '📽️', disabled: true }]
 
 // Programmazione (lista a cascata): qualche esempio, si estende in futuro.
 const CODE_TYPES: FileType[] = [
@@ -151,10 +149,6 @@ export function NewFileModal({
           <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Tipo</p>
           <div className="flex-1 overflow-y-auto max-h-72 flex flex-col gap-0.5 pr-1">
             {MAIN_TYPES.map((t) => (
-              <TypeRow key={t.ext} t={t} />
-            ))}
-            <div className="h-px bg-zinc-800 my-1" />
-            {FUTURE_TYPES.map((t) => (
               <TypeRow key={t.ext} t={t} />
             ))}
             <div className="h-px bg-zinc-800 my-1" />

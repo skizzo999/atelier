@@ -10,10 +10,11 @@ const PdfViewer = lazy(() => import('../PdfViewer/PdfViewer').then((m) => ({ def
 const DocxEditor = lazy(() => import('../DocxEditor/DocxEditor').then((m) => ({ default: m.DocxEditor })))
 const Editor = lazy(() => import('../Editor/Editor').then((m) => ({ default: m.Editor })))
 const XlsxViewer = lazy(() => import('../XlsxViewer/XlsxViewer').then((m) => ({ default: m.XlsxViewer })))
+const PptxViewer = lazy(() => import('../PptxViewer/PptxViewer').then((m) => ({ default: m.PptxViewer })))
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 
-type FileKind = 'image' | 'pdf' | 'docx' | 'sheet' | 'text'
+type FileKind = 'image' | 'pdf' | 'docx' | 'sheet' | 'pptx' | 'text'
 
 function kindOf(path: string): FileKind {
   const ext = path.split('.').pop()?.toLowerCase()
@@ -21,6 +22,7 @@ function kindOf(path: string): FileKind {
   if (ext === 'pdf') return 'pdf'
   if (ext === 'docx') return 'docx'
   if (ext === 'xlsx' || ext === 'xlsm' || ext === 'csv') return 'sheet'
+  if (ext === 'pptx') return 'pptx'
   return 'text'
 }
 
@@ -54,6 +56,8 @@ export function FileView() {
         <DocxEditor key={filePath} filePath={filePath} />
       ) : kind === 'sheet' ? (
         <XlsxViewer key={filePath} filePath={filePath} />
+      ) : kind === 'pptx' ? (
+        <PptxViewer key={filePath} filePath={filePath} />
       ) : (
         <Editor />
       )}
