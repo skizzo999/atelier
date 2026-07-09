@@ -3,19 +3,54 @@
 > Aggiornato al 2026-07-03, pomeriggio (si riprende STASERA). Dettaglio funzioni
 > in `docs/STATUS.md`; piano Office in `docs/PIANO_OFFICE.md`.
 
-## ⚡ Ripresa rapida (post-compact 2026-07-04)
-**Pacchetto Office quasi completo**: Excel = viewer fedele + editor (celle,
-formule subset, fill handle, undo, sposta-selezione, righe/colonne, fogli,
-condizionale); PowerPoint = viewer + creazione. Tutto committato fino al blocco
-xlsx incluso. Prossimi, in ordine (deciso dall'utente):
-1. **"Funzioni pro" Excel** (suo screenshot del menu Excel): Ordina, Filtro,
-   Cancella contenuto, Formato celle/mini-toolbar (grassetto/colori/formati),
-   Taglia/Copia/Incolla nel menu tasto destro → vedi PIANO_OFFICE.md "PROSSIMO"
-2. **Blocco presentazioni**: tasto **Presenta** (fullscreen, frecce, Esc) +
+## ⚡ Ripresa rapida (aggiornata 2026-07-08)
+**Direzione dichiarata dall'utente: "ricreare interamente Excel dentro
+Atelier"**. Excel = viewer fedele + editor + funzioni pro (9e) + **drop 1
+di Excel-completo** (9f): **motore formule vero** (fast-formula-parser MIT,
+~280 funzioni, ricalcolo live, alias italiani =SOMMA/=SE, `$` bloccati nel
+fill), **barra della formula** (nome + fx), **Formato celle** (bordi per
+lato/stile/colore + gradiente), **stili tabella predefiniti**, ordinamento
+numerico. In più (2026-07-08, feedback utente): **modalità formula COMPLETA** (click
+su una cella inserisce il riferimento, drag = range, ogni riferimento
+COLORATO come Excel: riquadro tratteggiato sulla cella + testo dello stesso
+colore nella formula), **fix allineamento** dell'overlay (celle e numero di
+riga ad altezza fissa = geometria sempre uguale al modello, auto-fit riga
+al font), **rowSpan vero** per le unioni verticali + **banner che
+debordano** (titolo 42pt di "Pro e contro" era tagliato) e **fix clamp dei
+range** (rowCount vs actualRowCount sui fogli sparsi). Terzo giro:
+**auto-fit delle righe al contenuto come Google** (i template esportano
+altezze stantie: banner in righe da 6pt — fix del glyph soup di Orario
+settimanale e del titolo sovrapposto in Pro e contro) e **fill handle
+visibile anche mentre scrivi** (il drag committa e poi riempie), **mini-menu
+del tasto Canc** (Solo contenuto / Solo formattazione / Tutto; Backspace =
+contenuto diretto). Tutto riprodotto e verificato in un harness browser col
+componente VERO (0 righe fuori modello su Pro e contro e Orario, delta
+overlay 0.00). L'utente ha detto "funziona tutto" su tutto il resto.
+**2026-07-09 — ULTIMO MIGLIO fatto (sezione 9h, da testare)**: tastiera
+completa (frecce/Invio scende/Tab/Ctrl+frecce/F2/scrivi-per-sostituire —
+⚠ il click ora SELEZIONA come Excel, si edita scrivendo, con F2 o doppio
+click), copia/incolla ricco (formule traslate + stili; Taglia svuota
+l'origine all'incolla, un solo Ctrl+Z), blocca riquadri (round-trip nel
+file + menu tasto destro), doppio click sul bordo colonna = auto-adatta.
+**2026-07-09 sera — giro "SPAESAMENTO" fatto (9i, da testare)**: date/orari/
+percentuali digitati riconosciuti, barra di stato Somma/Media/Conteggio,
+autocompletamento formule (=SO → SOMMA…), F4 cicla i $, Ctrl+D/R, doppio
+click sul fill handle, Shift+click, selezione multipla dalle intestazioni,
+Ctrl+F trova nel foglio, e **formule traslate su inserimento/eliminazione
+righe-colonne** (il buco di correttezza, chiuso con semantica Excel piena).
+Release v0.3.0: la decide l'utente dopo il test di 9h+9i.
+Tutto in sezione 9e-9i di PIANO_OFFICE.md; build verde, 78 test
+headless, **da testare a mano, NON ancora committato**. Prossimi:
+1. L'utente testa 9e+9f → fix → commit quando lo dice lui.
+2. **Backlog Excel-completo da prioritizzare con lui** (fine di 9f in
+   PIANO_OFFICE.md): blocca riquadri, formati numero/date, unione celle da
+   UI, trova e sostituisci, validazione dati, formule su insert/delete,
+   grafici (Fase 15), CF dopo ogni edit.
+3. **Blocco presentazioni**: tasto **Presenta** (fullscreen, frecce, Esc) +
    **editor slide** — PRIMA fare ricerca librerie (regola reuse-first:
    Fabric.js/Konva per canvas editing vs DOM nostro; confronto da portare
    all'utente)
-3. Release quando lo dice lui.
+4. Release quando lo dice lui.
 
 ---
 

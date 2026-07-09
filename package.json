@@ -47,6 +47,7 @@
     "docx": "^9.7.1",
     "dompurify": "^3.4.11",
     "exceljs": "^4.4.0",
+    "fast-formula-parser": "^1.0.19",
     "fflate": "^0.8.3",
     "highlight.js": "^11.11.1",
     "mammoth": "^1.12.0",
