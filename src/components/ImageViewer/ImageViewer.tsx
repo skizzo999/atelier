@@ -94,9 +94,9 @@ function cropCanvas(
   return c
 }
 
-const toolBtn =
-  'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
-const activeChip = 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded font-medium'
+// Pattern toolbar condiviso (index.css): fantasma + attivo blu pieno.
+const toolBtn = 'tbtn'
+const activeChip = 'tbtn tbtn-on'
 
 interface CropRect {
   x: number
@@ -1158,7 +1158,7 @@ function EditableImage({ filePath }: { filePath: string }) {
         <span className="text-sm text-zinc-400 truncate flex items-center gap-2">
           {dirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
           {fileName}
-          <span className="text-xs text-zinc-600">
+          <span className="text-xs text-zinc-500">
             {dims.w}×{dims.h}
           </span>
         </span>
@@ -1181,7 +1181,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           <button
             onClick={applyCrop}
             disabled={!cropRect || cropRect.w < 2 || cropRect.h < 2}
-            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+            className="px-3 h-7 btn-accent rounded-md text-xs disabled:opacity-40"
             title="Modifica la foto corrente"
           >
             Applica
@@ -1191,25 +1191,29 @@ function EditableImage({ filePath }: { filePath: string }) {
         <div className="px-4 py-1.5 border-b border-zinc-800 flex items-center gap-1.5 text-xs flex-wrap">
           {(
             [
-              ['select', '⬚ Selez.'],
-              ['pen1', '✏︎ Penna 1'],
-              ['pen2', '✏︎ Penna 2'],
-              ['arrow', '↗ Freccia'],
-              ['shape', '▭ Forme'],
-              ['text', 'T Testo'],
-              ['eraser', '⌫ Gomma'],
-              ['pan', '✋'],
+              ['select', 'Selez.'],
+              ['pen1', 'Penna 1'],
+              ['pen2', 'Penna 2'],
+              ['arrow', 'Freccia'],
+              ['shape', 'Forme'],
+              ['text', 'Testo'],
+              ['eraser', 'Gomma'],
             ] as [AnnotTool, string][]
           ).map(([t, label]) => (
-            <button
-              key={t}
-              onClick={() => setTool(t)}
-              title={t === 'pan' ? 'Sposta (anche con barra spazio o tasto centrale)' : undefined}
-              className={tool === t ? activeChip : toolBtn}
-            >
+            <button key={t} onClick={() => setTool(t)} className={tool === t ? activeChip : toolBtn}>
               {label}
             </button>
           ))}
+          <button
+            onClick={() => setTool('pan')}
+            title="Sposta la vista (anche con barra spazio o tasto centrale)"
+            className={tool === 'pan' ? activeChip : toolBtn}
+          >
+            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5.2 7.4V3.9a1 1 0 0 1 2 0v3M7.2 6.6V3a1 1 0 0 1 2 0v3.6M9.2 6.8V3.8a1 1 0 0 1 2 0v4.4" />
+              <path d="M11.2 8.2c.5-1 1.9-.8 1.9.3 0 2.6-1 4.1-1.8 5-.6.7-1.5 1-2.5 1H8c-1.6 0-2.6-.8-3.3-2L3 9.9c-.6-1 .7-1.9 1.5-1.1l.7.8V7.4" />
+            </svg>
+          </button>
 
           <div className="w-px h-5 bg-zinc-700 mx-1" />
 
@@ -1392,7 +1396,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           <button
             onClick={applyAnnotations}
             disabled={shapes.length === 0}
-            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+            className="px-3 h-7 btn-accent rounded-md text-xs disabled:opacity-40"
             title="Applica le annotazioni alla foto"
           >
             Applica
@@ -1434,7 +1438,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           </button>
           <button
             onClick={applyAdjust}
-            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white"
+            className="px-3 h-7 btn-accent rounded-md text-xs"
             title="Applica le regolazioni"
           >
             Applica
@@ -1478,7 +1482,7 @@ function EditableImage({ filePath }: { filePath: string }) {
             onClick={() => setInfoOpen((o) => !o)}
             title="Informazioni"
           >
-            ⓘ Info
+            Info
           </button>
           <button className={toolBtn} disabled={!canEdit || ocrRunning} onClick={runOcr} title="Estrai testo (OCR)">
             {ocrRunning ? 'OCR…' : 'OCR'}
@@ -1512,7 +1516,7 @@ function EditableImage({ filePath }: { filePath: string }) {
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-40"
+            className="px-3 h-7 btn-accent rounded-md text-xs disabled:opacity-40"
           >
             {saving ? 'Salvataggio…' : 'Salva'}
           </button>
@@ -1665,7 +1669,7 @@ function EditableImage({ filePath }: { filePath: string }) {
                   <div className="mt-2 h-1 bg-zinc-800 rounded overflow-hidden">
                     <div className="h-full bg-zinc-400" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
                   </div>
-                  <div className="mt-2 text-xs text-zinc-600">(al primo uso scarica il modello lingua)</div>
+                  <div className="mt-2 text-xs text-zinc-500">(al primo uso scarica il modello lingua)</div>
                 </div>
               ) : (
                 <>
@@ -1683,7 +1687,7 @@ function EditableImage({ filePath }: { filePath: string }) {
                     </button>
                     <button
                       onClick={() => setOcrText(null)}
-                      className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white"
+                      className="px-3 h-7 btn-accent rounded-md text-xs"
                     >
                       Chiudi
                     </button>
@@ -1769,7 +1773,7 @@ function ResizeModal({
           </button>
           <button
             onClick={() => onApply(w, h)}
-            className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white"
+            className="px-3 py-1.5 text-xs btn-accent rounded-md"
           >
             Applica
           </button>
@@ -1844,7 +1848,7 @@ function ViewOnlyImage({ filePath }: { filePath: string }) {
             Explorer
           </button>
           <button className={infoOpen ? activeChip : toolBtn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
-            ⓘ Info
+            Info
           </button>
           <div className="w-px h-5 bg-zinc-700 mx-1" />
           <button className={toolBtn} title="Riduci" onClick={() => zoomBy(1 / 1.25)}>

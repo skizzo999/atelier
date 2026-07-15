@@ -1,9 +1,30 @@
 # Prossimi step - Continuità
 
-> Aggiornato al 2026-07-03, pomeriggio (si riprende STASERA). Dettaglio funzioni
-> in `docs/STATUS.md`; piano Office in `docs/PIANO_OFFICE.md`.
+> Aggiornato al 2026-07-12. Dettaglio funzioni in `docs/STATUS.md`; piano
+> Office in `docs/PIANO_OFFICE.md`; diari in `docs/sessions/`.
 
-## ⚡ Ripresa rapida (aggiornata 2026-07-08)
+## 🚀 v0.3.0 RILASCIATA (2026-07-12)
+Tag `v0.3.0` → release automatica Win+macOS (GitHub Actions). Dentro:
+**pacchetto Excel completo** (griglia fedele + editor + motore formule
+fast-formula-parser ~280 funzioni + tastiera completa + incolla ricco +
+blocca riquadri + undo strutturale + tutto 9a-9i di PIANO_OFFICE.md) e
+**nuova veste grafica** (tema freddo grigio/bianco/azzurro/blu, Explorer
+stile Obsidian ridimensionabile/nascondibile, titlebar custom, TAB dei file
+riordinabili col drag, pattern unico dei toolbar con primari a gradiente,
+ConfirmDialog in-app, zero emoji). Landing già riconvertita alla stessa
+palette (og.png da rigenerare; FORM_ENDPOINT del form ancora vuoto).
+
+## ▶ PROSSIMO: blocco presentazioni (pptx)
+Deciso dall'utente ("nuova versione e poi pensiamo a pptx"):
+1. **PRIMA la ricerca librerie** (regola reuse-first): editor slide su
+   canvas (Fabric.js/Konva) vs DOM nostro; criterio = round-trip sui pptx
+   veri. Confronto da portare all'utente.
+2. Tasto **Presenta** (fullscreen, frecce/click avanti, Esc esce).
+3. Editor slide vero (testo, forme, immagini, riordino slide).
+Poi in coda: backlog Excel v0.3.x (grafici, validazione dati, formati
+numero completi), restyling fine dei toolbar con icone SVG, og.png landing.
+
+## ⚡ Ripresa rapida (storico, 2026-07-08)
 **Direzione dichiarata dall'utente: "ricreare interamente Excel dentro
 Atelier"**. Excel = viewer fedele + editor + funzioni pro (9e) + **drop 1
 di Excel-completo** (9f): **motore formule vero** (fast-formula-parser MIT,
@@ -40,7 +61,21 @@ Ctrl+F trova nel foglio, e **formule traslate su inserimento/eliminazione
 righe-colonne** (il buco di correttezza, chiuso con semantica Excel piena).
 Release v0.3.0: la decide l'utente dopo il test di 9h+9i.
 Tutto in sezione 9e-9i di PIANO_OFFICE.md; build verde, 78 test
-headless, **da testare a mano, NON ancora committato**. Prossimi:
+headless, committato e pushato (5a1be0c).
+**2026-07-11/12 — PARTE GRAFICA (da testare, NON committato)**: dopo il
+feedback dell'utente sul giro 1 caldo ("troppo morto"), tema DEFINITIVO
+freddo **grigio · bianco · azzurro · blu**: zinc→slate in tailwind.config,
+bottoni fondamentali col gradiente azzurro→blu (.btn-accent) che si staccano
+dai grigi, **Explorer stile Obsidian** (chevron, badge estensione, guide di
+rientro, niente emoji), **barra del titolo custom** (decorations:false —
+⚠ serve riavvio completo di `pnpm tauri dev`), **TAB per più file aperti**
+(store openTabs + TabBar, ✕/click centrale, rimappa su rinomina/sposta),
+**ConfirmDialog in-app** (via il confirm nativo, voce chiusa), emoji rimosse
+dai toolbar. **Landing riconvertita alla stessa palette** (og.png da
+rigenerare da og-source.svg). Landing blocker: FORM_ENDPOINT vuoto in
+assets/main.js. Diario completo: docs/sessions/2026-07-11_tema-workshop.md.
+Domani: test utente, set icone SVG organico, rifiniture, commit.
+Prossimi:
 1. L'utente testa 9e+9f → fix → commit quando lo dice lui.
 2. **Backlog Excel-completo da prioritizzare con lui** (fine di 9f in
    PIANO_OFFICE.md): blocca riquadri, formati numero/date, unione celle da

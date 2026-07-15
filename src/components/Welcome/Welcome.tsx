@@ -66,7 +66,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-zinc-900 text-zinc-100">
+    <div className="flex flex-1 min-h-0 w-full bg-zinc-900 text-zinc-100">
       {/* Sinistra: vault conosciuti */}
       <aside className="w-72 shrink-0 bg-zinc-950 border-r border-zinc-800 flex flex-col">
         <div className="px-4 py-3 border-b border-zinc-800">
@@ -74,7 +74,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {knownVaults.length === 0 && (
-            <p className="text-xs text-zinc-600 px-2 py-3">
+            <p className="text-xs text-zinc-500 px-2 py-3">
               Nessun vault ancora: creane uno o apri una cartella →
             </p>
           )}
@@ -87,7 +87,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-zinc-200 truncate">{v.name}</p>
-                <p className="text-[11px] text-zinc-600 truncate">{v.path}</p>
+                <p className="text-[11px] text-zinc-500 truncate">{v.path}</p>
               </div>
               <button
                 className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1"
@@ -108,8 +108,15 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
       <main className="flex-1 flex items-center justify-center p-8">
         <div className="w-[26rem] flex flex-col gap-6">
           <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight">Atelier</h1>
-            <p className="mt-2 text-sm text-zinc-500">Il tuo spazio di lavoro locale.</p>
+            <div className="flex items-center justify-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-display text-2xl text-blue-500 leading-none">
+                A
+              </span>
+              <h1 className="text-4xl font-display font-medium tracking-tight">Atelier</h1>
+            </div>
+            <p className="mt-3 text-sm text-zinc-500">
+              Ogni file. Un workspace. <span className="italic text-blue-500">Zero cloud.</span>
+            </p>
           </div>
 
           <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl divide-y divide-zinc-800">
@@ -123,7 +130,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
               <button
                 onClick={() => setCreating(true)}
                 disabled={busy}
-                className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg font-medium text-sm hover:bg-white disabled:opacity-50 transition-colors shrink-0"
+                className="px-4 py-2 btn-accent rounded-lg text-sm disabled:opacity-50 transition-colors shrink-0"
               >
                 Crea
               </button>
@@ -168,7 +175,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
                 <button
                   onClick={handleCreate}
                   disabled={busy || !name.trim()}
-                  className="flex-1 px-4 py-2 bg-zinc-100 text-zinc-900 rounded font-medium text-sm hover:bg-white disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 btn-accent rounded text-sm disabled:opacity-50 transition-colors"
                 >
                   Scegli posizione e crea
                 </button>

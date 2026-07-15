@@ -6,6 +6,7 @@ import { revealInExplorer } from '../../lib/imageActions'
 import { writeFileBinaryAtomic } from '../../lib/fileOps'
 import { useAppStore } from '../../store/appStore'
 import { ConvertButton } from '../Convert/ConvertButton'
+import { ConfirmDialog } from '../ConfirmDialog'
 import { parseCsv } from '../../lib/csv'
 // Solo funzioni pure: il parser vero (fast-formula-parser) è caricato pigro
 // dentro recalcSheet, al primo ricalcolo.
@@ -20,8 +21,17 @@ interface HistOp {
   // Modifiche di FORMATO (grassetto/colori/allineamento/formato numero):
   // snapshot JSON prima/dopo di font+fill+alignment+numFmt della cella.
   styles?: { r: number; c: number; before: string; after: string }[]
+  // Operazioni STRUTTURALI (righe/colonne): snapshot completo del modello
+  // del foglio prima/dopo — così anche queste si annullano con Ctrl+Z.
+  // Presente solo sotto la soglia di righe (clonare fogli enormi costa).
+  model?: { before: unknown; after: unknown }
 }
 const xlsxHistory = new Map<string, { undo: HistOp[]; redo: HistOp[] }>()
+
+// Soglia per lo snapshot strutturale e tetto di snapshot in cronologia
+// (pesano: un modello da migliaia di righe sono megabyte).
+const SNAP_MAX_ROWS = 4000
+const SNAP_MAX_OPS = 12
 
 type Range = { r1: number; c1: number; r2: number; c2: number }
 
@@ -309,7 +319,7 @@ function resolveColor(c: { argb?: string; theme?: number } | undefined, palette:
   return undefined
 }
 
-const btn = 'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
 // Stili tabella predefiniti ("Formatta come tabella" di Excel, in piccolo):
 // intestazione piena + righe alternate + bordi sottili coordinati.
@@ -974,6 +984,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const [submenu, setSubmenu] = useState<string | null>(null) // sottomenu aperto (Riga/Colonna/Ordina)
   const [filterMenu, setFilterMenu] = useState<{ c: number; x: number; y: number } | null>(null) // dropdown filtro
   const [renamingSheet, setRenamingSheet] = useState<number | null>(null)
+  const [sheetAsk, setSheetAsk] = useState<number | null>(null) // conferma eliminazione foglio
   // Barra della formula (casella nome + fx) e finestre di formattazione.
   const [fxDraft, setFxDraft] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState<string | null>(null)
@@ -1223,19 +1234,43 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   // Con `adjust` le FORMULE del foglio vengono riscritte come fa Excel
   // (riferimenti traslati, range allargati/accorciati, #REF! sui cancellati);
   // prima si materializzano le formule condivise (indirizzi stantii).
-  function structural(mutate: (ws: Worksheet) => void, adjust?: { kind: AdjustKind; pos: number }) {
+  function structural(mutate: (ws: Worksheet) => void, adjust?: { kind: AdjustKind; pos: number; count?: number }) {
     const ws = wb?.worksheets[active]
     if (!ws) return
     setEditing(null)
     setSelRange(null)
+    // Snapshot del foglio PRIMA dell'operazione: rende annullabili anche le
+    // operazioni strutturali (Ctrl+Z dopo "Elimina righe" le riporta in vita).
+    let before: unknown = null
+    if ((ws.rowCount || 0) <= SNAP_MAX_ROWS) {
+      try {
+        before = structuredClone(ws.model)
+      } catch {
+        before = null
+      }
+    }
     try {
       if (adjust) materializeSharedFormulas(ws)
       mutate(ws)
-      if (adjust) adjustSheetFormulas(ws, adjust.kind, adjust.pos)
+      // le formule del foglio si traslano per OGNI riga/colonna toccata
+      if (adjust) for (let i = 0; i < (adjust.count ?? 1); i++) adjustSheetFormulas(ws, adjust.kind, adjust.pos)
     } catch (e) {
       console.error('Operazione non riuscita:', e)
     }
-    xlsxHistory.delete(filePath)
+    if (before) {
+      try {
+        const after = structuredClone(ws.model)
+        const h = xlsxHistory.get(filePath) ?? { undo: [], redo: [] }
+        h.undo.push({ sheet: active, cells: [], model: { before, after } })
+        while (h.undo.length > 100 || h.undo.filter((o) => o.model).length > SNAP_MAX_OPS) h.undo.shift()
+        h.redo = []
+        xlsxHistory.set(filePath, h)
+      } catch {
+        xlsxHistory.delete(filePath)
+      }
+    } else {
+      xlsxHistory.delete(filePath) // foglio troppo grande: come prima
+    }
     rebuildActive()
     markDirty()
     void recalcAndRefresh()
@@ -1271,6 +1306,24 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     if (op.sheet !== active) selectSheet(op.sheet) // torna sul foglio giusto
     const ws = wb?.worksheets[op.sheet]
     if (!ws) return
+    // Operazione STRUTTURALE: si ripristina l'intero modello del foglio
+    // (ri-clonato: il foglio vivo non deve mutare lo snapshot in cronologia).
+    if (op.model) {
+      try {
+        ;(ws as unknown as { model: unknown }).model = structuredClone(redo ? op.model.after : op.model.before)
+      } catch (e) {
+        console.error('Ripristino struttura non riuscito:', e)
+        return
+      }
+      ;(redo ? h.undo : h.redo).push(op)
+      setSelRange(null) // gli indici di righe/colonne sono cambiati
+      navFocus.current = null
+      cacheRef.current.delete(op.sheet)
+      rebuildActive()
+      markDirty()
+      void recalcAndRefresh()
+      return
+    }
     // Annullando si applica in ordine INVERSO: se un'operazione tocca due
     // volte la stessa cella (es. taglia+incolla sovrapposti) il "before"
     // giusto è quello della prima scrittura.
@@ -2097,11 +2150,15 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     }
   }
 
-  async function removeSheet(i: number) {
+  // La conferma passa dalla modale in-app (ConfirmDialog), niente dialog nativo.
+  function removeSheet(i: number) {
     if (!wb || wb.worksheets.length <= 1) return
-    const { confirm } = await import('@tauri-apps/plugin-dialog')
-    const ok = await confirm(`Eliminare il foglio "${wb.worksheets[i].name}"?`, { title: 'Atelier', kind: 'warning' })
-    if (!ok) return
+    setSheetAsk(i)
+  }
+
+  function doRemoveSheet(i: number) {
+    setSheetAsk(null)
+    if (!wb || wb.worksheets.length <= 1) return
     wb.removeWorksheet(wb.worksheets[i].id)
     cacheRef.current.clear() // gli indici dei fogli slittano
     setSheetNames(wb.worksheets.map((w) => w.name))
@@ -2409,12 +2466,12 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           {!isCsv && (
             <button
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+              className="px-2.5 py-1 btn-accent rounded disabled:opacity-40"
               onClick={save}
               disabled={saving || !dirty || loading}
               title="Salva (Ctrl+S) — riscrive il file preservando stili e formule"
             >
-              {saving ? 'Salvataggio…' : '💾 Salva'}
+              {saving ? 'Salvataggio…' : 'Salva'}
             </button>
           )}
           <ConvertButton filePath={filePath} className={btn} />
@@ -2493,7 +2550,13 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             />
           </label>
           <label className="flex items-center gap-1 cursor-pointer" title="Colore riempimento">
-            <span className={fmtTarget ? '' : 'opacity-40'}>🪣</span>
+            <svg
+              viewBox="0 0 16 16"
+              className={`w-4 h-4 ${fmtTarget ? 'text-zinc-300' : 'opacity-40'}`}
+              fill="currentColor"
+            >
+              <path d="M8 2.2c2.6 2.7 4.2 4.7 4.2 6.6a4.2 4.2 0 1 1-8.4 0C3.8 6.9 5.4 4.9 8 2.2z" />
+            </svg>
             <input
               type="color"
               disabled={!fmtTarget}
@@ -2552,7 +2615,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             className="px-2 py-0.5 rounded hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
             onClick={() => setFmtDialog(true)}
           >
-            ⊞ Formato celle
+            Formato celle
           </button>
           <button
             title="Formatta la selezione come tabella (intestazione + righe alternate)"
@@ -2560,7 +2623,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             className="px-2 py-0.5 rounded hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
             onClick={(e) => setTableMenu({ x: e.clientX, y: e.clientY })}
           >
-            🗔 Tabella
+            Tabella
           </button>
         </div>
       )}
@@ -2602,7 +2665,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               disabled={!fmtTarget || !!editing}
               placeholder={editing ? 'Stai scrivendo nella cella…' : fmtTarget ? '' : 'Seleziona una cella'}
               className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
-              style={{ color: fxColors && !editing ? 'transparent' : '#e4e4e7', caretColor: '#e4e4e7' }}
+              style={{ color: fxColors && !editing ? 'transparent' : '#e2e8f0', caretColor: '#e2e8f0' }}
               value={editing ? '' : (fxDraft ?? (anchorCell ? rawOf(anchorCell) : ''))}
               onChange={(e) => {
                 setFxDraft(e.target.value)
@@ -2633,7 +2696,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               }}
             />
             {!editing &&
-              fxMirror('px-2 py-1 font-mono text-xs border border-transparent rounded', { color: '#e4e4e7', lineHeight: '16px' })}
+              fxMirror('px-2 py-1 font-mono text-xs border border-transparent rounded', { color: '#e2e8f0', lineHeight: '16px' })}
           </div>
         </div>
       )}
@@ -2863,13 +2926,13 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                               background: cell.bg,
                               // cella attiva (editing) = bordo Excel; selezione = tinta
                               boxShadow: isEditing
-                                ? 'inset 0 0 0 2px #1a73e8'
+                                ? 'inset 0 0 0 2px #2563eb'
                                 : inSel
-                                  ? 'inset 0 0 0 999px rgba(59,130,246,0.14)'
+                                  ? 'inset 0 0 0 999px rgba(59,130,246,0.15)'
                                   : isFind
                                     ? 'inset 0 0 0 999px rgba(250,204,21,0.35)' // risultato Ctrl+F
                                     : inFill
-                                      ? 'inset 0 0 0 999px rgba(59,130,246,0.08)'
+                                      ? 'inset 0 0 0 999px rgba(59,130,246,0.09)'
                                       : undefined,
                               color: cell.color ?? '#1f2937',
                               fontWeight: cell.b ? 700 : 400,
@@ -3169,7 +3232,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                       top: y,
                       width: wSel,
                       height: hSel,
-                      border: '2px solid #1a73e8',
+                      border: '2px solid #2563eb',
                       pointerEvents: 'none',
                       zIndex: 5,
                     }}
@@ -3185,7 +3248,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                           bottom: -5,
                           width: 9,
                           height: 9,
-                          background: '#1a73e8',
+                          background: '#2563eb',
                           border: '1px solid #ffffff',
                           pointerEvents: 'auto',
                           cursor: 'crosshair',
@@ -3214,7 +3277,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                       top: ROW_H + (offsets[movePreview.r1] ?? 0),
                       width: colX(movePreview.c2 + 1) - x,
                       height: (offsets[movePreview.r2 + 1] ?? totalH) - (offsets[movePreview.r1] ?? 0),
-                      border: '2px dashed #1a73e8',
+                      border: '2px dashed #2563eb',
                       pointerEvents: 'none',
                       zIndex: 5,
                     }}
@@ -3246,7 +3309,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                         lineHeight: '13px',
                         borderRadius: 3,
                         border: '1px solid #9ca3af',
-                        background: activeF ? '#1a73e8' : 'rgba(255,255,255,0.92)',
+                        background: activeF ? '#2563eb' : 'rgba(255,255,255,0.92)',
                         color: activeF ? '#ffffff' : '#4b5563',
                         cursor: 'pointer',
                       }}
@@ -3322,6 +3385,14 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           {(() => {
             const mr: Range = selRange ?? { r1: menu.r, r2: menu.r, c1: menu.c, c2: menu.c }
             const canSort = mr.r2 > mr.r1
+            // Selezione multi-riga/colonna che include il punto del click →
+            // le voci Riga/Colonna operano su TUTTE le righe/colonne selezionate.
+            const rMulti = mr.r2 > mr.r1 && menu.r >= mr.r1 && menu.r <= mr.r2
+            const rN = rMulti ? mr.r2 - mr.r1 + 1 : 1
+            const rStart = rMulti ? mr.r1 : menu.r
+            const cMulti = mr.c2 > mr.c1 && menu.c >= mr.c1 && menu.c <= mr.c2
+            const cN = cMulti ? mr.c2 - mr.c1 + 1 : 1
+            const cStart = cMulti ? mr.c1 : menu.c
             const panelX = Math.min(menu.x, window.innerWidth - 240)
             const panelY = Math.min(menu.y, window.innerHeight - 340)
             const subFlip = panelX + 224 + 180 > window.innerWidth // sottomenu a sinistra se non ci sta
@@ -3381,16 +3452,50 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                 {item('Copia', () => copyRange(mr))}
                 {item('Incolla', () => pasteFromClipboard(mr))}
                 <div className="h-px bg-zinc-700 my-1" />
-                {sub('riga', 'Riga', [
-                  ['Aggiungi sopra', () => structural((ws) => ws.insertRow(menu.r + 1, [], 'i'), { kind: 'insRow', pos: menu.r + 1 })],
-                  ['Aggiungi sotto', () => structural((ws) => ws.insertRow(menu.r + 2, [], 'i'), { kind: 'insRow', pos: menu.r + 2 })],
+                {sub('riga', rN > 1 ? `Righe (${rN})` : 'Riga', [
+                  [
+                    rN > 1 ? `Aggiungi ${rN} sopra` : 'Aggiungi sopra',
+                    () =>
+                      structural(
+                        (ws) => ws.insertRows(rStart + 1, Array.from({ length: rN }, () => []), 'i'),
+                        { kind: 'insRow', pos: rStart + 1, count: rN },
+                      ),
+                  ],
+                  [
+                    rN > 1 ? `Aggiungi ${rN} sotto` : 'Aggiungi sotto',
+                    () =>
+                      structural(
+                        (ws) => ws.insertRows(rStart + rN + 1, Array.from({ length: rN }, () => []), 'i'),
+                        { kind: 'insRow', pos: rStart + rN + 1, count: rN },
+                      ),
+                  ],
                   ['Duplica', () => structural((ws) => ws.duplicateRow(menu.r + 1, 1, true), { kind: 'insRow', pos: menu.r + 2 })],
-                  ['Elimina', () => structural((ws) => ws.spliceRows(menu.r + 1, 1), { kind: 'delRow', pos: menu.r + 1 })],
+                  [
+                    rN > 1 ? `Elimina ${rN} righe` : 'Elimina',
+                    () => structural((ws) => ws.spliceRows(rStart + 1, rN), { kind: 'delRow', pos: rStart + 1, count: rN }),
+                  ],
                 ])}
-                {sub('colonna', 'Colonna', [
-                  ['Aggiungi a sinistra', () => structural((ws) => ws.spliceColumns(menu.c + 1, 0, []), { kind: 'insCol', pos: menu.c + 1 })],
-                  ['Aggiungi a destra', () => structural((ws) => ws.spliceColumns(menu.c + 2, 0, []), { kind: 'insCol', pos: menu.c + 2 })],
-                  ['Elimina', () => structural((ws) => ws.spliceColumns(menu.c + 1, 1), { kind: 'delCol', pos: menu.c + 1 })],
+                {sub('colonna', cN > 1 ? `Colonne (${cN})` : 'Colonna', [
+                  [
+                    cN > 1 ? `Aggiungi ${cN} a sinistra` : 'Aggiungi a sinistra',
+                    () =>
+                      structural(
+                        (ws) => ws.spliceColumns(cStart + 1, 0, ...Array.from({ length: cN }, () => [] as unknown[])),
+                        { kind: 'insCol', pos: cStart + 1, count: cN },
+                      ),
+                  ],
+                  [
+                    cN > 1 ? `Aggiungi ${cN} a destra` : 'Aggiungi a destra',
+                    () =>
+                      structural(
+                        (ws) => ws.spliceColumns(cStart + cN + 1, 0, ...Array.from({ length: cN }, () => [] as unknown[])),
+                        { kind: 'insCol', pos: cStart + cN + 1, count: cN },
+                      ),
+                  ],
+                  [
+                    cN > 1 ? `Elimina ${cN} colonne` : 'Elimina',
+                    () => structural((ws) => ws.spliceColumns(cStart + 1, cN), { kind: 'delCol', pos: cStart + 1, count: cN }),
+                  ],
                 ])}
                 <div className="h-px bg-zinc-700 my-1" />
                 {sub(
@@ -3564,7 +3669,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             />
             <div className="flex gap-2">
               <button
-                className="flex-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-white text-xs disabled:opacity-40"
+                className="flex-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-accent-ink text-xs disabled:opacity-40"
                 disabled={!fmtTarget}
                 onClick={() =>
                   styleCells(
@@ -3656,6 +3761,17 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           </div>
         </>
       )}
+
+      {/* Conferma eliminazione foglio (modale in-app) */}
+      <ConfirmDialog
+        open={sheetAsk !== null}
+        title="Eliminare il foglio?"
+        message={`"${sheetAsk !== null ? (wb?.worksheets[sheetAsk]?.name ?? '') : ''}" verrà eliminato con tutto il suo contenuto.`}
+        confirmLabel="Elimina foglio"
+        danger
+        onCancel={() => setSheetAsk(null)}
+        onConfirm={() => sheetAsk !== null && doRemoveSheet(sheetAsk)}
+      />
 
       {/* Tab dei fogli (stile Excel, in basso): doppio click = rinomina, ＋ = nuovo */}
       {sheetNames.length > 0 && (

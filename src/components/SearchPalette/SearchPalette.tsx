@@ -142,7 +142,7 @@ export function SearchPalette({
             <div className="px-4 py-2 text-xs text-zinc-500">Ricerca…</div>
           )}
           {results.length === 0 && !searching && (
-            <div className="px-4 py-3 text-xs text-zinc-600">
+            <div className="px-4 py-3 text-xs text-zinc-500">
               {mode === 'content' && query.trim().length < 2
                 ? 'Scrivi almeno 2 caratteri.'
                 : 'Nessun risultato.'}

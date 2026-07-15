@@ -16,8 +16,7 @@ import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
-const btn =
-  'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
 // Valori dei campi modulo NON ancora salvati, per file: vivono qui (a livello
 // modulo) così sopravvivono al cambio file, come i buffer degli editor.
@@ -616,7 +615,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
                 ))
               : outline && outline.length > 0
                 ? <OutlineTree nodes={outline} onSelect={gotoDest} />
-                : <p className="text-xs text-zinc-600 px-1 py-2">Nessun indice in questo PDF.</p>}
+                : <p className="text-xs text-zinc-500 px-1 py-2">Nessun indice in questo PDF.</p>}
           </div>
         </aside>
       )}
@@ -637,7 +636,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
               }
             }}
             placeholder="Cerca nel PDF…"
-            className="bg-transparent text-sm text-zinc-100 w-48 px-1 focus:outline-none placeholder:text-zinc-600"
+            className="bg-transparent text-sm text-zinc-100 w-48 px-1 focus:outline-none placeholder:text-zinc-500"
           />
           <span className="text-xs text-zinc-500 tabular-nums w-14 text-center shrink-0">
             {searching ? '…' : hits.length ? `${current + 1}/${hits.length}` : query.trim().length >= 2 ? '0/0' : ''}
@@ -669,7 +668,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button
-            className={searchOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            className={searchOpen ? 'tbtn tbtn-on' : btn}
             title="Cerca nel PDF (Ctrl+F)"
             onClick={() => {
               setSearchOpen((o) => !o)
@@ -679,7 +678,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
             🔍 Cerca
           </button>
           <button
-            className={hlMode ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            className={hlMode ? 'tbtn tbtn-on' : btn}
             title="Evidenziatore: attiva e seleziona il testo; click su un'evidenziazione per rimuoverla"
             onClick={() => setHlMode((o) => !o)}
           >
@@ -687,12 +686,12 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           </button>
           {hasForm && (
             <button
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+              className="px-2.5 py-1 btn-accent rounded disabled:opacity-40"
               onClick={saveForm}
               disabled={formSaving || !formDirty}
               title="Salva i campi compilati dentro il PDF (Ctrl+S)"
             >
-              {formSaving ? 'Salvataggio…' : '💾 Salva modulo'}
+              {formSaving ? 'Salvataggio…' : 'Salva modulo'}
             </button>
           )}
           {hlMode && (
@@ -707,7 +706,9 @@ export function PdfViewer({ filePath }: { filePath: string }) {
                 />
               ))}
               <label className="cursor-pointer px-0.5" title="Personalizza il colore attivo">
-                <span className="text-sm">🎨</span>
+                <svg viewBox="0 0 16 16" className="w-4 h-4 text-zinc-400" fill="currentColor">
+                  <path d="M8 2.2c2.6 2.7 4.2 4.7 4.2 6.6a4.2 4.2 0 1 1-8.4 0C3.8 6.9 5.4 4.9 8 2.2z" />
+                </svg>
                 <input
                   type="color"
                   value={pdfHlColors[hlColorIdx]}
@@ -722,8 +723,8 @@ export function PdfViewer({ filePath }: { filePath: string }) {
           <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
             Explorer
           </button>
-          <button className={infoOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
-            ⓘ Info
+          <button className={infoOpen ? 'tbtn tbtn-on' : btn} onClick={() => setInfoOpen((o) => !o)} title="Informazioni">
+            Info
           </button>
           <div className="w-px h-5 bg-zinc-700 mx-1" />
           <button className={btn} title="Riduci" onClick={() => setScale((s) => +Math.max(0.4, s - 0.2).toFixed(2))}>
@@ -754,7 +755,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
               <button className={btn} onClick={copyPath}>
                 {copied ? 'Copiato ✓' : 'Copia percorso'}
               </button>
-              <button onClick={() => setInfoOpen(false)} className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white">
+              <button onClick={() => setInfoOpen(false)} className="px-3 h-7 btn-accent rounded-md text-xs">
                 Chiudi
               </button>
             </div>

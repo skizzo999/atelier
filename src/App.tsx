@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { exists } from '@tauri-apps/plugin-fs'
-import { confirm } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess, initVaultMeta } from './lib/vault'
@@ -14,18 +13,24 @@ import { FileTree } from './components/FileTree/FileTree'
 import { FileView } from './components/FileView/FileView'
 import { Welcome } from './components/Welcome/Welcome'
 import { SearchPalette } from './components/SearchPalette/SearchPalette'
+import { ConfirmDialog } from './components/ConfirmDialog'
+import { TitleBar } from './components/TitleBar'
+import { TabBar } from './components/TabBar'
 
 function App() {
   const vaultPath = useAppStore((s) => s.vaultPath)
-  const selectedFile = useAppStore((s) => s.selectedFile)
   const clearVault = useAppStore((s) => s.clearVault)
-  const mode = useAppStore((s) => s.mode)
-  const toggleMode = useAppStore((s) => s.toggleMode)
+  const sidebarWidth = useAppStore((s) => s.sidebarWidth)
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen)
+  const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const [booting, setBooting] = useState(true)
   // Un'altra istanza di Atelier è già aperta → mostra il picker dei vault
   // (stile Obsidian) invece di auto-aprire l'ultimo, senza toccare il persist.
   const [forcePicker, setForcePicker] = useState(false)
   const [palette, setPalette] = useState<'files' | 'content' | null>(null)
+  // Guardia chiusura: n° di file sporchi quando l'utente prova a chiudere
+  // (mostra la modale in-app al posto del confirm nativo di sistema).
+  const [closeAsk, setCloseAsk] = useState<number | null>(null)
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
   // ri-concesso al vault salvato; se la cartella non esiste più, lo dimentichiamo.
@@ -140,14 +145,10 @@ function App() {
           localStorage.removeItem('atelier-heartbeat') // beforeunload può non scattare con destroy()
           return // niente di sporco: chiudi pure
         }
-        const ok = await confirm(
-          n === 1
-            ? "C'è 1 file con modifiche non salvate: uscendo le perdi."
-            : `Ci sono ${n} file con modifiche non salvate: uscendo le perdi.`,
-          { title: 'Atelier', kind: 'warning', okLabel: 'Esci senza salvare', cancelLabel: 'Annulla' },
-        )
-        if (!ok) event.preventDefault()
-        else localStorage.removeItem('atelier-heartbeat')
+        // Modale in-app (niente confirm nativo): blocca la chiusura e chiedi.
+        // Se l'utente conferma, la modale chiude la finestra con destroy().
+        event.preventDefault()
+        setCloseAsk(n)
       })
       .then((f) => {
         if (disposed) f()
@@ -176,46 +177,83 @@ function App() {
     return () => window.removeEventListener('focus', onFocus)
   }, [clearVault])
 
+  // Barra del titolo custom sempre presente (decorations: false): la finestra
+  // resta trascinabile/chiudibile in ogni stato (boot, picker, app).
   if (booting) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-zinc-500">
-        Caricamento...
+      <div className="flex flex-col h-screen w-screen bg-zinc-900 overflow-hidden">
+        <TitleBar />
+        <div className="flex-1 flex items-center justify-center text-zinc-500">Caricamento...</div>
       </div>
     )
   }
 
   if (!vaultPath || forcePicker) {
-    return <Welcome onOpened={() => setForcePicker(false)} />
+    return (
+      <div className="flex flex-col h-screen w-screen bg-zinc-900 overflow-hidden">
+        <TitleBar />
+        <Welcome onOpened={() => setForcePicker(false)} />
+      </div>
+    )
   }
 
   return (
-    <div className="flex h-screen w-screen bg-zinc-900 text-zinc-100">
-      <aside className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col">
-        <div className="p-4 border-b border-zinc-800">
-          <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Explorer</h3>
-        </div>
-        <FileTree />
-      </aside>
+    <div className="flex flex-col h-screen w-screen bg-zinc-900 text-zinc-100 overflow-hidden">
+      <TitleBar />
+      <div className="flex flex-1 min-h-0">
+      {/* Explorer dinamico: larghezza trascinabile, nascondibile dalla titlebar */}
+      {sidebarOpen && (
+        <>
+          <aside style={{ width: sidebarWidth }} className="shrink-0 bg-zinc-950 flex flex-col">
+            <div className="px-4 pt-3 pb-2">
+              <h3 className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">Explorer</h3>
+            </div>
+            <FileTree />
+          </aside>
+          <div
+            className="w-1 shrink-0 cursor-col-resize bg-zinc-800/60 hover:bg-blue-500/50 transition-colors"
+            title="Trascina per ridimensionare"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              const startX = e.clientX
+              const orig = sidebarWidth
+              const move = (ev: MouseEvent) => setSidebarWidth(orig + ev.clientX - startX)
+              const up = () => {
+                document.removeEventListener('mousemove', move)
+                document.removeEventListener('mouseup', up)
+              }
+              document.addEventListener('mousemove', move)
+              document.addEventListener('mouseup', up)
+            }}
+          />
+        </>
+      )}
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-12 flex items-center justify-between px-4 border-b border-zinc-800">
-          {/* Percorso completo del file aperto (o del vault se nessun file). */}
-          <span className="text-xs text-zinc-500 truncate" title={selectedFile ?? vaultPath}>
-            {selectedFile ?? vaultPath}
-          </span>
-          <button
-            onClick={toggleMode}
-            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-300 transition-colors shrink-0"
-            title="Cambia modalità"
-          >
-            {mode === 'developer' ? '🛠 Developer' : '📝 Standard'}
-          </button>
-        </header>
-
+        <TabBar />
         <FileView />
       </main>
 
       {palette && <SearchPalette initialMode={palette} onClose={() => setPalette(null)} />}
+
+      {/* Guardia chiusura: modale in-app al posto del confirm nativo. */}
+      <ConfirmDialog
+        open={closeAsk !== null}
+        title="Modifiche non salvate"
+        message={
+          closeAsk === 1
+            ? "C'è 1 file con modifiche non salvate: uscendo le perdi."
+            : `Ci sono ${closeAsk} file con modifiche non salvate: uscendo le perdi.`
+        }
+        confirmLabel="Esci senza salvare"
+        danger
+        onCancel={() => setCloseAsk(null)}
+        onConfirm={() => {
+          localStorage.removeItem('atelier-heartbeat')
+          void getCurrentWindow().destroy()
+        }}
+      />
+      </div>
     </div>
   )
 }

@@ -97,6 +97,17 @@ const TreeActionsContext = createContext<TreeActions>({
   openMenu: () => {},
 })
 
+// Nome senza estensione + badge estensione (stile Obsidian): "Foto.jpg" →
+// "Foto" con etichetta JPG a destra; i .md restano puliti senza badge.
+function splitName(name: string, isFolder: boolean): { base: string; ext: string | null } {
+  if (isFolder) return { base: name, ext: null }
+  const i = name.lastIndexOf('.')
+  if (i <= 0) return { base: name, ext: null }
+  const ext = name.slice(i + 1).toUpperCase()
+  const base = name.slice(0, i)
+  return { base, ext: ext === 'MD' ? null : ext }
+}
+
 function FileNodeComponent({ node, style, dragHandle }: NodeRendererProps<FileNode>) {
   const { data } = node
   const { requestLoad, selectFile, openMenu } = useContext(TreeActionsContext)
@@ -105,15 +116,18 @@ function FileNodeComponent({ node, style, dragHandle }: NodeRendererProps<FileNo
       !data.isFolder &&
       (s.dirtyBuffers[data.path] !== undefined || s.imageBuffers[data.path] !== undefined),
   )
-  const icon = data.isFolder ? (node.isOpen ? '📂' : '📁') : '📄'
+  const isActive = useAppStore((s) => !data.isFolder && s.selectedFile === data.path)
+  const { base, ext } = splitName(data.name, data.isFolder)
 
   return (
     <div
       ref={dragHandle}
-      style={style}
-      className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-zinc-800 rounded ${
-        node.isSelected ? 'bg-zinc-700' : ''
-      } ${node.isDragging ? 'opacity-40' : ''} ${node.willReceiveDrop ? 'bg-zinc-700/70 ring-1 ring-zinc-500' : ''}`}
+      // paddingLeft di react-arborist azzerato: il rientro lo fanno le guide,
+      // così le righe verticali (stile Obsidian) sono continue e allineate.
+      style={{ ...style, paddingLeft: 0 }}
+      className={`group flex items-center h-full cursor-pointer rounded-md mx-1 ${
+        isActive || node.isSelected ? 'bg-zinc-700/50 text-zinc-100' : 'text-zinc-300 hover:bg-zinc-800/70'
+      } ${node.isDragging ? 'opacity-40' : ''} ${node.willReceiveDrop ? 'bg-blue-500/10 ring-1 ring-blue-500/50' : ''}`}
       onClick={() => {
         if (data.isFolder) {
           node.toggle()
@@ -130,11 +144,39 @@ function FileNodeComponent({ node, style, dragHandle }: NodeRendererProps<FileNo
         openMenu(data, e.clientX, e.clientY)
       }}
     >
-      <span className="text-xs select-none">{icon}</span>
-      <span className="text-sm text-zinc-200 truncate flex-1">{data.name}</span>
+      {/* guide di rientro: una linea sottile per livello */}
+      {Array.from({ length: node.level }, (_, i) => (
+        <span key={i} className="self-stretch w-[17px] shrink-0 flex justify-center">
+          <span className="w-px self-stretch bg-zinc-800" />
+        </span>
+      ))}
+      {/* chevron per le cartelle; i file hanno solo un piccolo spazio */}
+      {data.isFolder ? (
+        <svg
+          viewBox="0 0 16 16"
+          className={`w-4 h-4 shrink-0 mx-0.5 text-zinc-500 transition-transform duration-100 ${node.isOpen ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M6 4l4 4-4 4" />
+        </svg>
+      ) : (
+        <span className="w-2 shrink-0" />
+      )}
+      <span className={`text-[13px] truncate flex-1 pr-1 ${data.isFolder ? 'font-medium text-zinc-200' : ''}`}>
+        {base}
+      </span>
+      {ext && (
+        <span className="text-[9px] font-semibold tracking-wider text-zinc-500 bg-zinc-800/80 rounded px-1 py-px mr-1.5 shrink-0">
+          {ext}
+        </span>
+      )}
       {isDirty && (
         <span
-          className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+          className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mr-2"
           title="Modifiche non salvate"
         />
       )}
@@ -211,7 +253,7 @@ function NameModal({
           <button
             onClick={() => onConfirm(name.trim())}
             disabled={busy || !name.trim()}
-            className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-50"
+            className="px-3 py-1.5 text-xs btn-accent rounded-md disabled:opacity-50"
           >
             Conferma
           </button>
@@ -491,13 +533,11 @@ export function FileTree() {
     setConfirmBusy(true)
     try {
       await deleteEntry(confirmTarget.path)
-      // Scarta eventuali buffer non salvati del file/cartella eliminati.
+      // Scarta eventuali buffer non salvati del file/cartella eliminati e
+      // chiudi le loro tab (la selezione passa alla tab vicina).
       useAppStore.getState().clearBuffersUnder(confirmTarget.path)
       useAppStore.getState().clearImageBuffersUnder(confirmTarget.path)
-      const sel = useAppStore.getState().selectedFile
-      if (sel === confirmTarget.path || (sel && sel.startsWith(confirmTarget.path + '\\'))) {
-        setSelectedFile(null)
-      }
+      useAppStore.getState().closeTabsUnder(confirmTarget.path)
       setConfirmTarget(null)
     } catch (err) {
       console.error('Errore eliminazione:', err)
@@ -509,17 +549,17 @@ export function FileTree() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-zinc-800 flex gap-1.5">
+      <div className="px-2 pb-1 flex gap-1">
         <button
           onClick={() => vaultPath && setNewFileDir(vaultPath)}
-          className="flex-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          className="flex-1 px-2 py-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 rounded-md text-xs transition-colors"
           title="Crea un nuovo file nel vault"
         >
           Nuovo file
         </button>
         <button
           onClick={handleChangeVault}
-          className="flex-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded text-xs transition-colors"
+          className="flex-1 px-2 py-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70 rounded-md text-xs transition-colors"
         >
           Cambia vault
         </button>

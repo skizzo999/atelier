@@ -26,3 +26,6 @@ src-tauri/**/*.exe
 # OS
 .DS_Store
 Thumbs.db
+
+# Config locale di Claude Code (path di sessione, non condivisibile)
+.claude/

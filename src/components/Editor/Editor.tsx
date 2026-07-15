@@ -306,14 +306,11 @@ export function Editor() {
               </button>
             </div>
           )}
-          <ConvertButton
-            filePath={filePath}
-            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-300 disabled:opacity-40"
-          />
+          <ConvertButton filePath={filePath} className="tbtn" />
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="px-3 py-1 bg-zinc-100 text-zinc-900 rounded text-xs font-medium hover:bg-white disabled:opacity-40 disabled:cursor-default transition-colors"
+            className="px-3 h-7 btn-accent rounded-md text-xs disabled:opacity-40 disabled:cursor-default transition-colors"
           >
             {saving ? 'Salvataggio…' : 'Salva'}
           </button>

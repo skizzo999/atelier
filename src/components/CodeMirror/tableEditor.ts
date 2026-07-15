@@ -658,20 +658,20 @@ const tableTheme = EditorView.theme({
     width: '100%',
   },
   '.cm-lp-mdtable th, .cm-lp-mdtable td': {
-    border: '1px solid #3f3f46',
+    border: '1px solid #334155',
     padding: '0.35em 0.7em',
     textAlign: 'left',
     minWidth: '3em',
     outline: 'none',
-    caretColor: '#e4e4e7',
+    caretColor: '#f1f5f9',
   },
-  '.cm-lp-mdtable th': { background: 'rgba(255,255,255,0.05)', fontWeight: '700', color: '#e4e4e7' },
+  '.cm-lp-mdtable th': { background: 'rgba(255,255,255,0.05)', fontWeight: '700', color: '#f1f5f9' },
   '.cm-lp-mdtable td:focus, .cm-lp-mdtable th:focus': {
-    boxShadow: 'inset 0 0 0 2px rgba(122,162,247,0.6)',
+    boxShadow: 'inset 0 0 0 2px rgba(96,165,250,0.6)',
   },
   '.cm-mdtable-selcell': {
-    background: 'rgba(122,162,247,0.22) !important',
-    boxShadow: 'inset 0 0 0 1px rgba(122,162,247,0.7)',
+    background: 'rgba(59,130,246,0.2) !important',
+    boxShadow: 'inset 0 0 0 1px rgba(96,165,250,0.7)',
   },
   '.cm-mdtable-addrow': {
     display: 'block',
@@ -699,13 +699,13 @@ const tableTheme = EditorView.theme({
     borderRadius: '4px',
   },
   '.cm-mdtable-wrap:hover .cm-mdtable-addrow, .cm-mdtable-wrap:hover .cm-mdtable-addcol': {
-    color: '#9aa0aa',
-    borderColor: '#3f3f46',
+    color: '#94a3b8',
+    borderColor: '#334155',
     background: 'rgba(255,255,255,0.03)',
   },
   '.cm-mdtable-addrow:hover, .cm-mdtable-addcol:hover': {
-    background: 'rgba(122,162,247,0.15) !important',
-    color: '#e4e4e7 !important',
+    background: 'rgba(96,165,250,0.15) !important',
+    color: '#f1f5f9 !important',
   },
 })
 

@@ -90,13 +90,13 @@ export function ImageInfoPanel({ filePath, dims, sizeBytes, dpi, onClose }: Prop
         <div className="flex flex-col gap-2 pt-1">
           <button
             onClick={copyPath}
-            className="px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-200"
+            className="tbtn justify-center border border-zinc-700/60"
           >
             {copied ? 'Percorso copiato ✓' : 'Copia percorso'}
           </button>
           <button
             onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}
-            className="px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-200"
+            className="tbtn justify-center border border-zinc-700/60"
           >
             Apri in Explorer
           </button>

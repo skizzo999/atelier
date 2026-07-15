@@ -49,7 +49,7 @@ export function ConvertButton({ filePath, className }: { filePath: string; class
         disabled={busy}
         title="Converti in un altro formato (crea un nuovo file accanto all'originale)"
       >
-        {busy ? 'Converto…' : error ? 'Errore ✕' : '⇄ Converti'}
+        {busy ? 'Converto…' : error ? 'Errore ✕' : 'Converti'}
       </button>
       {open && (
         <div className="absolute right-0 top-8 z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1">

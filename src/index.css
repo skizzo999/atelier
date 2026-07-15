@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Token del tema "workshop" (dalla landing): usati dai CSS fuori-Tailwind. */
+:root {
+  --at-bg: #0a1020;
+  --at-raise: #0f172a;
+  --at-surface: #1e293b;
+  --at-surface-2: #26334a;
+  --at-border: #334155;
+  --at-text: #f1f5f9;
+  --at-dim: #94a3b8;
+  --at-faint: #64748b;
+  --at-accent: #3b82f6;
+  --at-accent-2: #38bdf8;
+  --at-gradient: linear-gradient(100deg, #38bdf8, #2563eb);
+}
+
 body {
   margin: 0;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -9,19 +24,112 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Selezione testo: ambra come la landing. */
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+/* Bottone primario stile landing: gradiente ambra→corallo, testo scuro. */
+.btn-accent {
+  background: var(--at-gradient);
+  color: #ffffff;
+  font-weight: 600;
+}
+.btn-accent:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-accent:disabled {
+  opacity: 0.4;
+}
+
+/* Toolbar di funzionalità (annotazioni, PDF, xlsx, …): un solo pattern.
+   .tbtn = bottone fantasma; .tbtn-on = strumento ATTIVO (blu pieno, acceso);
+   .tsep = divisore sottile. I primari (Salva/Applica) usano .btn-accent. */
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+.tbtn:hover:not(:disabled) {
+  color: #f1f5f9;
+  background: rgba(30, 41, 59, 0.75);
+}
+.tbtn:disabled {
+  opacity: 0.4;
+}
+.tbtn-on {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 500;
+}
+.tbtn-on:hover:not(:disabled) {
+  background: #2f6feb;
+  color: #ffffff;
+}
+.tsep {
+  width: 1px;
+  height: 20px;
+  background: #1e293b;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Slider in tinta ovunque (opacità, spessore, zoom…). */
+input[type='range'] {
+  accent-color: #3b82f6;
+}
+
+/* Scrollbar sottili e discrete, leggibili sia sul tema scuro sia sui fogli
+   bianchi (documenti): grigio caldo semitrasparente. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 135, 160, 0.4);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 155, 180, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 /* Allinea la vista Lettura (Tailwind prose) allo stile pulito dell'Ibrida */
 .prose {
-  color: #dcddde;
+  color: #dbe3ee;
+}
+/* Titoli grandi in serif, come la landing. */
+.prose h1,
+.prose h2 {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 .prose a {
-  color: #7aa2f7;
+  color: #60a5fa;
   font-weight: 400;
 }
 .prose blockquote {
   font-weight: 400;
   font-style: italic;
-  color: #a1a1aa;
-  border-left-color: #52525b;
+  color: #94a3b8;
+  border-left-color: #334155;
 }
 /* rimuove le virgolette ricciute che prose aggiunge alle citazioni */
 .prose blockquote p:first-of-type::before,
@@ -46,19 +154,19 @@ body {
   border-radius: 3px;
 }
 .prose a.wikilink {
-  color: #7aa2f7;
+  color: #60a5fa;
   font-weight: 400;
 }
 .prose blockquote.callout {
-  border-left: 3px solid #7aa2f7;
-  background: rgba(122, 162, 247, 0.08);
+  border-left: 3px solid #60a5fa;
+  background: rgba(96, 165, 250, 0.08);
   font-style: normal;
-  color: #dcddde;
+  color: #dbe3ee;
   padding: 0.5em 1em;
 }
 .prose blockquote.callout .callout-title {
   font-weight: 700;
-  color: #7aa2f7;
+  color: #60a5fa;
   margin: 0 0 0.3em;
   font-size: 0.85em;
   letter-spacing: 0.03em;
@@ -98,7 +206,7 @@ body {
   transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
 }
 .textLayer .markedContent { display: contents; }
-.textLayer ::selection { background: rgba(56, 138, 221, 0.4); }
+.textLayer ::selection { background: rgba(59, 130, 246, 0.35); }
 /* Evidenziazioni dei risultati di ricerca / evidenziatore (aggiunte dall'app). */
 .textLayer .app-highlight { background: rgba(250, 204, 21, 0.45); border-radius: 2px; }
 .textLayer .app-find { background: rgba(56, 138, 221, 0.45); border-radius: 2px; }
@@ -118,7 +226,7 @@ body {
   transform-origin: 0 0;
   user-select: text;
 }
-.ocrLayer ::selection { background: rgba(56, 138, 221, 0.4); }
+.ocrLayer ::selection { background: rgba(59, 130, 246, 0.35); }
 
 /* Risultati di ricerca: rettangoli sopra il canvas (sotto al testo trasparente). */
 .pdf-find {
@@ -192,7 +300,7 @@ body {
 .ProseMirror th { background: rgba(255, 255, 255, 0.05); }
 .ProseMirror img { max-width: 100%; height: auto; }
 .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #3b82f6; }
-.ProseMirror .selectedCell { background: rgba(56, 138, 221, 0.2); }
+.ProseMirror .selectedCell { background: rgba(59, 130, 246, 0.2); }
 
 /* Ricerca nel DOCX: <mark> sulle occorrenze, corrente in arancione. */
 mark.docx-find {
@@ -208,8 +316,8 @@ mark.docx-find-current {
 /* Campi modulo dei PDF (AcroForm): input sovrapposti alla pagina. Leggera
    tinta blu per rendere visibili le zone compilabili; testo scuro (foglio bianco). */
 .pdf-field {
-  background: rgba(122, 162, 247, 0.08);
-  border: 1px solid rgba(122, 162, 247, 0.35);
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.4);
   border-radius: 2px;
   color: #111827;
   padding: 0 2px;
@@ -236,8 +344,8 @@ textarea.pdf-field {
    fuori dallo scope del tema CodeMirror, quindi lo stile vive qui). */
 .cm-tablemenu {
   min-width: 13rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
+  background: var(--at-surface);
+  border: 1px solid var(--at-border);
   border-radius: 0.5rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   padding: 4px 0;
@@ -253,19 +361,19 @@ textarea.pdf-field {
   width: 100%;
   text-align: left;
   padding: 6px 12px;
-  color: #e4e4e7;
+  color: var(--at-text);
   background: none;
   border: none;
   cursor: pointer;
 }
-.cm-tablemenu-item:hover { background: #3f3f46; }
+.cm-tablemenu-item:hover { background: var(--at-border); }
 .cm-tablemenu-item:disabled { opacity: 0.4; cursor: default; }
 .cm-tablemenu-item:disabled:hover { background: none; }
 .cm-tablemenu-item.has-sub::after {
   content: '▸';
   position: absolute;
   right: 10px;
-  color: #71717a;
+  color: var(--at-faint);
   font-size: 11px;
 }
 .cm-tablemenu-sub {

@@ -512,7 +512,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
   const headingValue =
     ([1, 2, 3, 4, 5, 6].find((l) => editor?.isActive('heading', { level: l }))?.toString() as string) || 'p'
 
-  const btn = 'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+  const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -523,7 +523,7 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           {dirty && <span className="text-xs text-amber-400 shrink-0">• non salvato</span>}
           {continuous && (
             <span
-              className="text-xs text-sky-400 shrink-0"
+              className="text-xs text-blue-400 shrink-0"
               title="Documento con tabelle molto grandi: vista senza pagine (la paginazione andrebbe in blocco)"
             >
               • vista continua
@@ -532,15 +532,15 @@ export function DocxEditor({ filePath }: { filePath: string }) {
         </span>
         <div className="flex items-center gap-1 text-xs text-zinc-300">
           <button
-            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium disabled:opacity-40"
+            className="px-2.5 py-1 btn-accent rounded disabled:opacity-40"
             onClick={save}
             disabled={saving || loading || !!error}
             title="Salva (Ctrl+S) — sovrascrive il .docx"
           >
-            {saving ? 'Salvataggio…' : '💾 Salva'}
+            {saving ? 'Salvataggio…' : 'Salva'}
           </button>
           <button
-            className={settingsOpen ? 'px-2 py-1 bg-zinc-100 text-zinc-900 border border-zinc-100 rounded' : btn}
+            className={settingsOpen ? 'tbtn tbtn-on' : btn}
             title={continuous ? 'Non disponibile in vista continua' : 'Impostazioni documento'}
             disabled={loading || !!error || continuous}
             onClick={() => setSettingsOpen((o) => !o)}
@@ -725,7 +725,11 @@ export function DocxEditor({ filePath }: { filePath: string }) {
           <Sep />
           {/* Immagine + riga */}
           <TBtn title="Inserisci immagine" onClick={() => imageInputRef.current?.click()}>
-            🖼
+            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="12" height="10" rx="1.5" />
+              <circle cx="5.8" cy="6.5" r="1.1" />
+              <path d="M2.5 11.5l3.5-3 2.5 2 3-3 2 2" />
+            </svg>
           </TBtn>
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
           <TBtn title="Riga orizzontale" onClick={() => editor.chain().focus().setHorizontalRule().run()}>

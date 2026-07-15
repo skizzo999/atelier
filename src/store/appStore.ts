@@ -34,6 +34,11 @@ interface AppState {
   pdfHlColors: [string, string, string]
   // File attualmente aperto nell'editor (null = nessuno). Non persistito.
   selectedFile: string | null
+  // Tab dei file aperti, in ordine di apertura. Non persistito.
+  openTabs: string[]
+  // Explorer: larghezza (trascinabile) e visibilità. Persistiti.
+  sidebarWidth: number
+  sidebarOpen: boolean
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
   // Condiviso così l'explorer può mostrare l'indicatore "non salvato" sui file.
   dirtyBuffers: Record<string, string>
@@ -59,7 +64,15 @@ interface AppState {
   setPdfHlColor: (index: 0 | 1 | 2, color: string) => void
   toggleMode: () => void
   setSelectedFile: (path: string | null) => void
+  // Chiude una tab (se era attiva si passa alla vicina, come nei browser).
+  closeTab: (path: string) => void
+  // Sposta una tab prima di un'altra (null = in fondo). Per il drag.
+  moveTab: (path: string, beforePath: string | null) => void
+  // Chiude le tab di un file/cartella eliminati (chiave esatta + sottoalbero).
+  closeTabsUnder: (prefix: string) => void
   setPendingHighlight: (term: string | null) => void
+  setSidebarWidth: (w: number) => void
+  toggleSidebar: () => void
   bumpFsRevision: () => void
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
@@ -88,13 +101,16 @@ export const useAppStore = create<AppState>()(
       ],
       pdfHlColors: ['#facc15', '#4ade80', '#60a5fa'],
       selectedFile: null,
+      openTabs: [],
+      sidebarWidth: 256,
+      sidebarOpen: true,
       dirtyBuffers: {},
       pendingHighlight: null,
       fsRevision: 0,
       imageBuffers: {},
       setVaultPath: (path) => set({ vaultPath: path }),
       clearVault: () =>
-        set({ vaultPath: null, selectedFile: null, dirtyBuffers: {}, imageBuffers: {} }),
+        set({ vaultPath: null, selectedFile: null, openTabs: [], dirtyBuffers: {}, imageBuffers: {} }),
       registerVault: (path) =>
         set((state) => {
           const name = path.split('\\').pop() || path
@@ -119,8 +135,47 @@ export const useAppStore = create<AppState>()(
         }),
       toggleMode: () =>
         set((state) => ({ mode: state.mode === 'standard' ? 'developer' : 'standard' })),
-      setSelectedFile: (path) => set({ selectedFile: path }),
+      // Selezionare un file apre (o riattiva) la sua tab.
+      setSelectedFile: (path) =>
+        set((state) =>
+          path === null
+            ? { selectedFile: null }
+            : {
+                selectedFile: path,
+                openTabs: state.openTabs.includes(path) ? state.openTabs : [...state.openTabs, path],
+              },
+        ),
+      closeTab: (path) =>
+        set((state) => {
+          const i = state.openTabs.indexOf(path)
+          if (i < 0) return {}
+          const openTabs = state.openTabs.filter((p) => p !== path)
+          let selectedFile = state.selectedFile
+          if (selectedFile === path) selectedFile = openTabs[Math.min(i, openTabs.length - 1)] ?? null
+          return { openTabs, selectedFile }
+        }),
+      moveTab: (path, beforePath) =>
+        set((state) => {
+          if (path === beforePath || !state.openTabs.includes(path)) return {}
+          const tabs = state.openTabs.filter((p) => p !== path)
+          const idx = beforePath === null ? tabs.length : tabs.indexOf(beforePath)
+          if (idx < 0) return {}
+          tabs.splice(idx, 0, path)
+          return { openTabs: tabs }
+        }),
+      closeTabsUnder: (prefix) =>
+        set((state) => {
+          const gone = (p: string) => p === prefix || p.startsWith(prefix + '\\')
+          const openTabs = state.openTabs.filter((p) => !gone(p))
+          const selectedFile =
+            state.selectedFile && gone(state.selectedFile)
+              ? (openTabs[openTabs.length - 1] ?? null)
+              : state.selectedFile
+          return { openTabs, selectedFile }
+        }),
       setPendingHighlight: (term) => set({ pendingHighlight: term }),
+      setSidebarWidth: (w) => set({ sidebarWidth: Math.max(170, Math.min(520, Math.round(w))) }),
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       bumpFsRevision: () => set((state) => ({ fsRevision: state.fsRevision + 1 })),
       setBuffer: (path, content) =>
         set((state) => ({ dirtyBuffers: { ...state.dirtyBuffers, [path]: content } })),
@@ -165,7 +220,12 @@ export const useAppStore = create<AppState>()(
             }
             return next
           }
-          return { dirtyBuffers: remap(state.dirtyBuffers), imageBuffers: remap(state.imageBuffers) }
+          const remapPath = (p: string) => (p === from ? to : p.startsWith(from + '\\') ? to + p.slice(from.length) : p)
+          return {
+            dirtyBuffers: remap(state.dirtyBuffers),
+            imageBuffers: remap(state.imageBuffers),
+            openTabs: state.openTabs.map(remapPath),
+          }
         }),
     }),
     {
@@ -177,6 +237,8 @@ export const useAppStore = create<AppState>()(
         mdView: state.mdView,
         penPresets: state.penPresets,
         pdfHlColors: state.pdfHlColors,
+        sidebarWidth: state.sidebarWidth,
+        sidebarOpen: state.sidebarOpen,
       }),
     },
   ),

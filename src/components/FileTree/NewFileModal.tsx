@@ -5,28 +5,27 @@ import { createFile } from '../../lib/fileOps'
 interface FileType {
   ext: string
   label: string
-  icon: string
-  disabled?: boolean // placeholder per formati futuri (Excel, PowerPoint)
+  disabled?: boolean // placeholder per formati futuri
 }
 
 const MAIN_TYPES: FileType[] = [
-  { ext: 'md', label: 'Markdown', icon: '📝' },
-  { ext: 'docx', label: 'Word', icon: '📄' },
-  { ext: 'xlsx', label: 'Excel', icon: '📊' },
-  { ext: 'pptx', label: 'PowerPoint', icon: '📽️' },
-  { ext: 'txt', label: 'Testo', icon: '🗒️' },
+  { ext: 'md', label: 'Markdown' },
+  { ext: 'docx', label: 'Word' },
+  { ext: 'xlsx', label: 'Excel' },
+  { ext: 'pptx', label: 'PowerPoint' },
+  { ext: 'txt', label: 'Testo' },
 ]
 
 // Programmazione (lista a cascata): qualche esempio, si estende in futuro.
 const CODE_TYPES: FileType[] = [
-  { ext: 'html', label: 'HTML', icon: '🌐' },
-  { ext: 'css', label: 'CSS', icon: '🎨' },
-  { ext: 'js', label: 'JavaScript', icon: '🟨' },
-  { ext: 'ts', label: 'TypeScript', icon: '🟦' },
-  { ext: 'py', label: 'Python', icon: '🐍' },
-  { ext: 'java', label: 'Java', icon: '☕' },
-  { ext: 'php', label: 'PHP', icon: '🐘' },
-  { ext: 'json', label: 'JSON', icon: '🧾' },
+  { ext: 'html', label: 'HTML' },
+  { ext: 'css', label: 'CSS' },
+  { ext: 'js', label: 'JavaScript' },
+  { ext: 'ts', label: 'TypeScript' },
+  { ext: 'py', label: 'Python' },
+  { ext: 'java', label: 'Java' },
+  { ext: 'php', label: 'PHP' },
+  { ext: 'json', label: 'JSON' },
 ]
 
 const ALL_EXTS = [...MAIN_TYPES, ...CODE_TYPES].map((t) => t.ext)
@@ -83,17 +82,19 @@ export function NewFileModal({
         disabled={t.disabled}
         onClick={() => setExt(t.ext)}
         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${indent ? 'pl-6' : ''} ${
-          selected ? 'bg-zinc-100 text-zinc-900 font-medium' : t.disabled ? 'text-zinc-600' : 'text-zinc-300 hover:bg-zinc-800'
+          selected ? 'bg-blue-600 text-white font-medium' : t.disabled ? 'text-zinc-600' : 'text-zinc-300 hover:bg-zinc-800'
         }`}
         title={t.disabled ? 'In arrivo' : `.${t.ext}`}
       >
-        <span className="text-xs">{t.icon}</span>
+        <span
+          className={`text-[9px] font-semibold tracking-wider uppercase rounded px-1 py-px w-10 text-center shrink-0 ${
+            selected ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-500'
+          }`}
+        >
+          {t.ext}
+        </span>
         <span className="flex-1 truncate">{t.label}</span>
-        {t.disabled ? (
-          <span className="text-[10px] text-zinc-600 border border-zinc-700 rounded px-1">presto</span>
-        ) : (
-          <span className={`text-[10px] ${selected ? 'text-zinc-500' : 'text-zinc-600'}`}>.{t.ext}</span>
-        )}
+        {t.disabled && <span className="text-[10px] text-zinc-600 border border-zinc-700 rounded px-1">presto</span>}
       </button>
     )
   }
@@ -137,7 +138,7 @@ export function NewFileModal({
             <button
               onClick={create}
               disabled={busy || !finalName}
-              className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-900 rounded font-medium hover:bg-white disabled:opacity-50"
+              className="px-3 py-1.5 text-xs btn-accent rounded-md disabled:opacity-50"
             >
               {busy ? 'Creo…' : 'Crea'}
             </button>

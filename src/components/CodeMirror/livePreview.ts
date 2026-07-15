@@ -403,12 +403,14 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
 }
 
 // Aspetto "documento" (come la vista Lettura): font proporzionale, sfondo app.
-const HEAD = '#e4e4e7'
+const HEAD = '#f1f5f9'
 const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
+// Titoli grandi in serif, come la landing ("workshop" caldo).
+const DISPLAY_FONT = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif'
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  '&': { backgroundColor: '#18181b' },
+  '&': { backgroundColor: '#0f172a' },
   '.cm-scroller': { fontFamily: PROSE_FONT },
   '.cm-content': {
     fontFamily: PROSE_FONT,
@@ -417,20 +419,20 @@ const livePreviewTheme = EditorView.theme({
     // padding-bottom abbondante: spazio "arieggiato" tra il testo e la fine
     // della nota (si può scrollare oltre l'ultima riga, come Obsidian).
     padding: '28px 36px 30vh',
-    caretColor: '#e4e4e7',
-    color: '#dcddde',
+    caretColor: '#f1f5f9',
+    color: '#dbe3ee',
   },
   // Spazio sopra il titolo e tra il titolo e il testo che segue.
   '.cm-lp-blockspace': { paddingTop: '1em', paddingBottom: '0.45em' },
-  '.cm-lp-h1': { fontSize: '2em', fontWeight: '700', color: HEAD },
-  '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '700', color: HEAD },
+  '.cm-lp-h1': { fontSize: '2em', fontWeight: '600', color: HEAD, fontFamily: DISPLAY_FONT, letterSpacing: '-0.015em' },
+  '.cm-lp-h2': { fontSize: '1.5em', fontWeight: '600', color: HEAD, fontFamily: DISPLAY_FONT, letterSpacing: '-0.015em' },
   '.cm-lp-h3': { fontSize: '1.25em', fontWeight: '700', color: HEAD },
   '.cm-lp-h4': { fontSize: '1.05em', fontWeight: '700', color: HEAD },
   '.cm-lp-h5': { fontWeight: '700', color: HEAD },
   '.cm-lp-h6': { fontWeight: '700', color: HEAD },
   '.cm-lp-strong': { fontWeight: '700', color: HEAD },
   '.cm-lp-em': { fontStyle: 'italic' },
-  '.cm-lp-strike': { textDecoration: 'line-through', color: '#9aa0aa' },
+  '.cm-lp-strike': { textDecoration: 'line-through', color: '#94a3b8' },
   '.cm-lp-highlight': { backgroundColor: 'rgba(250, 204, 21, 0.25)', borderRadius: '3px', padding: '0 0.1em' },
   '.cm-lp-code': {
     fontFamily: MONO,
@@ -439,12 +441,12 @@ const livePreviewTheme = EditorView.theme({
     padding: '0.1em 0.35em',
     borderRadius: '4px',
   },
-  '.cm-lp-link': { color: '#7aa2f7', textDecoration: 'underline' },
-  '.cm-lp-wikilink': { color: '#7aa2f7', textDecoration: 'underline' },
+  '.cm-lp-link': { color: '#60a5fa', textDecoration: 'underline' },
+  '.cm-lp-wikilink': { color: '#60a5fa', textDecoration: 'underline' },
   '.cm-lp-callout': {
-    borderLeft: '3px solid #7aa2f7',
+    borderLeft: '3px solid #60a5fa',
     paddingLeft: '1em',
-    background: 'rgba(122,162,247,0.08)',
+    background: 'rgba(96,165,250,0.08)',
   },
   // Titolo del callout (es. NOTA) come pseudo-elemento: nessun widget, quindi
   // nessuno spazio fantasma sopra. line-height piccola = niente leading sopra;
@@ -454,25 +456,25 @@ const livePreviewTheme = EditorView.theme({
     display: 'block',
     lineHeight: '1.2',
     fontWeight: '700',
-    color: '#7aa2f7',
+    color: '#60a5fa',
     fontSize: '0.85em',
     letterSpacing: '0.03em',
     marginBottom: '0.25em',
   },
-  '.cm-lp-bullet': { color: '#9aa0aa' },
+  '.cm-lp-bullet': { color: '#94a3b8' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
   '.cm-lp-quote': {
-    borderLeft: '3px solid #52525b',
+    borderLeft: '3px solid #334155',
     paddingLeft: '1em',
-    color: '#a1a1aa',
+    color: '#94a3b8',
     fontStyle: 'italic',
   },
   '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
-  '.cm-lp-hr': { borderBottom: '1px solid #52525b' },
+  '.cm-lp-hr': { borderBottom: '1px solid #334155' },
   '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
   '.cm-lp-imagemissing': {
     display: 'inline-block',
-    color: '#a1a1aa',
+    color: '#94a3b8',
     fontSize: '0.85em',
     background: 'rgba(255,255,255,0.05)',
     padding: '0.3em 0.6em',
@@ -484,7 +486,7 @@ const livePreviewTheme = EditorView.theme({
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
-  '.cm-cursor': { borderLeftColor: '#e4e4e7' },
+  '.cm-cursor': { borderLeftColor: '#f1f5f9' },
   '.cm-gutters': { display: 'none' },
 }, { dark: true })
 

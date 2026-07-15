@@ -9,7 +9,7 @@ import type { PptxDoc, PptxSlide } from '../../lib/pptx'
 // come HTML posizionato (testo con stili base, immagini, sfondi/riempimenti
 // pieni). Niente gruppi trasformati, gradienti, tabelle, grafici, animazioni.
 
-const btn = 'px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40'
+const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
 // Il colore di sfondo è scuro? (per il colore testo di default)
 function isDark(hex?: string): boolean {
