@@ -1,9 +1,32 @@
 # Prossimi step - Continuità
 
-> Aggiornato al 2026-07-12. Dettaglio funzioni in `docs/STATUS.md`; piano
+> Aggiornato al 2026-07-16. Dettaglio funzioni in `docs/STATUS.md`; piano
 > Office in `docs/PIANO_OFFICE.md`; diari in `docs/sessions/`.
 
-## 🚀 v0.3.0 RILASCIATA (2026-07-12)
+## 🔧 Dopo la v0.3.0 (2026-07-15/16, committato)
+- **Fix grave formattazione**: ExcelJS condivide l'oggetto style tra celle
+  gemelle → copia privata (`ownStyle`) prima di ogni modifica di formato.
+- **Motore formule VERO**: ~60 nomi di fast-formula-parser erano stub vuoti
+  (MAX, MIN, CONFRONTA, SOMMA.PIÙ.SE…) → colmati con @formulajs/formulajs
+  (MIT): **342 funzioni funzionanti** testate. OFFSET/INDIRECT esclusi
+  (valore cached del file). Alias nuovi: SCEGLI, MEDIA/MAX/MIN.PIÙ.SE,
+  TESTO.UNISCI.
+- **Guida utente** in `docs/guida/`: HTML+PDF curati (Puppeteer, 16 pagine,
+  numeri pagina), italiano E inglese. Da tenere AGGIORNATA a ogni feature;
+  buona base per la pagina docs della landing.
+
+## ▶ PROSSIMO: blocco presentazioni (pptx)
+Ricerca librerie FATTA (2026-07-16, reuse-first): PPTist escluso (AGPL+Vue),
+Fabric/Konva non servono (solo tela). Candidati Apache-2.0:
+**pptx-renderer** (aiden0z — rendering HTML/SVG alta fedeltà, solo lettura)
+e **pptx-viewer** (ChristopherVR — promette anche edit, giovane).
+1. **Spike sui pptx veri** (es. `Prova Atelier.pptx` nel vault di test):
+   fedeltà a schermo + round-trip. Scegliere il renderer.
+2. Tasto **Presenta** (fullscreen, frecce/click avanti, Esc esce).
+3. Editor slide: DOM nostro (riuso pattern gizmo annotazioni) + chirurgia
+   XML sullo zip (fflate) per salvare senza perdere nulla.
+Poi in coda: backlog Excel v0.3.x (grafici, validazione dati, formati
+numero completi), icone SVG toolbar, og.png landing, FORM_ENDPOINT landing.
 Tag `v0.3.0` → release automatica Win+macOS (GitHub Actions). Dentro:
 **pacchetto Excel completo** (griglia fedele + editor + motore formule
 fast-formula-parser ~280 funzioni + tastiera completa + incolla ricco +

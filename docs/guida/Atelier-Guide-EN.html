@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atelier — User Guide</title>
+<style>
+  :root{
+    --ink:#0f172a; --body:#334155; --soft:#64748b; --line:#e2e8f0;
+    --bg:#ffffff; --panel:#f1f5f9; --panel2:#f8fafc;
+    --blue:#2563eb; --blue2:#38bdf8; --blue-ink:#1e40af; --blue-soft:#eff6ff;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:"Cascadia Code",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--sans);color:var(--body);background:var(--bg);font-size:15px;line-height:1.65}
+  .page{max-width:880px;margin:0 auto;padding:0 40px 80px}
+
+  /* ---------- cover ---------- */
+  .cover{min-height:92vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding:60px 0 40px}
+  .cover::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:48px}
+  .brand .badge{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#38bdf8,#2563eb);
+    color:#fff;font-family:var(--serif);font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 24px rgba(37,99,235,.28)}
+  .brand .name{font-family:var(--serif);font-size:30px;color:var(--ink);letter-spacing:.5px}
+  .cover h1{font-family:var(--serif);font-size:54px;line-height:1.12;color:var(--ink);font-weight:600;max-width:600px}
+  .cover h1 em{font-style:normal;background:linear-gradient(100deg,#38bdf8,#2563eb);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .cover p.sub{font-size:18px;color:var(--soft);margin-top:22px;max-width:540px}
+  .cover .meta{margin-top:56px;display:flex;gap:26px;color:var(--soft);font-size:13px}
+  .cover .meta b{color:var(--ink);font-weight:600}
+
+  /* ---------- table of contents ---------- */
+  .toc{padding:56px 0 8px}
+  .toc h2{border:none;padding:0;margin:0 0 24px}
+  .toc ol{list-style:none;counter-reset:toc}
+  .toc li{counter-increment:toc;border-bottom:1px dashed var(--line)}
+  .toc a{display:flex;align-items:baseline;gap:14px;padding:11px 2px;color:var(--body);text-decoration:none;font-size:15.5px}
+  .toc a:hover{color:var(--blue)}
+  .toc a::before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:12px;color:var(--blue);min-width:26px}
+  .toc a span.dots{flex:1;border-bottom:1px dotted #cbd5e1;transform:translateY(-4px);margin:0 4px}
+  .toc a small{color:var(--soft);font-size:12.5px}
+
+  /* ---------- typography ---------- */
+  section{padding-top:34px}
+  h2{font-family:var(--serif);font-size:31px;color:var(--ink);font-weight:600;margin:44px 0 6px;padding-top:26px;border-top:1px solid var(--line)}
+  h2 .n{font-family:var(--mono);font-size:13px;color:var(--blue);display:block;margin-bottom:10px;letter-spacing:2px}
+  h3{font-family:var(--serif);font-size:20.5px;color:var(--ink);font-weight:600;margin:34px 0 10px}
+  h4{font-size:14.5px;color:var(--ink);font-weight:600;margin:22px 0 6px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0 10px 22px}
+  li{margin:5px 0}
+  strong{color:var(--ink);font-weight:600}
+  .lead{font-size:16.5px;color:var(--soft);margin:12px 0 20px}
+  kbd{font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid #cbd5e1;border-bottom-width:2px;
+    border-radius:5px;padding:2px 7px;color:var(--ink);white-space:nowrap}
+  code{font-family:var(--mono);font-size:13px;background:var(--blue-soft);color:var(--blue-ink);border-radius:4px;padding:2px 6px}
+  .tip{background:var(--blue-soft);border-left:3px solid var(--blue);border-radius:0 10px 10px 0;padding:13px 18px;margin:18px 0;font-size:14px}
+  .tip b{color:var(--blue-ink)}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px 18px;margin:18px 0;font-size:14px}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th{font-family:var(--sans);text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--soft);
+    border-bottom:2px solid var(--ink);padding:8px 12px 6px}
+  td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+  tr:nth-child(even) td{background:var(--panel2)}
+  td:first-child{color:var(--ink);font-weight:500}
+
+  .fx-cat{margin:20px 0}
+  .fx-cat h4{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .fx-cat h4 .count{font-family:var(--mono);font-size:11.5px;color:#fff;background:var(--blue);border-radius:99px;padding:1.5px 9px;font-weight:600}
+  .fx-list{font-family:var(--mono);font-size:12.3px;line-height:2.1;color:var(--body);word-spacing:2px}
+  .fx-list b{color:var(--blue-ink);font-weight:600;background:var(--blue-soft);border-radius:4px;padding:1.5px 5px}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel2)}
+  .card h4{margin:0 0 6px;font-size:14.5px}
+  .card p{margin:0;font-size:13.5px;color:var(--soft)}
+
+  footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--soft);font-size:12.5px}
+
+  /* ---------- print / PDF ---------- */
+  @page{size:A4;margin:16mm 16mm 18mm}
+  @media print{
+    body{font-size:10.6pt;line-height:1.58}
+    .page{max-width:none;padding:0}
+    .cover{min-height:87vh;page-break-after:always}
+    .toc{page-break-after:always}
+    section{padding-top:0}
+    h2{margin-top:30px;padding-top:22px;page-break-after:avoid}
+    h3,h4{page-break-after:avoid}
+    p,li{orphans:3;widows:3}
+    table,.tip,.note,.card,.fx-cat{page-break-inside:avoid}
+    .cards{page-break-inside:avoid}
+    a{color:inherit;text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ======================= COVER ======================= -->
+<div class="cover">
+  <div class="brand"><div class="badge">A</div><div class="name">Atelier</div></div>
+  <h1>User <em>Guide</em></h1>
+  <p class="sub">Everything you can do with Atelier: notes, Word documents, PDFs,
+  images and spreadsheets — in one place, on your own computer.</p>
+  <div class="meta">
+    <div><b>Version</b>&nbsp; 0.3</div>
+    <div><b>Updated</b>&nbsp; July 2026</div>
+    <div><b>Platforms</b>&nbsp; Windows · macOS</div>
+  </div>
+</div>
+
+<!-- ======================= TOC ======================= -->
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#intro">What Atelier is <span class="dots"></span><small>philosophy and vaults</small></a></li>
+    <li><a href="#first-steps">First steps <span class="dots"></span><small>vault, window, explorer, tabs</small></a></li>
+    <li><a href="#files">Working with files <span class="dots"></span><small>create, search, convert, trash</small></a></li>
+    <li><a href="#markdown">Notes (Markdown) <span class="dots"></span><small>three views, tables, wikilinks</small></a></li>
+    <li><a href="#word">Word documents <span class="dots"></span><small>A4 pages, formatting, images</small></a></li>
+    <li><a href="#pdf">PDF <span class="dots"></span><small>highlighter, forms, OCR</small></a></li>
+    <li><a href="#images">Images <span class="dots"></span><small>annotations, arrows, text</small></a></li>
+    <li><a href="#spreadsheets">Spreadsheets <span class="dots"></span><small>grid, editing, formatting</small></a></li>
+    <li><a href="#formulas">Formulas <span class="dots"></span><small>342 functions</small></a></li>
+    <li><a href="#shortcuts">Keyboard shortcuts <span class="dots"></span><small>quick reference</small></a></li>
+    <li><a href="#faq">Frequently asked questions <span class="dots"></span><small>files, backups, limits</small></a></li>
+  </ol>
+</div>
+
+<!-- ======================= 1. INTRO ======================= -->
+<section id="intro">
+  <h2><span class="n">CHAPTER 01</span>What Atelier is</h2>
+  <p class="lead">Atelier is your local workspace: open, edit and organise your everyday
+  files without sending anything to the internet.</p>
+
+  <p>Most apps today live in the cloud: your documents sit on someone else's servers,
+  and you need an account and a connection. Atelier makes the opposite choice.
+  <strong>Your files stay files</strong>, inside a folder on your own disk that you
+  choose. No account, no forced sync, no subscriptions: if you ever uninstall Atelier,
+  your documents are still there, ready to open with any other program.</p>
+
+  <h3>The vault</h3>
+  <p>The <strong>vault</strong> is simply the folder that holds your work. It can be a
+  brand-new folder or one you already use — your documents folder, or a folder synced by
+  OneDrive/Dropbox (syncing, if you want it, stays your choice with your own tools).
+  Inside the vault Atelier only keeps a small service folder, <code>.atelier</code>,
+  with settings and the trash.</p>
+  <p>You can have <strong>several vaults</strong> — say "Work" and "Personal" — and
+  switch between them. Each Atelier window opens one vault.</p>
+
+  <h3>One app, many formats</h3>
+  <div class="cards">
+    <div class="card"><h4>Notes — .md</h4><p>Markdown notes with Obsidian-style hybrid writing, editable tables and links between notes.</p></div>
+    <div class="card"><h4>Documents — .docx</h4><p>An editor with real A4 pages, compatible with Word and Google Docs files.</p></div>
+    <div class="card"><h4>PDF</h4><p>Reading, search, highlighter, fillable forms and OCR for scans.</p></div>
+    <div class="card"><h4>Images — png, jpg, webp…</h4><p>Viewing and annotations: pen, arrows, shapes, text.</p></div>
+    <div class="card"><h4>Spreadsheets — .xlsx, .csv</h4><p>An Excel-faithful grid with a formula engine and 342 functions.</p></div>
+    <div class="card"><h4>Presentations — .pptx</h4><p>Slide viewer. Present mode and editor coming next.</p></div>
+  </div>
+</section>
+
+<!-- ======================= 2. FIRST STEPS ======================= -->
+<section id="first-steps">
+  <h2><span class="n">CHAPTER 02</span>First steps</h2>
+
+  <h3>Opening or creating a vault</h3>
+  <p>On first launch Atelier asks where you want to work:</p>
+  <ul>
+    <li><strong>Create a vault</strong> — choose where to create a new folder;</li>
+    <li><strong>Open a folder</strong> — turn an existing folder into a vault: the files
+    it contains appear straight away in the Explorer.</li>
+  </ul>
+  <p>From the next launch you get the <strong>list of known vaults</strong>: one click
+  and you're in. If you open a second Atelier window, the vault picker appears again —
+  so you can keep two vaults open side by side.</p>
+
+  <h3>The window</h3>
+  <p>The interface is divided into four areas, top to bottom:</p>
+  <table>
+    <tr><th style="width:190px">Area</th><th>What it holds</th></tr>
+    <tr><td>Title bar</td><td>On the left, the button that <strong>shows/hides the Explorer</strong> and the logo. In the middle you can drag the window (double click = maximise). On the right, the <strong>Standard / Developer</strong> switch and the minimise&nbsp;·&nbsp;maximise&nbsp;·&nbsp;close controls. If you close with unsaved changes, Atelier asks first.</td></tr>
+    <tr><td>Tab row</td><td>One tab per open file; on the right, the folder path of the active file.</td></tr>
+    <tr><td>Explorer (left)</td><td>The tree of folders and files in your vault.</td></tr>
+    <tr><td>Workspace</td><td>The open file, with its toolbar.</td></tr>
+  </table>
+
+  <h3>The Explorer</h3>
+  <ul>
+    <li><strong>Folders</strong> have a chevron that rotates when you open them.</li>
+    <li><strong>Files</strong> show a clean name and a <strong>badge with the extension</strong>
+    (PDF, XLSX, JPG…); Markdown notes, the home format, carry no badge.</li>
+    <li><strong>Drag</strong> a file onto a folder to move it.</li>
+    <li>Resize it by <strong>dragging its right edge</strong>; the button at the top left
+    of the title bar hides it entirely when you want maximum room for content.</li>
+  </ul>
+
+  <h3>Tabs</h3>
+  <ul>
+    <li>Every open file becomes a <strong>tab</strong>: click to switch between files.</li>
+    <li>The <strong>amber dot</strong> on a tab flags unsaved changes.</li>
+    <li>Close with the <strong>✕</strong> or a <strong>middle click</strong> (the mouse wheel).</li>
+    <li><strong>Reorder</strong> tabs by dragging them: a blue line shows where the tab will land.</li>
+  </ul>
+
+  <div class="tip"><b>Tip.</b> Links between notes, search results and converted files
+  all open in a tab: you never lose what you were working on.</div>
+</section>
+
+<!-- ======================= 3. FILES ======================= -->
+<section id="files">
+  <h2><span class="n">CHAPTER 03</span>Working with files</h2>
+
+  <h3>Creating a new file</h3>
+  <p>From the Explorer's <strong>New file</strong> button pick the type (Markdown note,
+  Word document, spreadsheet…), give it a name, and Atelier creates it in the selected
+  folder and opens it immediately.</p>
+
+  <h3>Bringing in existing files</h3>
+  <p>The vault is a normal folder: you can copy files into it from File Explorer /
+  Finder and they show up in the Explorer. Any .docx, .xlsx, .pdf or image created by
+  other apps opens as-is.</p>
+
+  <h3>Searching</h3>
+  <p>Two searches, always at hand:</p>
+  <ul>
+    <li><kbd>Ctrl</kbd>+<kbd>P</kbd> — <strong>search by name</strong>: type a few
+    letters of the file name, hit <kbd>Enter</kbd> and it opens.</li>
+    <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> — <strong>global content
+    search</strong>: find a word or phrase <em>inside</em> the files of the whole vault
+    and jump straight to the match.</li>
+  </ul>
+
+  <h3>Renaming, moving, deleting</h3>
+  <p>All of it happens in the Explorer. Deleting never destroys anything: the file goes
+  to the <strong>vault's Trash</strong>, where you can recover it. Open tabs follow
+  their files: rename or move a file and its tab updates by itself.</p>
+
+  <h3>Converting between formats</h3>
+  <p>Whenever a file can be transformed, its toolbar shows a <strong>Convert</strong>
+  button. Conversion <strong>creates a new file next to the original</strong> (the
+  original is never touched) and opens it right away.</p>
+  <table>
+    <tr><th style="width:170px">From…</th><th>…you can get</th></tr>
+    <tr><td>Markdown</td><td>Word (.docx) · PDF · HTML page · plain text</td></tr>
+    <tr><td>Word</td><td>PDF · Markdown · HTML page · plain text</td></tr>
+    <tr><td>PDF</td><td>Word (text only) · PNG images (one per page) · plain text</td></tr>
+    <tr><td>Image</td><td>PDF · PNG · JPEG · WebP</td></tr>
+    <tr><td>Excel</td><td>CSV (first sheet)</td></tr>
+    <tr><td>CSV</td><td>Excel (.xlsx) · Markdown</td></tr>
+    <tr><td>Text (.txt)</td><td>Markdown</td></tr>
+  </table>
+</section>
+
+<!-- ======================= 4. MARKDOWN ======================= -->
+<section id="markdown">
+  <h2><span class="n">CHAPTER 04</span>Notes (Markdown)</h2>
+  <p class="lead">Atelier's home format: plain-text files that stay yours forever, with
+  writing that turns beautiful to read as you type it.</p>
+
+  <h3>The three views</h3>
+  <p>At the top you choose how to see the note:</p>
+  <table>
+    <tr><th style="width:130px">View</th><th>When to use it</th></tr>
+    <tr><td>Editor</td><td>The Markdown source with syntax highlighting. For full control over the text.</td></tr>
+    <tr><td>Hybrid</td><td>The perfect middle ground, Obsidian-style: you write Markdown and the line turns into the result the moment you leave it. Big headings, real bold, real tables.</td></tr>
+    <tr><td>Reading</td><td>Only the final result, typeset with serif headings. For reading and presenting.</td></tr>
+  </table>
+
+  <h3>What you can write</h3>
+  <ul>
+    <li><strong>Headings</strong> (<code># Title</code>), <strong>bold</strong>, <em>italic</em>, bulleted and numbered lists, quotes, dividers.</li>
+    <li><strong>Editable tables</strong>: in the Hybrid view Markdown tables become real tables — click a cell and type, and use the menu to add or remove rows and columns. No more aligning dashes by hand.</li>
+    <li><strong>Links between notes</strong> with <code>[[note name]]</code>: click to jump; the note opens in its own tab.</li>
+    <li><strong>Callouts</strong> — coloured boxes for notes and warnings (<code>&gt; [!note]</code>).</li>
+    <li><strong>Code blocks</strong> with highlighting for dozens of languages.</li>
+    <li><strong>Images</strong> embedded in the note.</li>
+  </ul>
+
+  <h3>Context menu</h3>
+  <p>Right-click in the editor for quick actions on the selected text: formatting,
+  links and table operations.</p>
+
+  <div class="tip"><b>Why Markdown?</b> It's plain text: readable with any program,
+  versionable, searchable, incorruptible. Today's notes will open identical twenty
+  years from now.</div>
+</section>
+
+<!-- ======================= 5. WORD ======================= -->
+<section id="word">
+  <h2><span class="n">CHAPTER 05</span>Word documents</h2>
+  <p class="lead">An editor with real pages: what you see on screen is the A4 sheet
+  you'll print, without opening Word.</p>
+
+  <h3>Compatibility</h3>
+  <p>Atelier opens .docx files created by Microsoft Word, Google Docs and LibreOffice,
+  and saves them still compatible: the file remains a normal .docx you can open
+  anywhere.</p>
+
+  <h3>Writing and formatting</h3>
+  <ul>
+    <li><strong>Character</strong>: bold, italic, underline, text colour, highlight,
+    font family, superscript and subscript.</li>
+    <li><strong>Paragraph</strong>: headings, alignment (left/centre/right/justified),
+    bulleted and numbered lists, task lists with checkboxes.</li>
+    <li><strong>Tables</strong> with row and column management.</li>
+    <li><strong>Images</strong> inside the document, from the dedicated button.</li>
+  </ul>
+
+  <h3>Document settings</h3>
+  <p>The <strong>Settings</strong> panel controls page format and margins. With the
+  <strong>continuous view</strong> pages scroll without breaks — great for long-form
+  writing; switch it off to see the real page breaks.</p>
+
+  <h3>Saving</h3>
+  <p>The <strong>Save</strong> button (highlighted with the blue gradient) writes the
+  .docx. The amber dot on the tab reminds you when changes are pending.</p>
+</section>
+
+<!-- ======================= 6. PDF ======================= -->
+<section id="pdf">
+  <h2><span class="n">CHAPTER 06</span>PDF</h2>
+  <p class="lead">Read, find, highlight and fill in — with an automatic safety net
+  before any change.</p>
+
+  <h3>Reading and search</h3>
+  <p>Zoom, smooth page-by-page scrolling and <strong>text search</strong> from the
+  Search button. The <strong>Info</strong> panel shows the metadata (title, author,
+  page count…).</p>
+
+  <h3>Highlighter</h3>
+  <p>Turn on the highlighter, pick a colour from the palette and sweep over the text:
+  highlights are <strong>saved inside the PDF</strong>, so you'll find them again in any
+  other reader.</p>
+  <div class="note">On the first change Atelier automatically creates a <strong>backup
+  copy</strong> (<code>.bak</code>) next to the file: the original is always
+  recoverable.</div>
+
+  <h3>Fillable forms</h3>
+  <p>If the PDF contains a form (text fields, checkboxes…), the fields are highlighted
+  and <strong>can be filled in directly</strong>; saving writes the values into the
+  file, ready to send.</p>
+
+  <h3>OCR — text from scans</h3>
+  <p>A scanned PDF is just a picture: with <strong>OCR</strong> Atelier extracts its
+  text so you can copy and reuse it. Everything happens on your computer — no document
+  is uploaded anywhere.</p>
+</section>
+
+<!-- ======================= 7. IMAGES ======================= -->
+<section id="images">
+  <h2><span class="n">CHAPTER 07</span>Images</h2>
+  <p class="lead">Look closely and explain with a mark: arrows, highlights and notes
+  drawn straight onto the image.</p>
+
+  <h3>Viewing</h3>
+  <p><strong>Zoom</strong> with the wheel and <strong>pan</strong> with the hand tool to
+  move around a zoomed-in image. The <strong>Info</strong> panel shows the file's size
+  and details.</p>
+
+  <h3>Annotations</h3>
+  <p>The toolbar has everything you need to mark up an image:</p>
+  <table>
+    <tr><th style="width:150px">Tool</th><th>What it does</th></tr>
+    <tr><td>Select</td><td>Pick up an element you've already drawn: you can <strong>move, resize or delete it</strong> with the blue handles.</td></tr>
+    <tr><td>Pen 1 and 2</td><td>Freehand drawing in two thicknesses, any colour.</td></tr>
+    <tr><td>Arrow</td><td>Straight arrows to point at things.</td></tr>
+    <tr><td>Shapes</td><td>Rectangles and ellipses, to frame an area.</td></tr>
+    <tr><td>Text</td><td>Text labels on the image.</td></tr>
+    <tr><td>Eraser</td><td>Removes individual drawn elements.</td></tr>
+  </table>
+  <p>Until you press <strong>Apply</strong>, annotations stay editable: adjust them,
+  move them, change them. Apply merges them into the image and saves.</p>
+
+  <h3>Quality preserved</h3>
+  <p>Saving <strong>keeps the file's original DPI</strong>: a print-quality image stays
+  print-quality. And with <strong>OCR</strong> you can extract photographed text
+  (signs, documents, whiteboards).</p>
+</section>
+
+<!-- ======================= 8. SPREADSHEETS ======================= -->
+<section id="spreadsheets">
+  <h2><span class="n">CHAPTER 08</span>Spreadsheets</h2>
+  <p class="lead">If you know Excel, you already know Atelier: same logic, same keys,
+  same formulas. Only the colours are different.</p>
+
+  <h3>Your files, intact</h3>
+  <p>Atelier opens .xlsx and .csv files and <strong>preserves them entirely</strong>:
+  everything the file contains — even things Atelier doesn't display yet, like charts —
+  survives saving. The sheet you reopen in Excel is the one you saved.</p>
+
+  <h3>The grid</h3>
+  <ul>
+    <li>Real column widths and row heights, <strong>merged cells</strong>, colours, borders and number formats as in the original file.</li>
+    <li><strong>Multiple sheets</strong> with tabs at the bottom: add, rename, delete (with confirmation).</li>
+    <li><strong>Thousands of rows without slowdown</strong>: the grid draws only what you see.</li>
+    <li><strong>Freeze panes</strong> to pin headers and first columns (from the right-click menu; the setting is written into the file).</li>
+    <li><strong>Filters</strong> on headers, hidden rows respected.</li>
+    <li>The <strong>status bar</strong> shows Sum, Average and Count for the selection — just like Excel.</li>
+  </ul>
+
+  <h3>Moving and selecting</h3>
+  <ul>
+    <li>Click a cell = <strong>selection</strong>; drag to select a range; <kbd>Shift</kbd>+click to extend.</li>
+    <li>Click the <strong>row numbers or column letters</strong> to select whole rows/columns; drag across the headers to select several.</li>
+    <li><kbd>Ctrl</kbd>+arrows jumps to the edge of the data, <kbd>Ctrl</kbd>+<kbd>F</kbd> finds in the sheet.</li>
+  </ul>
+
+  <h3>Typing into cells</h3>
+  <ul>
+    <li>Select and <strong>type</strong>: the content is replaced (like Excel). To <strong>edit</strong> the existing content use <kbd>F2</kbd> or double click.</li>
+    <li><kbd>Enter</kbd> confirms and moves down, <kbd>Tab</kbd> confirms and moves right, <kbd>Esc</kbd> cancels.</li>
+    <li>Typed dates (<code>12/5</code>), times (<code>9:30</code>) and percentages (<code>25%</code>) are <strong>recognised</strong> and get the right format automatically.</li>
+    <li><kbd>Del</kbd> opens the mini-menu: <em>content only</em>, <em>formatting only</em> or <em>everything</em>. <kbd>Backspace</kbd> clears the content, no questions asked.</li>
+    <li><strong>Undo and redo</strong> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) cover everything: values, formats and even row/column operations.</li>
+  </ul>
+
+  <h3>Copy, paste and fill</h3>
+  <ul>
+    <li><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd> with <strong>styles and formulas</strong>: pasted formulas shift their references (like Excel); Cut clears the source at paste time.</li>
+    <li>The <strong>fill handle</strong> in the selection's corner drags series (1, 2, 3… / Mon, Tue…) and formulas; <strong>double click</strong> it to fill down as far as the neighbouring column.</li>
+    <li><kbd>Ctrl</kbd>+<kbd>D</kbd> fills down, <kbd>Ctrl</kbd>+<kbd>R</kbd> fills right.</li>
+    <li>Drag the selection's <strong>border</strong> to move cells.</li>
+  </ul>
+
+  <h3>Formatting</h3>
+  <ul>
+    <li>From the toolbar: <strong>bold, italic, underline, strikethrough</strong>, font size, text and fill colour, alignment.</li>
+    <li><strong>Format cells</strong>: per-side borders with style and colour, and number formats (currency, percentage, dates, times, decimals…).</li>
+    <li>Ready-made <strong>table styles</strong>: solid header and banded rows in one click.</li>
+    <li>Formatting applies to the selection only — and of course undoes with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+  </ul>
+
+  <h3>Rows, columns and data</h3>
+  <ul>
+    <li>Right-click the headers to <strong>insert or delete</strong> rows and columns, several at a time too ("Delete 3 rows"). The sheet's formulas <strong>shift by themselves</strong>, with Excel's exact semantics.</li>
+    <li>Double click a column edge = <strong>auto-fit width</strong> to content.</li>
+    <li><strong>Sorting</strong> ascending/descending, numeric and alphabetical.</li>
+    <li><strong>Merge cells</strong> from the toolbar.</li>
+  </ul>
+
+  <h3>CSV</h3>
+  <p>.csv files open in the same grid, can be edited and saved; the Convert button turns
+  them into real .xlsx when you need formulas and formatting.</p>
+</section>
+
+<!-- ======================= 9. FORMULAS ======================= -->
+<section id="formulas">
+  <h2><span class="n">CHAPTER 09</span>Formulas</h2>
+  <p class="lead">A real calculation engine: 342 functions, instant chained
+  recalculation, English and Italian function names.</p>
+
+  <h3>Writing a formula</h3>
+  <p>Just like Excel: select the cell, type <code>=</code> and build. Function names are
+  the standard English ones (<code>=SUM(A1:A5)</code>); Italian names are accepted too
+  (<code>=SOMMA(A1:A5)</code> is the same formula — the file always stores the English
+  name, exactly as Excel does, so the sheet opens anywhere). Both <code>,</code> and
+  <code>;</code> work as argument separators.</p>
+  <ul>
+    <li>The <strong>formula bar</strong> at the top shows the cell's address and its true content.</li>
+    <li>As you type, <strong>autocomplete</strong> suggests functions (<code>=SU</code> → SUM, SUBSTITUTE…).</li>
+    <li>In <strong>formula mode</strong>, click a cell (or drag a range) to insert its reference: every reference is <strong>colour-coded</strong>, with a matching outline on the cell — you read the formula at a glance.</li>
+    <li><kbd>F4</kbd> cycles absolute references: <code>A1 → $A$1 → A$1 → $A1</code>.</li>
+    <li>Change a value and <strong>every dependent formula updates</strong>, in cascade and across sheets. Results are written into the file: anyone opening it with another app sees the right numbers.</li>
+  </ul>
+
+  <h3>Functions by category</h3>
+
+  <div class="fx-cat"><h4>Math <span class="count">57</span></h4>
+  <div class="fx-list">SUM SUMIF SUMIFS SUMPRODUCT SUMSQ SUMX2MY2 SUMX2PY2 SUMXMY2 ROUND ROUNDUP ROUNDDOWN TRUNC INT ABS SQRT SQRTPI POWER MOD QUOTIENT EXP LN LOG LOG10 PI RAND RANDBETWEEN AGGREGATE SUBTOTAL PRODUCT CEILING CEILING.MATH CEILING.PRECISE ISO.CEILING FLOOR FLOOR.MATH FLOOR.PRECISE MROUND EVEN ODD SIGN GCD LCM FACT FACTDOUBLE COMBIN COMBINA MULTINOMIAL DEGREES RADIANS ROMAN ARABIC BASE DECIMAL SERIESSUM MDETERM MMULT MUNIT</div></div>
+
+  <div class="fx-cat"><h4>Statistics <span class="count">24</span></h4>
+  <div class="fx-list">AVERAGE AVERAGEA AVERAGEIF AVERAGEIFS MEDIAN MODE MAX MAXA MAXIFS MIN MINA MINIFS COUNT COUNTA COUNTIF COUNTIFS COUNTBLANK LARGE SMALL RANK STDEV AVEDEV PERMUT PERMUTATIONA</div></div>
+
+  <div class="fx-cat"><h4>Distributions &amp; analysis <span class="count">86</span></h4>
+  <div class="fx-list">CORREL PEARSON RSQ SLOPE INTERCEPT STEYX TREND GROWTH LINEST LOGEST FORECAST FORECAST.LINEAR FREQUENCY DEVSQ GEOMEAN HARMEAN TRIMMEAN KURT SKEW SKEW.P STANDARDIZE PERCENTILE.INC PERCENTILE.EXC PERCENTRANK.INC PERCENTRANK.EXC QUARTILE.INC QUARTILE.EXC RANK.EQ RANK.AVG MODE.SNGL MODE.MULT STDEV.S STDEV.P STDEVA STDEVPA VAR.S VAR.P VARA VARPA COVARIANCE.P COVARIANCE.S CONFIDENCE.NORM CONFIDENCE.T PROB PHI GAUSS GAMMA GAMMALN GAMMALN.PRECISE — and the distributions NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV LOGNORM.DIST LOGNORM.INV BINOM.DIST BINOM.DIST.RANGE BINOM.INV NEGBINOM.DIST POISSON.DIST HYPGEOM.DIST EXPON.DIST BETA.DIST BETA.INV GAMMA.DIST GAMMA.INV WEIBULL.DIST CHISQ.DIST CHISQ.DIST.RT CHISQ.INV CHISQ.INV.RT CHISQ.TEST T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T T.TEST F.DIST F.DIST.RT F.INV F.INV.RT F.TEST Z.TEST FISHER FISHERINV</div></div>
+
+  <div class="fx-cat"><h4>Logic <span class="count">11</span></h4>
+  <div class="fx-list">IF IFS IFERROR IFNA AND OR NOT XOR SWITCH TRUE FALSE</div></div>
+
+  <div class="fx-cat"><h4>Lookup &amp; reference <span class="count">14</span></h4>
+  <div class="fx-list">VLOOKUP HLOOKUP LOOKUP MATCH INDEX CHOOSE UNIQUE ADDRESS AREAS ROW ROWS COLUMN COLUMNS TRANSPOSE</div></div>
+
+  <div class="fx-cat"><h4>Text <span class="count">37</span></h4>
+  <div class="fx-list">TEXT TEXTJOIN CONCATENATE CONCAT UPPER LOWER PROPER TRIM LEN LEFT RIGHT MID REPLACE SUBSTITUTE FIND SEARCH REPT VALUE NUMBERVALUE EXACT FIXED DOLLAR CHAR CODE UNICHAR UNICODE CLEAN T LEFTB RIGHTB MIDB LENB FINDB SEARCHB REPLACEB ASC BAHTTEXT DBCS</div></div>
+
+  <div class="fx-cat"><h4>Date &amp; time <span class="count">25</span></h4>
+  <div class="fx-list">TODAY NOW DATE DAY MONTH YEAR HOUR MINUTE SECOND DAYS WEEKDAY EOMONTH DATEDIF DATEVALUE TIMEVALUE TIME EDATE WEEKNUM ISOWEEKNUM NETWORKDAYS NETWORKDAYS.INTL WORKDAY WORKDAY.INTL YEARFRAC DAYS360</div></div>
+
+  <div class="fx-cat"><h4>Information <span class="count">14</span></h4>
+  <div class="fx-list">ISBLANK ISNUMBER ISTEXT ISERROR ISERR ISNA ISEVEN ISLOGICAL ISNONTEXT ISREF ERROR.TYPE TYPE N NA</div></div>
+
+  <div class="fx-cat"><h4>Trigonometry <span class="count">21</span></h4>
+  <div class="fx-list">SIN COS TAN ASIN ACOS ATAN ATAN2 SINH COSH TANH ASINH ACOSH ATANH COT COTH ACOT ACOTH SEC SECH CSC CSCH</div></div>
+
+  <div class="fx-cat"><h4>Engineering <span class="count">51</span></h4>
+  <div class="fx-list">BIN2DEC BIN2HEX BIN2OCT DEC2BIN DEC2HEX DEC2OCT HEX2BIN HEX2DEC HEX2OCT OCT2BIN OCT2DEC OCT2HEX BITAND BITOR BITXOR BITLSHIFT BITRSHIFT DELTA GESTEP ERF ERFC COMPLEX IMABS IMAGINARY IMARGUMENT IMCONJUGATE IMCOS IMCOSH IMCOT IMCSC IMCSCH IMDIV IMEXP IMLN IMLOG10 IMLOG2 IMPOWER IMPRODUCT IMREAL IMSEC IMSECH IMSIN IMSINH IMSQRT IMSUB IMSUM IMTAN BESSELI BESSELJ BESSELK BESSELY</div></div>
+
+  <div class="fx-cat"><h4>Web <span class="count">2</span></h4>
+  <div class="fx-list">ENCODEURL WEBSERVICE</div></div>
+
+  <h3>Current limits (stated honestly)</h3>
+  <ul>
+    <li><strong>OFFSET and INDIRECT</strong> are not recalculated live (they require
+    dynamic references): the cell shows the value stored in the file.</li>
+    <li>Excel 365's "dynamic array" functions (FILTER, SORT, SEQUENCE, LAMBDA…) are not
+    available yet; UNIQUE exists in a basic form.</li>
+    <li>If a sheet uses an unsupported function <strong>nothing breaks</strong>: the
+    cell keeps the last value Excel calculated, and the file stays intact.</li>
+  </ul>
+</section>
+
+<!-- ======================= 10. SHORTCUTS ======================= -->
+<section id="shortcuts">
+  <h2><span class="n">CHAPTER 10</span>Keyboard shortcuts</h2>
+
+  <h3>Everywhere</h3>
+  <table>
+    <tr><th style="width:230px">Keys</th><th>Action</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Quick file search by name</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>Global search inside file contents</td></tr>
+    <tr><td>Double click the title bar</td><td>Maximise / restore the window</td></tr>
+    <tr><td>Middle click on a tab</td><td>Closes the tab</td></tr>
+  </table>
+
+  <h3>In the spreadsheet</h3>
+  <table>
+    <tr><th style="width:230px">Keys</th><th>Action</th></tr>
+    <tr><td>Arrow keys</td><td>Move the selection (confirming any pending edit)</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Tab</kbd></td><td>Confirm and move down / right</td></tr>
+    <tr><td><kbd>F2</kbd> or double click</td><td>Edit the cell's content</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Cancel the current edit</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+arrows</td><td>Jump to the edge of the data</td></tr>
+    <tr><td><kbd>Shift</kbd>+click / <kbd>Shift</kbd>+arrows</td><td>Extend the selection</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd></td><td>Copy / cut / paste (with styles and shifted formulas)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Undo / redo (rows and columns included)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Fill down / right</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find in the sheet</td></tr>
+    <tr><td><kbd>F4</kbd> (in a formula)</td><td>Cycle absolute references ($)</td></tr>
+    <tr><td><kbd>Del</kbd></td><td>Mini-menu: content / formatting / everything</td></tr>
+    <tr><td><kbd>Backspace</kbd></td><td>Clear the content</td></tr>
+    <tr><td>Double click a column edge</td><td>Auto-fit width</td></tr>
+    <tr><td>Double click the fill handle</td><td>Fill the formula all the way down</td></tr>
+  </table>
+</section>
+
+<!-- ======================= 11. FAQ ======================= -->
+<section id="faq">
+  <h2><span class="n">CHAPTER 11</span>Frequently asked questions</h2>
+
+  <h4>Where are my files?</h4>
+  <p>In the vault folder, as normal files. You can open them, copy them and back them up
+  with the tools you already use. Atelier doesn't convert them and doesn't hide them in
+  any database.</p>
+
+  <h4>Do I need an internet connection?</h4>
+  <p>No. Everything — editing, formulas, OCR, conversions — happens on your computer.</p>
+
+  <h4>What if I delete a file by mistake?</h4>
+  <p>It's in the vault's Trash (the <code>.atelier</code> folder): recover it from there.</p>
+
+  <h4>Can I open Atelier's files with other apps?</h4>
+  <p>Always: .docx, .xlsx, .pdf and images remain 100% standard files. Notes are
+  Markdown text, readable everywhere.</p>
+
+  <h4>Will Excel reopen the sheets I edit correctly?</h4>
+  <p>Yes: Atelier preserves the file's entire content, including the parts it doesn't
+  display (e.g. charts). Formulas are stored with their standard names and up-to-date
+  results.</p>
+
+  <h4>What's still missing?</h4>
+  <p>Presentations open read-only for now (Present mode and the editor are in the
+  works), Excel charts aren't drawn yet, and some Excel 365 dynamic functions aren't
+  supported (see chapter 9).</p>
+
+  <footer>
+    <div>Atelier — User Guide · v0.3</div>
+    <div>© 2026 Atelier</div>
+  </footer>
+</section>
+
+</div>
+</body>
+</html>

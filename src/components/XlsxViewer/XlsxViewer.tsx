@@ -1156,9 +1156,13 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     // Formato implicito come Excel: date/orari/percentuali digitati prendono
     // anche il formato numero (senza, Excel mostrerebbe il seriale grezzo).
     if (!cellRef.numFmt) {
-      if (value instanceof Date) cellRef.numFmt = /:\d/.test(raw) ? 'hh:mm' : 'dd/mm/yyyy'
-      else if (typeof value === 'number' && raw.trim().endsWith('%'))
-        cellRef.numFmt = Number.isInteger(value * 100) ? '0%' : '0.00%'
+      let fmt: string | undefined
+      if (value instanceof Date) fmt = /:\d/.test(raw) ? 'hh:mm' : 'dd/mm/yyyy'
+      else if (typeof value === 'number' && raw.trim().endsWith('%')) fmt = Number.isInteger(value * 100) ? '0%' : '0.00%'
+      if (fmt) {
+        ownStyle(cellRef)
+        cellRef.numFmt = fmt
+      }
     }
     // Formula: prova a calcolarla col mini-motore (aritmetica + SUM/MEDIA/…):
     // il risultato va anche nel file come cached, così ogni app lo mostra.
@@ -1340,7 +1344,9 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         fill?: object
         border?: object
       }
-      const cell = ws.getRow(e.r + 1).getCell(e.c + 1) as unknown as {
+      const target = ws.getRow(e.r + 1).getCell(e.c + 1)
+      ownStyle(target)
+      const cell = target as unknown as {
         numFmt?: string
         font?: object
         alignment?: object
@@ -1781,10 +1787,20 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
 
   // ---- Funzioni "pro" della griglia: appunti, ordina, formato, filtro ----
 
+  // ExcelJS condivide lo STESSO oggetto style tra tutte le celle che nel file
+  // avevano lo stesso stile (cache per indice di stile): mutarlo cambierebbe
+  // TUTTE le celle gemelle. Da chiamare prima di ogni modifica di formato:
+  // dà alla cella una copia privata dello stile.
+  function ownStyle(cell: Cell) {
+    const c = cell as unknown as { style?: object }
+    c.style = c.style ? (JSON.parse(JSON.stringify(c.style)) as object) : {}
+  }
+
   // Snapshot di stile per appunti/cronologia.
   const styleSnap = (cell: Cell) =>
     JSON.stringify({ numFmt: cell.numFmt, font: cell.font, alignment: cell.alignment, fill: cell.fill, border: cell.border })
   const applyStyleSnap = (cell: Cell, s: string) => {
+    ownStyle(cell)
     const p = JSON.parse(s) as { numFmt?: string; font?: object; alignment?: object; fill?: object; border?: object }
     const t = cell as unknown as { numFmt?: string; font?: object; alignment?: object; fill?: object; border?: object }
     t.numFmt = p.numFmt
@@ -1945,6 +1961,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           if (record) op.cells.push({ r, c, before: cell.value, after: null })
           cell.value = null
         }
+        ownStyle(cell)
         mutate(cell, r, c)
         if (record) op.styles!.push({ r, c, before, after: snap(cell) })
       }

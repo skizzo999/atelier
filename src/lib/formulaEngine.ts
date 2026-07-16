@@ -58,6 +58,11 @@ const IT_EN: Record<string, string> = {
   'CONTA.VUOTE': 'COUNTBLANK',
   SE: 'IF',
   'PIÙ.SE': 'IFS',
+  SCEGLI: 'CHOOSE',
+  'MEDIA.PIÙ.SE': 'AVERAGEIFS',
+  'MAX.PIÙ.SE': 'MAXIFS',
+  'MIN.PIÙ.SE': 'MINIFS',
+  'TESTO.UNISCI': 'TEXTJOIN',
   'SE.ERRORE': 'IFERROR',
   'SE.NON.DISP': 'IFNA',
   E: 'AND',
@@ -149,6 +154,9 @@ const fromSerial = (n: number) => new Date(EPOCH + Math.round(n * DAY))
 // ---- Caricamento pigro del parser ----
 interface ParserInstance {
   parse(formula: string, position: { sheet: string; row: number; col: number }): unknown
+  functions: Record<string, (...args: unknown[]) => unknown>
+  funsNeedContext: string[]
+  supportedFunctions(): string[]
 }
 interface ParserCtor {
   new (config: {
@@ -163,6 +171,16 @@ async function loadParser(): Promise<ParserCtor> {
     ctorCache = m.default
   }
   return ctorCache
+}
+
+// Implementazioni di riserva: fast-formula-parser REGISTRA ~340 nomi ma ~60
+// sono stub vuoti (MAX, MIN, MEDIAN, MATCH, CHOOSE, SUMIFS, COUNTIFS…).
+// Le colma @formulajs/formulajs (MIT, solo implementazioni senza parser),
+// caricato pigro insieme al parser.
+let fjCache: Record<string, unknown> | null = null
+async function loadFormulajs(): Promise<Record<string, unknown>> {
+  if (!fjCache) fjCache = (await import('@formulajs/formulajs')) as unknown as Record<string, unknown>
+  return fjCache
 }
 
 // Risultato del parser → CellValue accettabile come result (o undefined se
@@ -310,6 +328,7 @@ export async function recalcSheet(wb: Workbook, ws: Worksheet): Promise<{ r: num
   if (!formulaCells.length || formulaCells.length > 3000) return []
 
   const Parser = await loadParser()
+  const fj = await loadFormulajs()
   const cache = new Map<string, unknown>()
   const evaluating = new Set<string>()
 
@@ -354,8 +373,8 @@ export async function recalcSheet(wb: Workbook, ws: Worksheet): Promise<{ r: num
   // formula (new Parser costa ~2,5 ms).
   const pool: ParserInstance[] = []
   let depth = 0
-  const makeParser = (): ParserInstance =>
-    new Parser({
+  const makeParser = (): ParserInstance => {
+    const p = new Parser({
       onCell: ({ sheet, row, col }) => {
         const wsX = (sheet && wb.getWorksheet(sheet)) || ws
         return valueOf(wsX, wsX.getRow(row).getCell(col))
@@ -378,6 +397,78 @@ export async function recalcSheet(wb: Workbook, ws: Worksheet): Promise<{ r: num
         return out
       },
     })
+    // Buchi della libreria: molti nomi registrati sono stub che restituiscono
+    // undefined (MAX, MIN, MEDIAN, CONFRONTA, SOMMA.PIÙ.SE… — verificato con
+    // parse reali). Le implementazioni arrivano da formulajs, adattate al
+    // protocollo del parser: argomenti { value } → valori piatti (i range
+    // restano matrici 2D, formulajs li appiattisce da sé); un Error di
+    // formulajs → undefined, cioè "niente valore" e il viewer tiene il cached.
+    const fns = p.functions
+    const one = (a: unknown): unknown => (a && typeof a === 'object' && 'value' in (a as object) ? (a as { value: unknown }).value : a)
+    const wrap =
+      (fn: (...a: unknown[]) => unknown) =>
+      (...args: unknown[]) => {
+        const plain = args.map((a) => ((a as { omitted?: boolean } | null)?.omitted ? undefined : one(a)))
+        const r = fn(...plain)
+        return r instanceof Error ? undefined : r
+      }
+    // formulajs esporta i nomi con punto senza punto (STDEV.S → STDEVS) o
+    // come oggetto annidato (STDEV.S → STDEV.S): prova entrambe le forme.
+    const fromFj = (name: string): ((...a: unknown[]) => unknown) | null => {
+      const direct = fj[name] ?? fj[name.replace(/\./g, '')]
+      if (typeof direct === 'function') return direct as (...a: unknown[]) => unknown
+      const dot = name.indexOf('.')
+      if (dot > 0) {
+        const obj = fj[name.slice(0, dot)]
+        const sub = obj && typeof obj === 'object' ? (obj as Record<string, unknown>)[name.slice(dot + 1)] : undefined
+        if (typeof sub === 'function') return sub as (...a: unknown[]) => unknown
+      }
+      return null
+    }
+    const real = new Set(p.supportedFunctions()) // nomi con un corpo vero
+    const patched = new Set<string>()
+    for (const name of Object.keys(fns)) {
+      // OFFSET/INDIRECT restituiscono RIFERIMENTI: senza il contesto del
+      // parser non sono replicabili, meglio il cached del file.
+      if (real.has(name) || name === 'OFFSET' || name === 'INDIRECT') continue
+      const impl = fromFj(name)
+      if (impl) {
+        fns[name] = wrap(impl)
+        patched.add(name)
+      }
+    }
+    // Nomi che il parser non registra affatto (storici e moderni) + alias.
+    for (const [name, fjName] of [
+      ['STDEV', 'STDEVS'],
+      ['MODE', 'MODESNGL'],
+      ['RANK', 'RANKEQ'],
+      ['COUNTA', 'COUNTA'],
+      ['COUNTBLANK', 'COUNTBLANK'],
+      ['COUNTIFS', 'COUNTIFS'],
+      ['UPPER', 'UPPER'],
+      ['UNIQUE', 'UNIQUE'],
+      ['LOOKUP', 'LOOKUP'],
+      ['XLOOKUP', 'XLOOKUP'],
+    ] as const) {
+      if (!real.has(name) && typeof fj[fjName] === 'function') {
+        fns[name] = wrap(fj[fjName] as (...a: unknown[]) => unknown)
+        patched.add(name)
+      }
+    }
+    // Le funzioni colmate ricevono VALORI, non riferimenti: via dalla lista
+    // "serve contesto" (CHOOSE ci sta: col contesto come primo argomento
+    // l'implementazione formulajs riceverebbe argomenti sfalsati).
+    p.funsNeedContext = p.funsNeedContext.filter((n) => !patched.has(n))
+    fns.VALUE = (t) => {
+      // VALORE con virgola decimale italiana e % (formulajs è solo en-US)
+      const s = String(one(t) ?? '').trim()
+      const pct = s.endsWith('%')
+      const body = (pct ? s.slice(0, -1) : s).trim()
+      const n = Number(body.includes(',') && !body.includes('.') ? body.replace(',', '.') : body)
+      return Number.isNaN(n) ? undefined : pct ? n / 100 : n // undefined → errore, come da libreria
+    }
+    return p
+  }
   function parseAt(f: string, pos: { sheet: string; row: number; col: number }): unknown {
     if (!pool[depth]) pool[depth] = makeParser()
     const p = pool[depth]
