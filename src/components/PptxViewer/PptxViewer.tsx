@@ -1,121 +1,82 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { revealInExplorer } from '../../lib/imageActions'
 import { ConvertButton } from '../Convert/ConvertButton'
-import { IMAGE_MIME } from '../../lib/mime'
-import type { PptxDoc, PptxSlide } from '../../lib/pptx'
 
-// Viewer PowerPoint best-effort (Fase 3 del piano Office): slide renderizzate
-// come HTML posizionato (testo con stili base, immagini, sfondi/riempimenti
-// pieni). Niente gruppi trasformati, gradienti, tabelle, grafici, animazioni.
+// Viewer PowerPoint ad alta fedeltà: rendering di @aiden0z/pptx-renderer
+// (Apache-2.0, HTML/SVG, scelto con lo spike sui file veri — vedi
+// docs/sessions/2026-07-16). Il FILE resta la verità: qui solo lettura;
+// l'editor arriverà con la chirurgia XML sullo zip.
+// Modalità PRESENTA: schermo intero, click/frecce avanti, Esc esce.
 
 const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
-// Il colore di sfondo è scuro? (per il colore testo di default)
-function isDark(hex?: string): boolean {
-  if (!hex) return false
-  const n = parseInt(hex.slice(1), 16)
-  const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)
-  return lum < 128
+// Tipi minimi della libreria (caricata pigra: pesa, serve solo per i .pptx).
+interface LibViewer {
+  goToSlide(i: number): void
+  setZoom(percent: number): void
+  // NB: possono restituire sia una Promise sia un valore sincrono
+  renderSlideToContainer(i: number, el: HTMLElement): unknown
+  renderThumbnailToContainer(i: number, el: HTMLElement): unknown
+  renderList(opts?: { windowed?: boolean }): Promise<unknown>
+  load(pres: unknown): void
+  destroy(): void
 }
-
-// Una slide renderizzata alla scala data (usata anche per le miniature).
-function Slide({
-  slide,
-  doc,
-  scale,
-  urls,
-}: {
-  slide: PptxSlide
-  doc: PptxDoc
-  scale: number
-  urls: Map<Uint8Array, string>
-}) {
-  const defColor = isDark(slide.bg) ? '#f4f4f5' : '#1f2937'
-  return (
-    <div
-      className="relative overflow-hidden rounded-md shrink-0 ring-1 ring-black/10 shadow-[0_2px_16px_rgba(0,0,0,0.5)]"
-      style={{ width: doc.w * scale, height: doc.h * scale, background: slide.bg ?? '#ffffff' }}
-    >
-      {slide.shapes.map((s, i) => {
-        const st: React.CSSProperties = {
-          position: 'absolute',
-          left: s.x * scale,
-          top: s.y * scale,
-          width: s.w * scale,
-          height: s.h * scale,
-        }
-        if (s.img) {
-          const url = urls.get(s.img.bytes)
-          return url ? <img key={i} src={url} alt="" style={{ ...st, objectFit: 'fill' }} /> : null
-        }
-        return (
-          <div key={i} style={{ ...st, background: s.fill, overflow: 'hidden' }}>
-            {s.paras?.map((p, j) => (
-              <div
-                key={j}
-                style={{
-                  textAlign: (p.align as 'left' | 'center' | 'right') ?? 'left',
-                  padding: `0 ${6 * scale}px`,
-                  lineHeight: 1.25,
-                }}
-              >
-                {p.bullet && <span style={{ color: defColor, fontSize: 18 * scale }}>• </span>}
-                {p.runs.map((r, k) => (
-                  <span
-                    key={k}
-                    style={{
-                      fontSize: (r.sz ?? 24) * scale,
-                      fontWeight: r.b ? 700 : 400,
-                      fontStyle: r.i ? 'italic' : undefined,
-                      color: r.color ?? defColor,
-                    }}
-                  >
-                    {r.text}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        )
-      })}
-    </div>
-  )
+interface LibModule {
+  PptxViewer: {
+    new (el: HTMLElement, opts?: Record<string, unknown>): LibViewer
+    open(buf: ArrayBuffer, el: HTMLElement, opts?: Record<string, unknown>): Promise<LibViewer>
+  }
+  parseZip(buf: ArrayBuffer, limits?: unknown): Promise<unknown>
+  buildPresentation(files: unknown): { slides?: unknown[] }
+  RECOMMENDED_ZIP_LIMITS: unknown
 }
 
 export function PptxViewer({ filePath }: { filePath: string }) {
-  const [doc, setDoc] = useState<PptxDoc | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [scale, setScale] = useState(0.8)
+  const [count, setCount] = useState(0)
+  const [zoom, setZoomState] = useState(100)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const urlsRef = useRef(new Map<Uint8Array, string>())
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [presenting, setPresenting] = useState<number | null>(null)
 
+  const containerRef = useRef<HTMLDivElement>(null)
+  const viewerRef = useRef<LibViewer | null>(null)
+  const presentingRef = useRef<number | null>(null)
+  presentingRef.current = presenting
+  const countRef = useRef(0)
+  countRef.current = count
+  const stageRef = useRef<HTMLDivElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  // ---- Apertura del file ----
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(false)
-    setDoc(null)
+    setCount(0)
+    setPresenting(null)
     ;(async () => {
       const bytes = await readFile(filePath)
-      const { parsePptx } = await import('../../lib/pptx')
-      const parsed = parsePptx(bytes)
-      if (cancelled) return
-      // Immagini → object URL (una volta sola, revocate alla chiusura).
-      const urls = new Map<Uint8Array, string>()
-      for (const slide of parsed.slides)
-        for (const s of slide.shapes) {
-          if (s.img && !urls.has(s.img.bytes)) {
-            const blob = new Blob([s.img.bytes], { type: IMAGE_MIME[s.img.ext] ?? 'image/png' })
-            urls.set(s.img.bytes, URL.createObjectURL(blob))
-          }
-        }
-      urlsRef.current = urls
-      // Adatta alla larghezza disponibile.
-      const cw = containerRef.current?.clientWidth ?? 900
-      setScale(Math.max(0.2, Math.min(1.5, (cw - 64) / parsed.w)))
-      setDoc(parsed)
+      const mod = (await import('@aiden0z/pptx-renderer')) as unknown as LibModule
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+      const files = await mod.parseZip(buf, mod.RECOMMENDED_ZIP_LIMITS)
+      const pres = mod.buildPresentation(files)
+      if (cancelled || !containerRef.current) return
+      const viewer = new mod.PptxViewer(containerRef.current, { fitMode: 'contain' })
+      viewer.load(pres)
+      await viewer.renderList({ windowed: true })
+      if (cancelled) {
+        viewer.destroy()
+        return
+      }
+      viewerRef.current = viewer
+      setCount(pres.slides?.length ?? 0)
+      // Lo zoom della libreria è RELATIVO al contenitore (100 = tutta la
+      // larghezza utile): 96 lascia un piccolo margine, come "Adatta".
+      viewer.setZoom(96)
+      zoomRef.current = 96
+      setZoomState(96)
       setLoading(false)
     })().catch((e) => {
       console.error('Apertura PPTX:', e)
@@ -126,16 +87,111 @@ export function PptxViewer({ filePath }: { filePath: string }) {
     })
     return () => {
       cancelled = true
-      for (const url of urlsRef.current.values()) URL.revokeObjectURL(url)
-      urlsRef.current = new Map()
+      viewerRef.current?.destroy()
+      viewerRef.current = null
     }
   }, [filePath])
 
-  function fitWidth() {
-    if (!doc) return
-    const cw = containerRef.current?.clientWidth ?? 900
-    setScale(Math.max(0.2, Math.min(1.5, (cw - 64) / doc.w)))
+  // zoomRef evita la chiusura stantia sui click rapidi di +/−.
+  const zoomRef = useRef(100)
+  function applyZoom(p: number) {
+    const z = Math.max(20, Math.min(200, Math.round(p)))
+    zoomRef.current = z
+    setZoomState(z)
+    viewerRef.current?.setZoom(z)
   }
+  function fitWidth() {
+    applyZoom(96)
+  }
+
+  // ---- Miniature (rese dalla libreria, una per slide) ----
+  const thumbRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el || el.childElementCount > 0) return
+      const i = Number(el.dataset.slide)
+      try {
+        void Promise.resolve(viewerRef.current?.renderThumbnailToContainer(i, el)).catch(() => {})
+      } catch (e) {
+        console.error('Miniatura pptx:', e)
+      }
+    },
+    // le miniature vanno ricreate quando cambia file (count torna a 0 e poi al nuovo valore)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filePath, count],
+  )
+
+  // ---- Modalità Presenta ----
+  const showSlide = useCallback(async (i: number) => {
+    const stage = stageRef.current
+    const v = viewerRef.current
+    if (!stage || !v) return
+    stage.innerHTML = ''
+    await v.renderSlideToContainer(i, stage)
+    // La libreria rende a dimensione modello: scala per riempire lo schermo.
+    const child = stage.firstElementChild as HTMLElement | null
+    if (child) {
+      const w = child.offsetWidth || 960
+      const h = child.offsetHeight || 540
+      const k = Math.min(window.innerWidth / w, window.innerHeight / h)
+      stage.style.width = `${w}px`
+      stage.style.height = `${h}px`
+      stage.style.transform = `scale(${k})`
+      stage.style.transformOrigin = 'center center'
+    }
+  }, [])
+
+  const startPresent = useCallback(() => {
+    setPresenting(0)
+  }, [])
+  const stopPresent = useCallback(() => {
+    setPresenting(null)
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (presenting === null) return
+    // Schermo intero sull'overlay (se il permesso manca, resta a finestra piena).
+    overlayRef.current?.requestFullscreen?.().catch(() => {})
+    void showSlide(presenting)
+
+    const step = (d: number) => {
+      const cur = presentingRef.current ?? 0
+      const next = Math.max(0, Math.min(countRef.current - 1, cur + d))
+      if (next !== cur) setPresenting(next)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        stopPresent()
+      } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+        e.preventDefault()
+        step(1)
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace') {
+        e.preventDefault()
+        step(-1)
+      }
+    }
+    const onFsChange = () => {
+      if (!document.fullscreenElement && presentingRef.current !== null) setPresenting(null)
+    }
+    const onResize = () => {
+      if (presentingRef.current !== null) void showSlide(presentingRef.current)
+    }
+    window.addEventListener('keydown', onKey, true)
+    document.addEventListener('fullscreenchange', onFsChange)
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('fullscreenchange', onFsChange)
+      window.removeEventListener('resize', onResize)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenting === null])
+
+  // Cambio slide durante la presentazione.
+  useEffect(() => {
+    if (presenting !== null) void showSlide(presenting)
+  }, [presenting, showSlide])
 
   const raw = filePath.split('\\').pop() ?? ''
   let fileName = raw
@@ -147,17 +203,15 @@ export function PptxViewer({ filePath }: { filePath: string }) {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {sidebarOpen && doc && (
+      {sidebarOpen && count > 0 && (
         <aside className="w-52 shrink-0 border-r border-zinc-800 bg-zinc-900/40 overflow-y-auto p-2 flex flex-col gap-2">
-          {doc.slides.map((s, i) => (
-            <button
-              key={i}
-              className="block group"
-              onClick={() => document.getElementById(`pptx-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            >
-              <div className="mx-auto group-hover:ring-2 group-hover:ring-blue-500 rounded-md">
-                <Slide slide={s} doc={doc} scale={168 / doc.w} urls={urlsRef.current} />
-              </div>
+          {Array.from({ length: count }, (_, i) => (
+            <button key={`${filePath}-${i}`} className="block group" onClick={() => viewerRef.current?.goToSlide(i)}>
+              <div
+                ref={thumbRef}
+                data-slide={i}
+                className="mx-auto rounded-md overflow-hidden ring-1 ring-black/20 group-hover:ring-2 group-hover:ring-blue-500"
+              />
               <span className="block text-center text-[11px] text-zinc-500 mt-0.5">{i + 1}</span>
             </button>
           ))}
@@ -171,40 +225,68 @@ export function PptxViewer({ filePath }: { filePath: string }) {
               ☰
             </button>
             <span className="truncate">{fileName}</span>
-            {doc && <span className="text-xs text-zinc-500 shrink-0">· {doc.slides.length} slide</span>}
+            {count > 0 && <span className="text-xs text-zinc-500 shrink-0">· {count} slide</span>}
           </span>
           <div className="flex items-center gap-1 text-xs text-zinc-300">
             <ConvertButton filePath={filePath} className={btn} />
             <button className={btn} title="Apri in Explorer" onClick={() => revealInExplorer(filePath).catch((e) => console.error(e))}>
               Explorer
             </button>
-            <div className="w-px h-5 bg-zinc-700 mx-1" />
-            <button className={btn} title="Riduci" onClick={() => setScale((s) => +Math.max(0.2, s - 0.1).toFixed(2))}>
+            <div className="tsep" />
+            <button className={btn} title="Riduci" onClick={() => applyZoom(zoomRef.current - 10)}>
               −
             </button>
-            <span className="w-12 text-center text-zinc-400 tabular-nums">{Math.round(scale * 100)}%</span>
-            <button className={btn} title="Ingrandisci" onClick={() => setScale((s) => +Math.min(2, s + 0.1).toFixed(2))}>
+            <span className="w-12 text-center text-zinc-400 tabular-nums">{zoom}%</span>
+            <button className={btn} title="Ingrandisci" onClick={() => applyZoom(zoomRef.current + 10)}>
               +
             </button>
             <button className={btn} onClick={fitWidth}>
               Adatta
             </button>
+            <div className="tsep" />
+            <button
+              className="btn-accent rounded-md h-7 px-3 text-xs font-medium disabled:opacity-40"
+              disabled={count === 0}
+              onClick={startPresent}
+              title="Presenta a schermo intero (frecce o click per avanzare, Esc per uscire)"
+            >
+              Presenta
+            </button>
           </div>
         </div>
 
-        <div ref={containerRef} className="flex-1 overflow-auto bg-zinc-900 flex flex-col items-center gap-6 px-6 py-7">
-          {error && <p className="m-auto text-zinc-500 text-sm">Impossibile aprire la presentazione.</p>}
+        <div className="flex-1 overflow-auto bg-zinc-900 relative">
+          {error && <p className="absolute inset-0 grid place-items-center text-zinc-500 text-sm">Impossibile aprire la presentazione.</p>}
           {loading && !error && (
-            <div className="m-auto h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="h-7 w-7 rounded-full border-2 border-zinc-700 border-t-zinc-400 animate-spin" />
+            </div>
           )}
-          {doc &&
-            doc.slides.map((s, i) => (
-              <div key={i} id={`pptx-${i}`} style={{ scrollMarginTop: 16 }}>
-                <Slide slide={s} doc={doc} scale={scale} urls={urlsRef.current} />
-              </div>
-            ))}
+          <div ref={containerRef} className="px-6 py-7 [&_*]:select-text" />
         </div>
       </div>
+
+      {presenting !== null && (
+        <div
+          ref={overlayRef}
+          className="fixed inset-0 z-[100] bg-black grid place-items-center cursor-pointer select-none"
+          onClick={() => {
+            const next = Math.min(countRef.current - 1, (presentingRef.current ?? 0) + 1)
+            if (next === presentingRef.current) stopPresent()
+            else setPresenting(next)
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            const prev = Math.max(0, (presentingRef.current ?? 0) - 1)
+            setPresenting(prev)
+          }}
+        >
+          <div ref={stageRef} />
+          <div className="absolute bottom-3 right-4 text-zinc-600 text-xs tabular-nums pointer-events-none">
+            {presenting + 1} / {count}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

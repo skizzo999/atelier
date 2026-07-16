@@ -15,16 +15,23 @@
   numeri pagina), italiano E inglese. Da tenere AGGIORNATA a ogni feature;
   buona base per la pagina docs della landing.
 
-## ▶ PROSSIMO: blocco presentazioni (pptx)
-Ricerca librerie FATTA (2026-07-16, reuse-first): PPTist escluso (AGPL+Vue),
-Fabric/Konva non servono (solo tela). Candidati Apache-2.0:
-**pptx-renderer** (aiden0z — rendering HTML/SVG alta fedeltà, solo lettura)
-e **pptx-viewer** (ChristopherVR — promette anche edit, giovane).
-1. **Spike sui pptx veri** (es. `Prova Atelier.pptx` nel vault di test):
-   fedeltà a schermo + round-trip. Scegliere il renderer.
-2. Tasto **Presenta** (fullscreen, frecce/click avanti, Esc esce).
-3. Editor slide: DOM nostro (riuso pattern gizmo annotazioni) + chirurgia
-   XML sullo zip (fflate) per salvare senza perdere nulla.
+## ✅ pptx passo 1 FATTO (2026-07-16, committato): viewer fedele + Presenta
+Spike sui file veri: **pptx-viewer-core BOCCIATO** (round-trip corrompe già
+senza modifiche), **@aiden0z/pptx-renderer PROMOSSO** (Apache-2.0) e
+integrato nel PptxViewer: miniature della libreria, zoom relativo al
+contenitore (fit=96, il toggle miniature NON resetta lo zoom — richiesta
+utente), **Presenta** fullscreen (click/frecce avanti, Esc esce, scala
+esatta). Verificato end-to-end nel harness col CSS di produzione. Guida
+aggiornata (it+en) e PDF rigenerati.
+
+## ▶ PROSSIMO: EDITOR SLIDE (pptx passo 2)
+Architettura: il FILE resta la verità — **chirurgia XML sullo zip** (fflate
+già in casa), UI DOM nostra (riuso pattern gizmo annotazioni immagini).
+1. Modulo `src/lib/pptxEdit.ts`: apri zip, elenca i testi di una slide,
+   modifica un run, salva → round-trip verificato headless sul file vero
+   (il renderer rilegge, PowerPoint riapre).
+2. UI: doppio click su un testo nel viewer → editing in place → Salva.
+3. Poi: sposta/ridimensiona forme, aggiungi testo/immagini, riordino slide.
 Poi in coda: backlog Excel v0.3.x (grafici, validazione dati, formati
 numero completi), icone SVG toolbar, og.png landing, FORM_ENDPOINT landing.
 Tag `v0.3.0` → release automatica Win+macOS (GitHub Actions). Dentro:
