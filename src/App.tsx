@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import './App.css'
 import { exists } from '@tauri-apps/plugin-fs'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -16,12 +16,16 @@ import { SearchPalette } from './components/SearchPalette/SearchPalette'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { TitleBar } from './components/TitleBar'
 import { TabBar } from './components/TabBar'
+// Pannello Developer: caricato pigramente, così la modalità Standard non
+// porta in bundle terminale, git e strumenti.
+const DevPanel = lazy(() => import('./components/DevPanel/DevPanel').then((m) => ({ default: m.DevPanel })))
 
 function App() {
   const vaultPath = useAppStore((s) => s.vaultPath)
   const clearVault = useAppStore((s) => s.clearVault)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
+  const mode = useAppStore((s) => s.mode)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const [booting, setBooting] = useState(true)
   // Un'altra istanza di Atelier è già aperta → mostra il picker dei vault
@@ -229,9 +233,16 @@ function App() {
         </>
       )}
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <TabBar />
-        <FileView />
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <TabBar />
+          <FileView />
+        </div>
+        {mode === 'developer' && (
+          <Suspense fallback={null}>
+            <DevPanel />
+          </Suspense>
+        )}
       </main>
 
       {palette && <SearchPalette initialMode={palette} onClose={() => setPalette(null)} />}

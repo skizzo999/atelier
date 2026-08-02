@@ -342,6 +342,7 @@ export function Editor() {
           markdownMode={markdown}
           livePreviewMode={markdown && view === 'live'}
           fileDir={fileDir}
+          fileName={fileName ?? ''}
           onWikilink={handleWikilink}
           viewRef={editorViewRef}
           onChange={(v) => {

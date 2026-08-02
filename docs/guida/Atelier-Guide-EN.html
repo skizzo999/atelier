@@ -127,6 +127,7 @@
     <li><a href="#images">Images <span class="dots"></span><small>annotations, arrows, text</small></a></li>
     <li><a href="#spreadsheets">Spreadsheets <span class="dots"></span><small>grid, editing, formatting</small></a></li>
     <li><a href="#formulas">Formulas <span class="dots"></span><small>342 functions</small></a></li>
+    <li><a href="#developer">Developer mode <span class="dots"></span><small>code, terminal, Git, tools</small></a></li>
     <li><a href="#shortcuts">Keyboard shortcuts <span class="dots"></span><small>quick reference</small></a></li>
     <li><a href="#faq">Frequently asked questions <span class="dots"></span><small>files, backups, limits</small></a></li>
   </ol>
@@ -400,6 +401,8 @@
     <li><strong>Thousands of rows without slowdown</strong>: the grid draws only what you see.</li>
     <li><strong>Freeze panes</strong> to pin headers and first columns (from the right-click menu; the setting is written into the file).</li>
     <li><strong>Filters</strong> on headers, hidden rows respected.</li>
+    <li><strong>The file's charts are drawn</strong> where they belong on the sheet: bars, lines, areas, pies and scatter, with the original colours and titles (read-only; untouched on save).</li>
+    <li><strong>Data validation</strong>: cells with a list of allowed values show the arrow and drop-down menu, just like Excel — even when the list lives on another sheet.</li>
     <li>The <strong>status bar</strong> shows Sum, Average and Count for the selection — just like Excel.</li>
   </ul>
 
@@ -515,8 +518,61 @@
 </section>
 
 <!-- ======================= 10. SHORTCUTS ======================= -->
+<section id="developer">
+  <h2><span class="n">CHAPTER 10</span>Developer mode</h2>
+  <p class="lead">One switch in the title bar turns Atelier into a technical
+  workbench, without changing anything you already use.</p>
+
+  <p>Top right, next to the window controls, sits the <strong>Standard /
+  Developer</strong> switch. In Developer a <strong>bottom panel</strong> appears with
+  three tabs; drag its top edge to resize, click the active tab to collapse it. Nothing
+  else in the app changes.</p>
+
+  <h3>Code editor</h3>
+  <p>Code files (<code>.ts</code>, <code>.js</code>, <code>.py</code>,
+  <code>.json</code>, <code>.html</code>, <code>.css</code>, <code>.rs</code>… over a
+  hundred languages) open with <strong>syntax highlighting</strong>, <strong>line
+  numbers</strong>, active-line marker, bracket matching, auto-indent and
+  <kbd>Ctrl</kbd>+<kbd>F</kbd> search. The language is inferred from the extension and
+  loaded only when needed. This works in <em>both</em> modes: code reads well in
+  Standard too.</p>
+
+  <h3>Terminal</h3>
+  <p>A real terminal, opened in your vault folder. Type a command and press
+  <kbd>Enter</kbd>: output streams in as it arrives, with errors in red and the exit
+  code at the end.</p>
+  <ul>
+    <li><strong>Arrow keys ↑↓</strong> bring back commands you already ran.</li>
+    <li><strong><code>cd</code></strong> behaves as expected: the current folder sticks
+    for the next command too (the prompt shows it).</li>
+    <li><strong>Stop</strong> (or <kbd>Ctrl</kbd>+<kbd>C</kbd>) kills a long-running
+    command; <code>clear</code> or <kbd>Ctrl</kbd>+<kbd>L</kbd> wipes the screen.</li>
+  </ul>
+  <div class="note">For safety Atelier never launches arbitrary executables: it hands
+  the command line to the system interpreter (PowerShell on Windows, sh on macOS),
+  exactly like a terminal would.</div>
+
+  <h3>Git</h3>
+  <p>If your vault is a Git repository, the tab shows the <strong>current branch</strong>
+  and every changed file, each with its label (<em>modified</em>, <em>new</em>,
+  <em>deleted</em>, <em>renamed</em>). Click a file to see the <strong>diff</strong>,
+  added lines in green and removed in red. At the bottom, the full round trip:
+  <strong>Stage all → Commit → Push</strong>. If the folder isn't a repository yet, a
+  button initialises one.</p>
+
+  <h3>Tools</h3>
+  <table>
+    <tr><th style="width:130px">Tool</th><th>What it does</th></tr>
+    <tr><td>JSON</td><td>Format, minify and validate, pointing at the exact error when the text isn't valid JSON.</td></tr>
+    <tr><td>Regex</td><td>Try a regular expression against a text and see the matches highlighted, with a count.</td></tr>
+    <tr><td>Compare</td><td>Diffs two texts line by line: what was removed and what was added.</td></tr>
+    <tr><td>Encode</td><td>Base64 and URL (both ways), SHA-256 digest, with one-click copy.</td></tr>
+  </table>
+</section>
+
+<!-- ======================= 11. SHORTCUTS ======================= -->
 <section id="shortcuts">
-  <h2><span class="n">CHAPTER 10</span>Keyboard shortcuts</h2>
+  <h2><span class="n">CHAPTER 11</span>Keyboard shortcuts</h2>
 
   <h3>Everywhere</h3>
   <table>
@@ -554,11 +610,21 @@
     <tr><td>Right click · <kbd>←</kbd> · <kbd>Backspace</kbd></td><td>Previous slide</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Leave the presentation</td></tr>
   </table>
+
+  <h3>In code and the terminal</h3>
+  <table>
+    <tr><th style="width:230px">Keys</th><th>Action</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Search inside the open code file</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Indent the line (or the selection)</td></tr>
+    <tr><td><kbd>↑</kbd> · <kbd>↓</kbd> in the terminal</td><td>Cycle through past commands</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal</td><td>Stop the running command</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> in the terminal</td><td>Clear the screen</td></tr>
+  </table>
 </section>
 
 <!-- ======================= 11. FAQ ======================= -->
 <section id="faq">
-  <h2><span class="n">CHAPTER 11</span>Frequently asked questions</h2>
+  <h2><span class="n">CHAPTER 12</span>Frequently asked questions</h2>
 
   <h4>Where are my files?</h4>
   <p>In the vault folder, as normal files. You can open them, copy them and back them up
@@ -588,8 +654,8 @@
   by design: Atelier shows and presents them, it doesn't edit them.</p>
 
   <h4>What's still missing?</h4>
-  <p>Excel charts aren't drawn yet, and some Excel 365 dynamic functions aren't
-  supported (see chapter 9).</p>
+  <p>Spreadsheet charts are shown but can't be created from Atelier, and some Excel 365
+  dynamic functions aren't supported (see chapter 9).</p>
 
   <footer>
     <div>Atelier — User Guide · v0.3</div>

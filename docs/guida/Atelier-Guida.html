@@ -127,6 +127,7 @@
     <li><a href="#immagini">Immagini <span class="dots"></span><small>annotazioni, frecce, testo</small></a></li>
     <li><a href="#excel">Fogli di calcolo <span class="dots"></span><small>griglia, modifica, formato</small></a></li>
     <li><a href="#formule">Le formule <span class="dots"></span><small>342 funzioni, alias italiani</small></a></li>
+    <li><a href="#developer">Modalità Developer <span class="dots"></span><small>codice, terminale, Git, strumenti</small></a></li>
     <li><a href="#scorciatoie">Scorciatoie da tastiera <span class="dots"></span><small>riferimento rapido</small></a></li>
     <li><a href="#faq">Domande frequenti <span class="dots"></span><small>file, backup, limiti</small></a></li>
   </ol>
@@ -402,6 +403,8 @@
     <li><strong>Migliaia di righe senza rallentamenti</strong>: la griglia disegna solo ciò che vedi.</li>
     <li><strong>Blocca riquadri</strong> per tenere ferme intestazioni e prime colonne (dal menu del tasto destro; l'impostazione viene scritta nel file).</li>
     <li><strong>Filtri</strong> sulle intestazioni e righe nascoste rispettate.</li>
+    <li><strong>Grafici del file visibili</strong> al loro posto sul foglio: barre, linee, aree, torte e dispersione, coi colori e i titoli originali (in lettura; restano intatti al salvataggio).</li>
+    <li><strong>Validazione dati</strong>: le celle con un elenco di valori ammessi mostrano la freccetta e il menu a tendina, come in Excel — anche quando l'elenco sta su un altro foglio.</li>
     <li>La <strong>barra di stato</strong> in basso mostra Somma, Media e Conteggio della selezione — come in Excel.</li>
   </ul>
 
@@ -517,9 +520,63 @@
   </ul>
 </section>
 
-<!-- ======================= 10. SCORCIATOIE ======================= -->
+<!-- ======================= 10. DEVELOPER ======================= -->
+<section id="developer">
+  <h2><span class="n">CAPITOLO 10</span>Modalità Developer</h2>
+  <p class="lead">Un interruttore nella barra del titolo trasforma Atelier in un
+  banco di lavoro tecnico, senza cambiare nulla di quello che già usi.</p>
+
+  <p>In alto a destra, accanto ai controlli della finestra, c'è il selettore
+  <strong>Standard / Developer</strong>. In Developer compare un <strong>pannello in
+  basso</strong> con tre schede; l'altezza si regola trascinando il bordo superiore e si
+  richiude cliccando la scheda attiva. Tutto il resto dell'app resta identico.</p>
+
+  <h3>Editor di codice</h3>
+  <p>I file di codice (<code>.ts</code>, <code>.js</code>, <code>.py</code>,
+  <code>.json</code>, <code>.html</code>, <code>.css</code>, <code>.rs</code>… oltre
+  cento linguaggi) si aprono con <strong>evidenziazione della sintassi</strong>,
+  <strong>numeri di riga</strong>, riga attiva marcata, parentesi abbinate, rientro
+  automatico e ricerca con <kbd>Ctrl</kbd>+<kbd>F</kbd>. Il linguaggio si deduce
+  dall'estensione e si carica solo quando serve. Questo vale in <em>entrambe</em> le
+  modalità: anche in Standard il codice si legge bene.</p>
+
+  <h3>Terminale</h3>
+  <p>Un terminale vero, aperto nella cartella del vault. Scrivi il comando e premi
+  <kbd>Invio</kbd>: l'output compare mano a mano, con gli errori in rosso e il codice
+  di uscita alla fine.</p>
+  <ul>
+    <li><strong>Le frecce ↑↓</strong> ripescano i comandi già dati.</li>
+    <li><strong><code>cd</code></strong> funziona come ci si aspetta: la cartella
+    corrente resta quella anche per il comando dopo (il prompt la mostra).</li>
+    <li><strong>Interrompi</strong> (o <kbd>Ctrl</kbd>+<kbd>C</kbd>) ferma un comando
+    lungo; <code>clear</code> o <kbd>Ctrl</kbd>+<kbd>L</kbd> puliscono.</li>
+  </ul>
+  <div class="note">Per sicurezza Atelier non lancia programmi arbitrari: passa la riga
+  di comando all'interprete di sistema (PowerShell su Windows, sh su macOS), esattamente
+  come farebbe un terminale.</div>
+
+  <h3>Git</h3>
+  <p>Se il vault è un repository Git, la scheda mostra il <strong>ramo corrente</strong> e
+  l'elenco dei file cambiati, ognuno con la sua etichetta (<em>modificato</em>,
+  <em>nuovo</em>, <em>eliminato</em>, <em>rinominato</em>). Cliccando un file vedi le
+  <strong>differenze</strong> con le righe aggiunte in verde e tolte in rosso. In basso
+  il giro completo: <strong>Aggiungi tutto → Commit → Push</strong>. Se la cartella non
+  è ancora un repository, un pulsante lo inizializza.</p>
+
+  <h3>Strumenti</h3>
+  <table>
+    <tr><th style="width:130px">Strumento</th><th>Cosa fa</th></tr>
+    <tr><td>JSON</td><td>Formatta, minifica e valida, indicando l'errore esatto quando il testo non è JSON valido.</td></tr>
+    <tr><td>Regex</td><td>Provi un'espressione regolare su un testo e vedi le corrispondenze evidenziate, col conteggio.</td></tr>
+    <tr><td>Confronta</td><td>Mette a confronto due testi riga per riga: cosa è stato tolto e cosa aggiunto.</td></tr>
+    <tr><td>Codifica</td><td>Base64 e URL (andata e ritorno), impronta SHA-256, con copia del risultato.</td></tr>
+  </table>
+
+</section>
+
+<!-- ======================= 11. SCORCIATOIE ======================= -->
 <section id="scorciatoie">
-  <h2><span class="n">CAPITOLO 10</span>Scorciatoie da tastiera</h2>
+  <h2><span class="n">CAPITOLO 11</span>Scorciatoie da tastiera</h2>
 
   <h3>Ovunque</h3>
   <table>
@@ -557,11 +614,21 @@
     <tr><td>Click destro · <kbd>←</kbd> · <kbd>Backspace</kbd></td><td>Slide precedente</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Esce dalla presentazione</td></tr>
   </table>
+
+  <h3>Nel codice e nel terminale</h3>
+  <table>
+    <tr><th style="width:230px">Tasti</th><th>Azione</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Cerca dentro il file di codice aperto</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Rientra la riga (o la selezione)</td></tr>
+    <tr><td><kbd>↑</kbd> · <kbd>↓</kbd> nel terminale</td><td>Scorre i comandi già dati</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> nel terminale</td><td>Interrompe il comando in corso</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> nel terminale</td><td>Pulisce lo schermo</td></tr>
+  </table>
 </section>
 
 <!-- ======================= 11. FAQ ======================= -->
 <section id="faq">
-  <h2><span class="n">CAPITOLO 11</span>Domande frequenti</h2>
+  <h2><span class="n">CAPITOLO 12</span>Domande frequenti</h2>
 
   <h4>Dove sono i miei file?</h4>
   <p>Nella cartella del vault, come file normali. Puoi aprirli, copiarli e farne il
@@ -591,8 +658,8 @@
   presenta, non le modifica.</p>
 
   <h4>Cosa manca ancora?</h4>
-  <p>I grafici di Excel non vengono ancora disegnati, e alcune funzioni dinamiche di
-  Excel 365 non sono supportate (vedi il capitolo 9).</p>
+  <p>Nei fogli di calcolo i grafici si vedono ma non si creano da Atelier, e alcune
+  funzioni dinamiche di Excel 365 non sono supportate (vedi il capitolo 9).</p>
 
   <footer>
     <div>Atelier — Guida all'uso · v0.3</div>

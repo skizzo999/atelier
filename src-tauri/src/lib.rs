@@ -55,6 +55,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        // Esecuzione comandi: alimenta il terminale e il pannello Git della
+        // modalità Developer (interpreti consentiti nello scope della capability).
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![allow_path, set_hidden, trash_path])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

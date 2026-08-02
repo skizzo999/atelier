@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
+import { Compartment, EditorState } from '@codemirror/state'
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput, LanguageDescription } from '@codemirror/language'
+import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
@@ -111,6 +112,7 @@ export function CodeMirrorEditor({
   markdownMode,
   livePreviewMode = false,
   fileDir = '',
+  fileName = '',
   onWikilink,
   viewRef,
 }: {
@@ -119,11 +121,16 @@ export function CodeMirrorEditor({
   markdownMode: boolean
   livePreviewMode?: boolean
   fileDir?: string
+  /** Nome del file: serve a dedurre il linguaggio per l'evidenziazione. */
+  fileName?: string
   onWikilink?: (name: string) => void
   viewRef?: React.MutableRefObject<EditorView | null>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
+  // Il linguaggio dei file di codice si carica in modo pigro: il compartment
+  // permette di iniettarlo (o cambiarlo) senza ricreare l'editor.
+  const langComp = useRef(new Compartment())
   const settingExternally = useRef(false)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -142,12 +149,18 @@ export function CodeMirrorEditor({
     const liveMode = markdownMode && livePreviewMode
     const extensions = [
       history(),
-      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
       EditorView.lineWrapping,
       liveMode ? [] : oneDark,
       // In Ibrida: evidenzia solo il codice nei blocchi, non il markdown.
       liveMode ? syntaxHighlighting(codeHighlightStyle) : [],
+      // Comodità da editor di codice (fuori dalla vista Ibrida, dove
+      // darebbero fastidio alla resa "documento"): numeri di riga, riga
+      // attiva, parentesi abbinate, rientro automatico, Ctrl+F.
+      liveMode ? [] : [lineNumbers(), highlightActiveLineGutter(), highlightActiveLine()],
+      liveMode ? [] : [bracketMatching(), indentOnInput(), search({ top: true }), highlightSelectionMatches()],
       baseTheme,
+      langComp.current.of([]),
       EditorView.updateListener.of((u) => {
         if (u.docChanged && !settingExternally.current) {
           onChangeRef.current(u.state.doc.toString())
@@ -177,6 +190,27 @@ export function CodeMirrorEditor({
     // ricrea quando cambia la modalità o la cartella del file (per le immagini).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markdownMode, livePreviewMode, fileDir])
+
+  // Evidenziazione per linguaggio nei file di codice: il pacchetto del
+  // linguaggio (dedotto dall'estensione) si scarica solo quando serve.
+  useEffect(() => {
+    if (markdownMode || !fileName) return
+    let cancelled = false
+    const desc = LanguageDescription.matchFilename(languages, fileName)
+    if (!desc) {
+      view.current?.dispatch({ effects: langComp.current.reconfigure([]) })
+      return
+    }
+    desc
+      .load()
+      .then((support) => {
+        if (!cancelled) view.current?.dispatch({ effects: langComp.current.reconfigure(support) })
+      })
+      .catch((e) => console.error('Linguaggio non caricato:', e))
+    return () => {
+      cancelled = true
+    }
+  }, [fileName, markdownMode, livePreviewMode])
 
   // Applica i cambi esterni di `value` (es. caricamento di un nuovo file).
   useEffect(() => {

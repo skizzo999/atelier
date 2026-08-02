@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type AppMode = 'standard' | 'developer'
+// Schede del pannello Developer.
+export type DevTab = 'terminal' | 'git' | 'tools'
 // Vista dell'editor markdown: Codice / Ibrida (live preview) / Lettura.
 export type MarkdownView = 'source' | 'live' | 'reading'
 
@@ -39,6 +41,11 @@ interface AppState {
   // Explorer: larghezza (trascinabile) e visibilità. Persistiti.
   sidebarWidth: number
   sidebarOpen: boolean
+  // Pannello Developer (terminale/git/strumenti): altezza, visibilità e
+  // scheda attiva. Persistiti; conta solo in modalità developer.
+  devPanelHeight: number
+  devPanelOpen: boolean
+  devTab: DevTab
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
   // Condiviso così l'explorer può mostrare l'indicatore "non salvato" sui file.
   dirtyBuffers: Record<string, string>
@@ -73,6 +80,9 @@ interface AppState {
   setPendingHighlight: (term: string | null) => void
   setSidebarWidth: (w: number) => void
   toggleSidebar: () => void
+  setDevPanelHeight: (h: number) => void
+  toggleDevPanel: () => void
+  setDevTab: (tab: DevTab) => void
   bumpFsRevision: () => void
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
@@ -104,6 +114,9 @@ export const useAppStore = create<AppState>()(
       openTabs: [],
       sidebarWidth: 256,
       sidebarOpen: true,
+      devPanelHeight: 280,
+      devPanelOpen: true,
+      devTab: 'terminal',
       dirtyBuffers: {},
       pendingHighlight: null,
       fsRevision: 0,
@@ -176,6 +189,9 @@ export const useAppStore = create<AppState>()(
       setPendingHighlight: (term) => set({ pendingHighlight: term }),
       setSidebarWidth: (w) => set({ sidebarWidth: Math.max(170, Math.min(520, Math.round(w))) }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      setDevPanelHeight: (h) => set({ devPanelHeight: Math.max(120, Math.min(700, Math.round(h))) }),
+      toggleDevPanel: () => set((state) => ({ devPanelOpen: !state.devPanelOpen })),
+      setDevTab: (tab) => set({ devTab: tab, devPanelOpen: true }),
       bumpFsRevision: () => set((state) => ({ fsRevision: state.fsRevision + 1 })),
       setBuffer: (path, content) =>
         set((state) => ({ dirtyBuffers: { ...state.dirtyBuffers, [path]: content } })),
@@ -239,6 +255,9 @@ export const useAppStore = create<AppState>()(
         pdfHlColors: state.pdfHlColors,
         sidebarWidth: state.sidebarWidth,
         sidebarOpen: state.sidebarOpen,
+        devPanelHeight: state.devPanelHeight,
+        devPanelOpen: state.devPanelOpen,
+        devTab: state.devTab,
       }),
     },
   ),

@@ -12,6 +12,8 @@ import { parseCsv } from '../../lib/csv'
 // dentro recalcSheet, al primo ricalcolo.
 import { normalizeFormula, shiftRefsAbs, FORMULA_NAMES, materializeSharedFormulas, adjustSheetFormulas } from '../../lib/formulaEngine'
 import type { AdjustKind } from '../../lib/formulaEngine'
+import type { ChartInfo } from '../../lib/xlsxCharts'
+import { ChartView } from './ChartView'
 
 // Cronologia annulla/ripeti per file (valori e stili: le operazioni
 // strutturali su righe/colonne la azzerano perché gli indici slittano).
@@ -228,6 +230,7 @@ interface CellData {
   covR?: number // coperta da un master in un'altra riga (indice 0-based del master)
   wrap?: boolean // testo a capo (alignment.wrapText)
   chk?: boolean // cella booleana → checkbox cliccabile
+  dv?: string[] // validazione dati a elenco → menu a tendina (come Excel)
   bt?: string // bordi espliciti della cella (css)
   br?: string
   bb?: string
@@ -744,10 +747,52 @@ function cellText(v: CellValue, numFmt?: string): { text: string; num: boolean }
   return { text: String(v), num: false }
 }
 
+// Validazione dati a ELENCO (Excel: Dati → Convalida): le voci possono
+// essere scritte inline ("a,b,c") o puntare a un intervallo del file.
+// Restituisce le voci risolte, o null se la cella non ha un elenco.
+function listOptions(cell: Cell): string[] | null {
+  const dv = (cell as unknown as { dataValidation?: { type?: string; formulae?: unknown[] } }).dataValidation
+  if (!dv || dv.type !== 'list') return null
+  const f = dv.formulae?.[0]
+  if (typeof f !== 'string' || !f) return null
+  // Elenco scritto a mano: "Sì,No" (con o senza virgolette).
+  if (!/[!:$]/.test(f) || /^".*"$/.test(f)) {
+    return f
+      .replace(/^"|"$/g, '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  // Riferimento a un intervallo: Foglio!$A$1:$A$9 (o senza foglio).
+  const m = /^(?:'?([^'!]+)'?!)?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(f.trim())
+  if (!m) return null
+  const wb = cell.worksheet?.workbook
+  const ws = m[1] ? wb?.getWorksheet(m[1]) : cell.worksheet
+  if (!ws) return null
+  const c1 = colIndex(m[2])
+  const r1 = Number(m[3])
+  const c2 = m[4] ? colIndex(m[4]) : c1
+  const r2 = m[5] ? Number(m[5]) : r1
+  if ((r2 - r1 + 1) * (c2 - c1 + 1) > 500) return null // elenchi assurdi: lasciamo perdere
+  const out: string[] = []
+  for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++)
+    for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+      const t = cellText(ws.getRow(r).getCell(c).value).text
+      if (t) out.push(t)
+    }
+  return out.length ? out : null
+}
+
 function toCellData(cell: Cell, palette: string[]): CellData {
   const { text, num } = cellText(cell.value, cell.numFmt)
   const out: CellData = { t: text, num }
   if (typeof cell.value === 'boolean') out.chk = true
+  try {
+    const opts = listOptions(cell)
+    if (opts) out.dv = opts
+  } catch {
+    /* validazione illeggibile: la cella resta normale */
+  }
   const f = cell.font
   if (f?.bold) out.b = true
   if (f?.italic) out.i = true
@@ -983,6 +1028,10 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const [menu, setMenu] = useState<{ x: number; y: number; r: number; c: number } | null>(null)
   const [submenu, setSubmenu] = useState<string | null>(null) // sottomenu aperto (Riga/Colonna/Ordina)
   const [filterMenu, setFilterMenu] = useState<{ c: number; x: number; y: number } | null>(null) // dropdown filtro
+  // Menu a tendina della validazione dati (elenco): cella + posizione + voci.
+  const [dvMenu, setDvMenu] = useState<{ r: number; c: number; x: number; y: number; opts: string[] } | null>(null)
+  // Grafici del file (sola lettura), disegnati sopra la griglia al loro posto.
+  const [charts, setCharts] = useState<ChartInfo[]>([])
   const [renamingSheet, setRenamingSheet] = useState<number | null>(null)
   const [sheetAsk, setSheetAsk] = useState<number | null>(null) // conferma eliminazione foglio
   // Barra della formula (casella nome + fx) e finestre di formattazione.
@@ -1051,6 +1100,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     setSheet(null)
     setActive(0)
     setScrollTop(0)
+    setCharts([])
     cacheRef.current.clear()
     ;(async () => {
       if (isCsv) {
@@ -1071,6 +1121,14 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         book = new ExcelJS.Workbook()
         await book.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
         setDirty(false)
+        // GRAFICI: ExcelJS non li espone, li leggiamo dallo zip del file
+        // (sola lettura; restano intatti nel salvataggio come tutto il resto).
+        try {
+          const { readCharts } = await import('../../lib/xlsxCharts')
+          if (!cancelled) setCharts(readCharts(bytes))
+        } catch (e) {
+          console.warn('Grafici non letti:', e)
+        }
       }
       if (cancelled) return
       setEditing(null)
@@ -3209,6 +3267,22 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                               ) : (
                                 cell.t
                               )}
+                              {/* Validazione dati a elenco: freccetta come in
+                                  Excel, il click apre le voci ammesse. */}
+                              {cell.dv && !isEditing && !isCsv && (
+                                <button
+                                  className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-sm bg-white/85 text-[9px] text-zinc-600 border border-zinc-300 hover:bg-blue-600 hover:text-white hover:border-blue-600"
+                                  title="Scegli un valore"
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                    setDvMenu({ r, c, x: box.left, y: box.bottom, opts: cell.dv! })
+                                  }}
+                                >
+                                  ▾
+                                </button>
+                              )}
                             </div>
                           </td>
                         )
@@ -3219,6 +3293,28 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               </tbody>
             </table>
             <div style={{ height: Math.max(0, totalH - (offsets[end] ?? totalH)) }} />
+
+            {/* GRAFICI del file (sola lettura), al loro posto sul foglio. */}
+            {charts
+              .filter((ch) => ch.sheet === active)
+              .map((ch, i) => {
+                const x = colX(Math.min(ch.from.col, widths.length - 1))
+                const y = ROW_H + (offsets[Math.min(ch.from.row, offsets.length - 1)] ?? 0)
+                const x2 = colX(Math.min(ch.to.col, widths.length))
+                const y2 = ROW_H + (offsets[Math.min(ch.to.row, offsets.length - 1)] ?? 0)
+                const w = Math.max(200, x2 - x)
+                const h = Math.max(140, y2 - y)
+                return (
+                  <div
+                    key={i}
+                    style={{ position: 'absolute', left: x, top: y, width: w, height: h, zIndex: 20 }}
+                    className="shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded"
+                    title={ch.title || 'Grafico del file (sola lettura)'}
+                  >
+                    <ChartView chart={ch} width={w} height={h} />
+                  </div>
+                )
+              })}
 
             {/* Bordo spesso della selezione (stile Excel): il bordo si può
                 trascinare per SPOSTARE le celle; il quadratino è il fill handle
@@ -3542,6 +3638,31 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       )}
 
       {/* Dropdown del filtro: spunte sui valori della colonna */}
+      {/* Tendina della validazione dati: scegli una voce e la cella si compila. */}
+      {dvMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onMouseDown={() => setDvMenu(null)} />
+          <div
+            className="fixed z-50 w-48 max-h-64 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1"
+            style={{ left: Math.min(dvMenu.x, window.innerWidth - 200), top: Math.min(dvMenu.y, window.innerHeight - 260) }}
+          >
+            {dvMenu.opts.map((o) => (
+              <button
+                key={o}
+                className="w-full text-left px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 truncate"
+                title={o}
+                onClick={() => {
+                  commitEdit(dvMenu.r, dvMenu.c, o)
+                  setDvMenu(null)
+                }}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {filterMenu &&
         sheet?.filter &&
         !isCsv &&
