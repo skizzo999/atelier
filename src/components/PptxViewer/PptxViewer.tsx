@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readFile } from '@tauri-apps/plugin-fs'
+import { unzipSync, strFromU8 } from 'fflate'
 import { revealInExplorer } from '../../lib/imageActions'
 import { ConvertButton } from '../Convert/ConvertButton'
 
 // Viewer PowerPoint ad alta fedeltà: rendering di @aiden0z/pptx-renderer
 // (Apache-2.0, HTML/SVG, scelto con lo spike sui file veri — vedi
-// docs/sessions/2026-07-16). Il FILE resta la verità: qui solo lettura;
-// l'editor arriverà con la chirurgia XML sullo zip.
-// Modalità PRESENTA: schermo intero, click/frecce avanti, Esc esce.
+// docs/sessions/2026-07-16). SOLO lettura e presentazione, per decisione di
+// prodotto (2026-07-17): l'editor è fuori dallo scope.
+// Modalità PRESENTA: schermo intero, click/frecce avanti, Esc esce; le
+// TRANSIZIONI dichiarate nel file sono riprodotte come dissolvenza.
 
 const btn = 'tbtn' // pattern toolbar condiviso (index.css)
 
@@ -42,6 +44,8 @@ export function PptxViewer({ filePath }: { filePath: string }) {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<LibViewer | null>(null)
+  // Transizione dichiarata per ogni slide (p:transition nell'XML): durata ms.
+  const transRef = useRef<{ has: boolean; dur: number }[]>([])
   const presentingRef = useRef<number | null>(null)
   presentingRef.current = presenting
   const countRef = useRef(0)
@@ -58,6 +62,25 @@ export function PptxViewer({ filePath }: { filePath: string }) {
     setPresenting(null)
     ;(async () => {
       const bytes = await readFile(filePath)
+      // Transizioni per la modalità Presenta (mai bloccante se qualcosa va male).
+      transRef.current = []
+      try {
+        const z = unzipSync(bytes)
+        const names = Object.keys(z)
+          .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+          .sort((a, b) => Number(a.match(/\d+/g)!.pop()) - Number(b.match(/\d+/g)!.pop()))
+        transRef.current = names.map((n) => {
+          const xml = strFromU8(z[n])
+          const m = xml.match(/<(?:p|p14|mc):transition[^>]*/)
+          if (!m) return { has: false, dur: 0 }
+          const durMs = m[0].match(/dur="(\d+)"/)
+          const spd = m[0].match(/spd="(\w+)"/)?.[1]
+          const dur = durMs ? Number(durMs[1]) : spd === 'slow' ? 900 : spd === 'med' ? 600 : 400
+          return { has: true, dur: Math.max(150, Math.min(3000, dur)) }
+        })
+      } catch {
+        /* niente transizioni */
+      }
       const mod = (await import('@aiden0z/pptx-renderer')) as unknown as LibModule
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
       const files = await mod.parseZip(buf, mod.RECOMMENDED_ZIP_LIMITS)
@@ -125,6 +148,15 @@ export function PptxViewer({ filePath }: { filePath: string }) {
     const stage = stageRef.current
     const v = viewerRef.current
     if (!stage || !v) return
+    // Transizione dichiarata nel file → la slide entra in dissolvenza.
+    const tr = transRef.current[i]
+    if (tr?.has) {
+      stage.style.transition = 'none'
+      stage.style.opacity = '0'
+    } else {
+      stage.style.transition = ''
+      stage.style.opacity = '1'
+    }
     stage.innerHTML = ''
     await v.renderSlideToContainer(i, stage)
     // La libreria rende a dimensione modello: scala per riempire lo schermo.
@@ -138,6 +170,13 @@ export function PptxViewer({ filePath }: { filePath: string }) {
       stage.style.transform = `scale(${k})`
       stage.style.transformOrigin = 'center center'
     }
+    if (tr?.has) {
+      // Reflow sincrono: la transizione parte senza dipendere da rAF (che
+      // nei pannelli in background è sospeso).
+      void stage.offsetWidth
+      stage.style.transition = `opacity ${tr.dur}ms ease`
+      stage.style.opacity = '1'
+    }
   }, [])
 
   const startPresent = useCallback(() => {
@@ -150,9 +189,9 @@ export function PptxViewer({ filePath }: { filePath: string }) {
 
   useEffect(() => {
     if (presenting === null) return
-    // Schermo intero sull'overlay (se il permesso manca, resta a finestra piena).
+    // Schermo intero sull'overlay (se il permesso manca, resta a finestra
+    // piena). Il disegno della slide lo fa l'effetto su [presenting].
     overlayRef.current?.requestFullscreen?.().catch(() => {})
-    void showSlide(presenting)
 
     const step = (d: number) => {
       const cur = presentingRef.current ?? 0

@@ -15,25 +15,25 @@
   numeri pagina), italiano E inglese. Da tenere AGGIORNATA a ogni feature;
   buona base per la pagina docs della landing.
 
-## ✅ pptx passo 1 FATTO (2026-07-16, committato): viewer fedele + Presenta
-Spike sui file veri: **pptx-viewer-core BOCCIATO** (round-trip corrompe già
-senza modifiche), **@aiden0z/pptx-renderer PROMOSSO** (Apache-2.0) e
-integrato nel PptxViewer: miniature della libreria, zoom relativo al
-contenitore (fit=96, il toggle miniature NON resetta lo zoom — richiesta
-utente), **Presenta** fullscreen (click/frecce avanti, Esc esce, scala
-esatta). Verificato end-to-end nel harness col CSS di produzione. Guida
-aggiornata (it+en) e PDF rigenerati.
+## ✅ pptx CHIUSO (2026-07-17, decisione utente: "eliminiamo l'editor")
+Il blocco presentazioni è DEFINITIVO così: **viewer ad alta fedeltà**
+(@aiden0z/pptx-renderer, Apache-2.0 — spike documentato nei diari) con
+miniature e zoom, **Presenta** fullscreen (click/frecce, Esc) che riproduce
+le **transizioni dichiarate nel file** (p:transition → dissolvenza, durata
+da `dur` o `spd`; verificato nel harness su file con e senza transizioni).
+L'EDITOR è fuori scope per scelta di prodotto: il codice sperimentale
+(pptxEdit, overlay WYSIWYG) è stato RIMOSSO, il piano PIANO_EDITOR_PPTX.md
+eliminato. Non riaprire senza decisione esplicita dell'utente.
 
-## ▶ PROSSIMO: EDITOR SLIDE (pptx passo 2)
-Architettura: il FILE resta la verità — **chirurgia XML sullo zip** (fflate
-già in casa), UI DOM nostra (riuso pattern gizmo annotazioni immagini).
-1. Modulo `src/lib/pptxEdit.ts`: apri zip, elenca i testi di una slide,
-   modifica un run, salva → round-trip verificato headless sul file vero
-   (il renderer rilegge, PowerPoint riapre).
-2. UI: doppio click su un testo nel viewer → editing in place → Salva.
-3. Poi: sposta/ridimensiona forme, aggiungi testo/immagini, riordino slide.
-Poi in coda: backlog Excel v0.3.x (grafici, validazione dati, formati
-numero completi), icone SVG toolbar, og.png landing, FORM_ENDPOINT landing.
+## ▶ PROSSIMO: modalità DEVELOPER + chiusura progetto
+L'utente vuole FINIRE il progetto in fretta ("massima resa zero errori").
+1. **Modalità Developer**: il toggle nella titlebar esiste ma è VUOTO e non
+   è mai stata definita → domande esplicite fatte all'utente (contenuti e
+   scope); con le risposte va scritta la ROADMAP di chiusura completa e poi
+   eseguita a colpo unico.
+2. In coda (da confermare con lui nella roadmap): backlog Excel (grafici in
+   lettura, validazione dati), og.png landing, FORM_ENDPOINT del form
+   landing, release finale.
 Tag `v0.3.0` → release automatica Win+macOS (GitHub Actions). Dentro:
 **pacchetto Excel completo** (griglia fedele + editor + motore formule
 fast-formula-parser ~280 funzioni + tastiera completa + incolla ricco +
