@@ -78,7 +78,11 @@ export function Terminal() {
         line,
         cwd || undefined,
         (text, stream) => {
-          for (const t of text.replace(/\r\n?/g, '\n').split('\n')) push(t, stream === 'err' ? 'err' : 'out')
+          // Ogni evento porta gia' UNA riga: togliamo il solo a-capo finale,
+          // altrimenti lo split produce una riga vuota di troppo e il
+          // terminale risulta spaziato doppio (le righe vuote vere restano).
+          const clean = text.replace(/\r\n?/g, '\n').replace(/\n$/, '')
+          for (const t of clean.split('\n')) push(t, stream === 'err' ? 'err' : 'out')
         },
         (code) => {
           childRef.current = null
