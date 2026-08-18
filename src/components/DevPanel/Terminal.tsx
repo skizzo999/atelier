@@ -33,6 +33,16 @@ export function Terminal() {
     setCwd(vaultPath ?? '')
   }, [vaultPath])
 
+  // Comando arrivato dal tasto "Esegui" dell'editor: lo eseguiamo qui.
+  const pendingCommand = useAppStore((s) => s.pendingCommand)
+  const clearPendingCommand = useAppStore((s) => s.clearPendingCommand)
+  useEffect(() => {
+    if (!pendingCommand || running) return
+    clearPendingCommand()
+    void submit(pendingCommand)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCommand, running])
+
   // Ogni riga nuova scorre in fondo.
   useEffect(() => {
     const el = scrollRef.current
@@ -45,10 +55,10 @@ export function Terminal() {
       return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next
     })
 
-  async function submit() {
-    const line = input.trim()
+  async function submit(forced?: string) {
+    const line = (forced ?? input).trim()
     if (!line || running) return
-    setInput('')
+    if (!forced) setInput('')
     historyRef.current = [line, ...historyRef.current.filter((h) => h !== line)].slice(0, 100)
     histPos.current = -1
     push(`${shortCwd(cwd)}> ${line}`, 'cmd')

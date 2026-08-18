@@ -537,6 +537,24 @@
   loaded only when needed. This works in <em>both</em> modes: code reads well in
   Standard too.</p>
 
+  <h3>Running and previewing what you write</h3>
+  <p>Two buttons in the editor bar, appearing only when they apply:</p>
+  <ul>
+    <li><strong>▷ Run</strong> on runnable files (<code>.py</code>, <code>.js</code>,
+    <code>.ts</code>, <code>.ps1</code>, <code>.sh</code>, <code>.rb</code>,
+    <code>.php</code>, <code>.go</code>): saves the file and launches it in the
+    terminal, switching to Developer mode by itself. Output streams below.</li>
+    <li><strong>Preview</strong> on web files (<code>.html</code>, <code>.svg</code>):
+    next to "Code" a "Preview" tab appears and shows the page as a browser would —
+    stylesheets, scripts and relative images included. Save and the preview
+    refreshes.</li>
+  </ul>
+  <div class="note">The preview runs <em>isolated</em>: your page's scripts work, but
+  they cannot reach Atelier or your data.</div>
+  <p>You can of course type the command yourself in the terminal
+  (<code>npm run dev</code>, <code>python script.py</code>, anything): the button is
+  just the shortcut.</p>
+
   <h3>Terminal</h3>
   <p>A real terminal, opened in your vault folder. Type a command and press
   <kbd>Enter</kbd>: output streams in as it arrives, with errors in red and the exit

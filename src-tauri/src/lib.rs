@@ -7,6 +7,13 @@ use tauri_plugin_fs::FsExt;
 fn allow_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
     app.fs_scope()
         .allow_directory(&path, true)
+        .map_err(|e| e.to_string())?;
+    // Stesso permesso al protocollo asset: serve all'anteprima HTML, che
+    // carica il file vero in un iframe (così CSS, script e immagini con
+    // percorso relativo si risolvono da soli come in un browser).
+    use tauri::Manager;
+    app.asset_protocol_scope()
+        .allow_directory(&path, true)
         .map_err(|e| e.to_string())
 }
 

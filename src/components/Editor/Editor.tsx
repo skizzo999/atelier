@@ -12,6 +12,8 @@ import { loadImage } from '../../lib/images'
 import { resolveOrCreateNote } from '../../lib/notes'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 import { ConvertButton } from '../Convert/ConvertButton'
+import { runCommandFor, isPreviewable } from '../../lib/runFile'
+import { convertFileSrc } from '@tauri-apps/api/core'
 
 // Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
 marked.use(
@@ -113,9 +115,14 @@ export function Editor() {
   // "dirty" derivato dallo store: c'è un buffer non salvato per questo file.
   const dirty = useAppStore((s) => filePath !== null && s.dirtyBuffers[filePath] !== undefined)
 
+  const runInTerminal = useAppStore((s) => s.runInTerminal)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Anteprima dei file web (html/svg): il file vero dentro un iframe, così
+  // fogli di stile, script e immagini relativi si risolvono come in un browser.
+  const [preview, setPreview] = useState(false)
+  const [previewRev, setPreviewRev] = useState(0) // ricarica dopo un salvataggio
   // Path di cui `content` è effettivamente caricato (per sapere quando è pronto).
   const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null)
   const editorViewRef = useRef<EditorView | null>(null)
@@ -166,6 +173,7 @@ export function Editor() {
     try {
       await writeFileAtomic(filePath, content)
       clearBuffer(filePath)
+      setPreviewRev((r) => r + 1) // l'anteprima mostra la versione appena salvata
     } catch (err) {
       console.error('Errore salvataggio file:', err)
     } finally {
@@ -306,6 +314,44 @@ export function Editor() {
               </button>
             </div>
           )}
+          {/* File web: interruttore Codice / Anteprima */}
+          {isPreviewable(filePath) && (
+            <div className="flex rounded border border-zinc-700 overflow-hidden text-xs">
+              <button
+                onClick={() => setPreview(false)}
+                className={`px-2 py-1 ${!preview ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'}`}
+              >
+                Codice
+              </button>
+              <button
+                onClick={() => {
+                  setPreview(true)
+                  setPreviewRev((r) => r + 1)
+                }}
+                className={`px-2 py-1 border-l border-zinc-700 ${preview ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'}`}
+                title="Guarda la pagina come la vedrebbe un browser"
+              >
+                Anteprima
+              </button>
+            </div>
+          )}
+          {/* Script eseguibile: lo lancia nel terminale della modalità Developer */}
+          {(() => {
+            const run = runCommandFor(filePath)
+            if (!run) return null
+            return (
+              <button
+                className="tbtn"
+                title={`Esegue nel terminale: ${run.command}`}
+                onClick={() => {
+                  if (dirty) void handleSave() // si esegue quello che è su disco
+                  runInTerminal(run.command)
+                }}
+              >
+                ▷ {run.label}
+              </button>
+            )
+          })()}
           <ConvertButton filePath={filePath} className="tbtn" />
           <button
             onClick={handleSave}
@@ -319,6 +365,17 @@ export function Editor() {
 
       {loading ? (
         <div className="p-4 text-zinc-500 text-sm">Caricamento...</div>
+      ) : preview && isPreviewable(filePath) ? (
+        // sandbox senza allow-same-origin: gli script della pagina girano
+        // (serve a provare il sito) ma in un'origine isolata, senza accesso
+        // ad Atelier né ai suoi dati.
+        <iframe
+          key={previewRev}
+          title="Anteprima"
+          src={convertFileSrc(filePath)}
+          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          className="flex-1 w-full bg-white border-0"
+        />
       ) : markdown && view === 'reading' ? (
         <div className="flex-1 overflow-y-auto p-6">
           <div

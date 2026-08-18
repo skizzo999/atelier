@@ -46,6 +46,9 @@ interface AppState {
   devPanelHeight: number
   devPanelOpen: boolean
   devTab: DevTab
+  // Comando che il terminale deve eseguire appena possibile (lo imposta il
+  // tasto "Esegui" dell'editor). Il terminale lo consuma e lo azzera.
+  pendingCommand: string | null
   // Modifiche non salvate per file (path -> contenuto). Non persistito.
   // Condiviso così l'explorer può mostrare l'indicatore "non salvato" sui file.
   dirtyBuffers: Record<string, string>
@@ -83,6 +86,10 @@ interface AppState {
   setDevPanelHeight: (h: number) => void
   toggleDevPanel: () => void
   setDevTab: (tab: DevTab) => void
+  // Manda un comando al terminale: passa in Developer, apre il pannello
+  // sulla scheda giusta e lascia lì il comando da eseguire.
+  runInTerminal: (cmd: string) => void
+  clearPendingCommand: () => void
   bumpFsRevision: () => void
   setBuffer: (path: string, content: string) => void
   clearBuffer: (path: string) => void
@@ -117,6 +124,7 @@ export const useAppStore = create<AppState>()(
       devPanelHeight: 280,
       devPanelOpen: true,
       devTab: 'terminal',
+      pendingCommand: null,
       dirtyBuffers: {},
       pendingHighlight: null,
       fsRevision: 0,
@@ -192,6 +200,9 @@ export const useAppStore = create<AppState>()(
       setDevPanelHeight: (h) => set({ devPanelHeight: Math.max(120, Math.min(700, Math.round(h))) }),
       toggleDevPanel: () => set((state) => ({ devPanelOpen: !state.devPanelOpen })),
       setDevTab: (tab) => set({ devTab: tab, devPanelOpen: true }),
+      runInTerminal: (cmd) =>
+        set({ mode: 'developer', devTab: 'terminal', devPanelOpen: true, pendingCommand: cmd }),
+      clearPendingCommand: () => set({ pendingCommand: null }),
       bumpFsRevision: () => set((state) => ({ fsRevision: state.fsRevision + 1 })),
       setBuffer: (path, content) =>
         set((state) => ({ dirtyBuffers: { ...state.dirtyBuffers, [path]: content } })),

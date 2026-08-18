@@ -28,12 +28,16 @@
         "font-src": "'self' data:",
         "media-src": "'self' blob: data:",
         "worker-src": "'self' blob:",
-        "frame-src": "'none'",
+        "frame-src": "'self' asset: http://asset.localhost https://asset.localhost",
         "object-src": "'none'",
         "base-uri": "'self'",
         "connect-src": "ipc: http://ipc.localhost 'self' blob: https://cdn.jsdelivr.net https://tessdata.projectnaptha.com"
       },
-      "devCsp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: ws: wss: http: https: ipc:"
+      "devCsp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: ws: wss: http: https: ipc:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
     }
   },
   "bundle": {
