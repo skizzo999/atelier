@@ -1,15 +1,20 @@
 import { unzipSync, strFromU8 } from 'fflate'
 
-// Lettura dei GRAFICI di un .xlsx (sola lettura). ExcelJS non li espone, ma
-// il file li porta con sé: dentro lo zip ci sono il disegno (dove sta il
-// grafico sul foglio) e il grafico vero e proprio, con i valori GIÀ in cache
-// (c:numCache / c:strCache) — quindi non serve rileggere le celle.
+// Lettura dei GRAFICI di un .xlsx. ExcelJS non li espone, ma il file li
+// porta con sé: dentro lo zip ci sono il disegno (dove sta il grafico sul
+// foglio) e il grafico vero e proprio, coi valori in cache (c:numCache).
+// Teniamo ANCHE i riferimenti alle celle (c:f): così, quando l'utente
+// modifica i dati, il grafico si aggiorna invece di restare quello salvato.
 // Il grafico viene poi disegnato in SVG dalla griglia.
 
 export interface ChartSeries {
   name: string
   values: number[]
   color?: string
+  /** Riferimento delle celle dei valori (es. "Foglio1!$B$2:$B$4"). */
+  valuesRef?: string
+  /** Riferimento della cella col nome della serie. */
+  nameRef?: string
 }
 
 export interface ChartInfo {
@@ -20,6 +25,45 @@ export interface ChartInfo {
   title: string
   categories: string[]
   series: ChartSeries[]
+  /** Riferimento delle celle delle categorie. */
+  categoriesRef?: string
+}
+
+/** Un riferimento "Foglio!$A$1:$B$9" scomposto (indici 1-based). */
+export interface RefRange {
+  sheet?: string
+  r1: number
+  c1: number
+  r2: number
+  c2: number
+}
+
+const colIndex = (letters: string): number => {
+  let n = 0
+  for (const ch of letters.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64)
+  return n
+}
+
+// Scompone un riferimento di intervallo. Torna null se non lo riconosce
+// (formule complesse, nomi definiti: in quel caso restano i valori in cache).
+export function parseRef(ref: string): RefRange | null {
+  // Il nome del foglio conta solo se seguito da '!': senza questo vincolo un
+  // riferimento come "$C$5" verrebbe scambiato per un nome di foglio.
+  const m = /^(?:(?:'([^']+)'|([^'!]+))!)?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(ref.trim())
+  if (!m) return null
+  const sheet = m[1] ?? m[2]
+  const c1 = colIndex(m[3])
+  const r1 = Number(m[4])
+  const c2 = m[5] ? colIndex(m[5]) : c1
+  const r2 = m[6] ? Number(m[6]) : r1
+  if (!Number.isFinite(r1) || !Number.isFinite(r2)) return null
+  return {
+    sheet: sheet || undefined,
+    r1: Math.min(r1, r2),
+    c1: Math.min(c1, c2),
+    r2: Math.max(r1, r2),
+    c2: Math.max(c1, c2),
+  }
 }
 
 // --- helper DOM indipendenti dal prefisso di namespace ---
@@ -194,6 +238,7 @@ function parseChart(xml: string, parser: DOMParser): Omit<ChartInfo, 'sheet' | '
     : ''
 
   let categories: string[] = []
+  let categoriesRef: string | undefined
   const series: ChartSeries[] = []
   for (const ser of kids(holder, 'ser')) {
     const nameEl = first(ser, 'tx')
@@ -202,7 +247,10 @@ function parseChart(xml: string, parser: DOMParser): Omit<ChartInfo, 'sheet' | '
       `Serie ${series.length + 1}`
     const catEl = first(ser, 'cat') ?? first(ser, 'xVal')
     const cats = catEl ? points(first(catEl, 'strCache') ?? first(catEl, 'numCache')) : []
-    if (cats.length > categories.length) categories = cats
+    if (cats.length > categories.length) {
+      categories = cats
+      categoriesRef = (catEl ? first(catEl, 'f')?.textContent : null) ?? categoriesRef
+    }
     const valEl = first(ser, 'val') ?? first(ser, 'yVal')
     const values = points(valEl ? first(valEl, 'numCache') : null).map((v) => {
       const n = Number(v)
@@ -211,9 +259,15 @@ function parseChart(xml: string, parser: DOMParser): Omit<ChartInfo, 'sheet' | '
     if (!values.length) continue
     const colorEl = first(ser, 'srgbClr')
     const color = colorEl ? `#${attr(colorEl, 'val')}` : undefined
-    series.push({ name: String(name), values, color })
+    series.push({
+      name: String(name),
+      values,
+      color,
+      valuesRef: (valEl ? first(valEl, 'f')?.textContent : null) ?? undefined,
+      nameRef: (nameEl ? first(nameEl, 'f')?.textContent : null) ?? undefined,
+    })
   }
   if (!series.length) return null
   if (!categories.length) categories = series[0].values.map((_, i) => String(i + 1))
-  return { type, title, categories, series }
+  return { type, title, categories, series, categoriesRef }
 }

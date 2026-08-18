@@ -13,6 +13,7 @@ import { parseCsv } from '../../lib/csv'
 import { normalizeFormula, shiftRefsAbs, FORMULA_NAMES, materializeSharedFormulas, adjustSheetFormulas } from '../../lib/formulaEngine'
 import type { AdjustKind } from '../../lib/formulaEngine'
 import type { ChartInfo } from '../../lib/xlsxCharts'
+import { parseRef } from '../../lib/xlsxCharts'
 import { ChartView } from './ChartView'
 
 // Cronologia annulla/ripeti per file (valori e stili: le operazioni
@@ -1157,6 +1158,52 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       cancelled = true
     }
   }, [filePath, isCsv])
+
+  // I grafici seguono i DATI: i riferimenti alle celle (c:f) vengono
+  // risolti sul workbook vivo a ogni modifica, così modificare un valore
+  // aggiorna subito le barre invece di mostrare quello salvato nel file.
+  // Se un riferimento non è riconoscibile restano i valori in cache.
+  const liveCharts = useMemo(() => {
+    if (!wb || !charts.length) return charts
+    const cells = (ref?: string): CellValue[] => {
+      if (!ref) return []
+      const r = parseRef(ref)
+      if (!r) return []
+      const ws = r.sheet ? wb.worksheets.find((x) => x.name === r.sheet) : wb.worksheets[0]
+      if (!ws || (r.r2 - r.r1 + 1) * (r.c2 - r.c1 + 1) > 5000) return []
+      const out: CellValue[] = []
+      for (let row = r.r1; row <= r.r2; row++)
+        for (let col = r.c1; col <= r.c2; col++) out.push(ws.getRow(row).getCell(col).value)
+      return out
+    }
+    const asNumber = (v: CellValue): number => {
+      if (typeof v === 'number') return v
+      if (v instanceof Date) return v.getTime()
+      if (v && typeof v === 'object') {
+        const res = (v as { result?: CellValue }).result
+        if (res !== undefined) return asNumber(res)
+      }
+      const n = Number(v)
+      return Number.isFinite(n) ? n : 0
+    }
+    return charts.map((ch) => {
+      const cats = cells(ch.categoriesRef)
+      const series = ch.series.map((se) => {
+        const vals = cells(se.valuesRef)
+        const nm = cells(se.nameRef)
+        return {
+          ...se,
+          values: vals.length ? vals.map(asNumber) : se.values,
+          name: nm.length && nm[0] !== null && nm[0] !== undefined ? cellText(nm[0]).text || se.name : se.name,
+        }
+      })
+      return {
+        ...ch,
+        categories: cats.length ? cats.map((v) => cellText(v).text) : ch.categories,
+        series,
+      }
+    })
+  }, [charts, wb, sheet])
 
   // Cambio foglio: costruzione pigra + cache.
   function selectSheet(i: number) {
@@ -3295,7 +3342,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             <div style={{ height: Math.max(0, totalH - (offsets[end] ?? totalH)) }} />
 
             {/* GRAFICI del file (sola lettura), al loro posto sul foglio. */}
-            {charts
+            {liveCharts
               .filter((ch) => ch.sheet === active)
               .map((ch, i) => {
                 const x = colX(Math.min(ch.from.col, widths.length - 1))

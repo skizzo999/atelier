@@ -28,8 +28,16 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-is-maximized",
     "core:window:allow-start-dragging",
+    "shell:allow-kill",
     {
       "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "run-powershell", "cmd": "powershell", "args": true },
+        { "name": "run-sh", "cmd": "sh", "args": true }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
       "allow": [
         { "name": "run-powershell", "cmd": "powershell", "args": true },
         { "name": "run-sh", "cmd": "sh", "args": true }
