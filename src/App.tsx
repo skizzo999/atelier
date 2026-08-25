@@ -215,7 +215,8 @@ function App() {
             <FileTree />
           </aside>
           <div
-            className="w-1 shrink-0 cursor-col-resize bg-zinc-800/60 hover:bg-blue-500/50 transition-colors"
+            // Come nel pannello Developer: zona di presa larga, linea sottile.
+            className="group relative w-[9px] -mx-[4px] shrink-0 z-10 cursor-col-resize"
             title="Trascina per ridimensionare"
             onMouseDown={(e) => {
               e.preventDefault()
@@ -229,7 +230,9 @@ function App() {
               document.addEventListener('mousemove', move)
               document.addEventListener('mouseup', up)
             }}
-          />
+          >
+            <div className="absolute top-0 bottom-0 left-[4px] w-[1px] bg-zinc-800/60 group-hover:w-[2px] group-hover:bg-blue-500/70 transition-colors" />
+          </div>
         </>
       )}
 

@@ -13,7 +13,7 @@ import { resolveOrCreateNote } from '../../lib/notes'
 import { CodeMirrorEditor } from '../CodeMirror/CodeMirrorEditor'
 import { ConvertButton } from '../Convert/ConvertButton'
 import { runCommandFor, isPreviewable } from '../../lib/runFile'
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { HtmlPreview } from './HtmlPreview'
 
 // Evidenziazione sintassi nei blocchi di codice della vista Lettura (highlight.js).
 marked.use(
@@ -366,16 +366,7 @@ export function Editor() {
       {loading ? (
         <div className="p-4 text-zinc-500 text-sm">Caricamento...</div>
       ) : preview && isPreviewable(filePath) ? (
-        // sandbox senza allow-same-origin: gli script della pagina girano
-        // (serve a provare il sito) ma in un'origine isolata, senza accesso
-        // ad Atelier né ai suoi dati.
-        <iframe
-          key={previewRev}
-          title="Anteprima"
-          src={convertFileSrc(filePath)}
-          sandbox="allow-scripts allow-forms allow-popups allow-modals"
-          className="flex-1 w-full bg-white border-0"
-        />
+        <HtmlPreview filePath={filePath} rev={previewRev} />
       ) : markdown && view === 'reading' ? (
         <div className="flex-1 overflow-y-auto p-6">
           <div

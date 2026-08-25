@@ -30,3 +30,9 @@ export async function copyImageElementToClipboard(img: HTMLImageElement): Promis
   ctx.drawImage(img, 0, 0)
   return copyCanvasToClipboard(c)
 }
+
+// Apre un file col programma predefinito del sistema (per l'HTML: il browser).
+export async function openWithSystem(path: string): Promise<void> {
+  const { openPath } = await import('@tauri-apps/plugin-opener')
+  await openPath(path)
+}

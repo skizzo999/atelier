@@ -26,7 +26,10 @@ export function DevPanel() {
       {/* Maniglia di ridimensionamento (solo a pannello aperto) */}
       {open && (
         <div
-          className="h-1 -mt-1 cursor-row-resize bg-transparent hover:bg-blue-500/50 transition-colors"
+          // Zona di presa GENEROSA (9px a cavallo del bordo): prenderla non
+          // deve essere una questione di pixel. La linea blu appare al
+          // passaggio ed è sottile, ma l'area cliccabile è tutta questa.
+          className="group relative h-[9px] -mt-[5px] -mb-[4px] z-10 cursor-row-resize"
           title="Trascina per ridimensionare"
           onMouseDown={(e) => {
             e.preventDefault()
@@ -40,7 +43,10 @@ export function DevPanel() {
             document.addEventListener('mousemove', move)
             document.addEventListener('mouseup', up)
           }}
-        />
+        >
+          {/* linea blu sottile, centrata nella zona di presa */}
+          <div className="absolute left-0 right-0 top-[4px] h-[2px] bg-transparent group-hover:bg-blue-500/70 transition-colors" />
+        </div>
       )}
 
       <div className="h-8 shrink-0 flex items-center gap-1 px-2 border-b border-zinc-800">
