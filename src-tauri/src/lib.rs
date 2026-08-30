@@ -14,7 +14,19 @@ fn allow_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
     use tauri::Manager;
     app.asset_protocol_scope()
         .allow_directory(&path, true)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // ...e nella forma con le barre in avanti. L'anteprima costruisce un URL
+    // con i separatori VERI (senza, tutto il percorso diventa un unico pezzo
+    // di indirizzo e i riferimenti relativi si perdono): il controllo dello
+    // scope confronta il percorso così com'è scritto nell'URL, quindi deve
+    // essere autorizzata anche questa forma.
+    let forward = path.replace('\\', "/");
+    if forward != path {
+        app.asset_protocol_scope()
+            .allow_directory(&forward, true)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 // Un comando invocabile dalla webview non deve accettare path arbitrari:

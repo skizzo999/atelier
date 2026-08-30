@@ -1,12 +1,21 @@
 {
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
     "opener:allow-reveal-item-in-dir",
-    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$HOME/**"
+        }
+      ]
+    },
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-file",
@@ -32,15 +41,31 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        { "name": "run-powershell", "cmd": "powershell", "args": true },
-        { "name": "run-sh", "cmd": "sh", "args": true }
+        {
+          "name": "run-powershell",
+          "cmd": "powershell",
+          "args": true
+        },
+        {
+          "name": "run-sh",
+          "cmd": "sh",
+          "args": true
+        }
       ]
     },
     {
       "identifier": "shell:allow-spawn",
       "allow": [
-        { "name": "run-powershell", "cmd": "powershell", "args": true },
-        { "name": "run-sh", "cmd": "sh", "args": true }
+        {
+          "name": "run-powershell",
+          "cmd": "powershell",
+          "args": true
+        },
+        {
+          "name": "run-sh",
+          "cmd": "sh",
+          "args": true
+        }
       ]
     }
   ]

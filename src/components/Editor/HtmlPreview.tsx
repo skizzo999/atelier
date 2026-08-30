@@ -1,6 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { convertFileSrc } from '@tauri-apps/api/core'
 import { openWithSystem } from '../../lib/imageActions'
+
+// Indirizzo del file per l'iframe. NON usiamo convertFileSrc di Tauri: quello
+// comprime tutto il percorso in un UNICO pezzo di indirizzo (le barre
+// diventano %5C), e allora un riferimento relativo come `stile.css` viene
+// cercato nella radice invece che accanto alla pagina — il sito appare senza
+// stile e senza script. Qui teniamo i separatori veri e codifichiamo un pezzo
+// alla volta, così il browser risolve i percorsi relativi come si deve.
+function assetUrl(filePath: string): string {
+  const encoded = filePath
+    .replace(/\\/g, '/')
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')
+  return navigator.userAgent.includes('Windows')
+    ? `http://asset.localhost/${encoded}`
+    : `asset://localhost/${encoded}`
+}
 
 // Anteprima dei file web: il file VERO dentro un iframe, servito dal
 // protocollo asset di Tauri — così fogli di stile, script e immagini con
@@ -22,7 +38,7 @@ export function HtmlPreview({ filePath, rev }: { filePath: string; rev: number }
     setSlow(false)
     setError(null)
     try {
-      setUrl(convertFileSrc(filePath))
+      setUrl(assetUrl(filePath))
     } catch (e) {
       setError(String(e))
     }
