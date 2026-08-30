@@ -20,10 +20,16 @@ Tag `v0.4.0` → release automatica Win+macOS (GitHub Actions). Dentro:
   L'editor slide è FUORI SCOPE per decisione dell'utente (2026-07-17):
   non riaprirlo senza una sua richiesta esplicita.
 
-## ⚠ Da testare a mano dopo il riavvio completo di `pnpm tauri dev`
-Terminale e Git dipendono dal permesso shell reale (capability nuova):
-verificati finora solo con una shell simulata nell'harness. Tutto il resto è
-verificato end-to-end.
+In più, dopo il primo giro di prove dell'utente (2026-08-25):
+- **Avvio più veloce**: la scansione del vault è passata a Rust, una chiamata
+  sola invece di una per cartella (erano 132 sul vault vero).
+- **▷ Esegui** sugli script e **Anteprima** sui file web (html/svg), con
+  "Apri nel browser" accanto.
+- Maniglie di ridimensionamento afferrabili (erano larghe 1 pixel).
+
+## ✅ Tutto provato dall'utente
+Terminale, Git, grafici che seguono i dati, tendine di validazione,
+transizioni pptx, editor di codice, anteprima HTML con CSS e script.
 
 ## Coda (nessuna è impegnata: decide l'utente)
 - Landing: `og.png` da rigenerare e **FORM_ENDPOINT vuoto** in
