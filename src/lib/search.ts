@@ -33,6 +33,20 @@ function skip(name: string): boolean {
 const MAX_DEPTH = 64
 
 export async function walkFiles(root: string): Promise<VaultFile[]> {
+  // Via veloce: la scansione la fa Rust in UNA chiamata. Dal frontend
+  // costava una chiamata per cartella, in fila — su un vault vero (centinaia
+  // di cartelle) erano secondi all'avvio e a ogni modifica su disco.
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return await invoke<VaultFile[]>('list_vault_files', { root })
+  } catch (e) {
+    console.warn('Scansione veloce non disponibile, uso quella lenta:', e)
+  }
+  return walkFilesSlow(root)
+}
+
+// Ripiego: scansione dal frontend, una cartella alla volta.
+async function walkFilesSlow(root: string): Promise<VaultFile[]> {
   const out: VaultFile[] = []
 
   async function walk(dir: string, depth: number) {

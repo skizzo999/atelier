@@ -56,6 +56,69 @@ fn set_hidden(app: tauri::AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
+// Un file del vault, come lo vuole il frontend.
+#[derive(serde::Serialize)]
+struct VaultFile {
+    path: String,
+    name: String,
+    rel: String,
+}
+
+// Stesse esclusioni del FileTree e della ricerca: file di servizio, backup,
+// cartelle nascoste e node_modules restano fuori.
+fn skip_entry(name: &str) -> bool {
+    name.starts_with('.')
+        || name == "node_modules"
+        || name.ends_with(".tmp")
+        || name.ends_with(".bak")
+        || name.ends_with(".atelier")
+}
+
+// Elenca TUTTI i file del vault in UNA sola chiamata. Farlo dal frontend
+// costava una chiamata per cartella (centinaia, in fila): su un vault vero
+// erano secondi all'avvio e a ogni modifica su disco.
+#[tauri::command]
+fn list_vault_files(app: tauri::AppHandle, root: String) -> Result<Vec<VaultFile>, String> {
+    ensure_in_scope(&app, &root)?;
+    let root_path = std::path::Path::new(&root);
+    let mut out = Vec::new();
+    // Pila esplicita invece della ricorsione: niente stack overflow su alberi
+    // patologici. Il tetto è la rete di sicurezza contro i cicli da symlink.
+    let mut stack = vec![(root_path.to_path_buf(), 0u32)];
+    const MAX_DEPTH: u32 = 64;
+    while let Some((dir, depth)) = stack.pop() {
+        if depth > MAX_DEPTH {
+            continue;
+        }
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue, // cartella illeggibile: la saltiamo, non è un errore fatale
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if skip_entry(&name) {
+                continue;
+            }
+            let full = entry.path();
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            let is_link = entry.file_type().map(|t| t.is_symlink()).unwrap_or(false);
+            if is_dir {
+                if !is_link {
+                    stack.push((full, depth + 1));
+                }
+            } else {
+                let path_s = full.to_string_lossy().to_string();
+                let rel = path_s
+                    .strip_prefix(&root)
+                    .map(|r| r.trim_start_matches(|c| c == '\\' || c == '/').to_string())
+                    .unwrap_or_else(|| name.clone());
+                out.push(VaultFile { path: path_s, name, rel });
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -65,7 +128,7 @@ pub fn run() {
         // Esecuzione comandi: alimenta il terminale e il pannello Git della
         // modalità Developer (interpreti consentiti nello scope della capability).
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![allow_path, set_hidden, trash_path])
+        .invoke_handler(tauri::generate_handler![allow_path, set_hidden, trash_path, list_vault_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

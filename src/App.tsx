@@ -98,21 +98,28 @@ function App() {
       return
     }
     let cancelled = false
-    walkFiles(vaultPath).then((files) => {
-      if (cancelled) return
-      const imgMap = new Map<string, string>()
-      const noteMap = new Map<string, string>()
-      for (const f of files) {
-        const lower = f.name.toLowerCase()
-        const ext = lower.split('.').pop()
-        if (ext && IMG_EXT.has(ext)) imgMap.set(lower, f.path)
-        if (lower.endsWith('.md')) noteMap.set(lower.replace(/\.md$/, ''), f.path)
-      }
-      setVaultImageIndex(imgMap)
-      setNoteIndex(noteMap)
-    })
+    // Piccola attesa: una raffica di eventi dal watcher (es. un salvataggio
+    // che tocca più file) non deve far ripartire la scansione ogni volta.
+    const timer = setTimeout(() => {
+      walkFiles(vaultPath)
+        .then((files) => {
+          if (cancelled) return
+          const imgMap = new Map<string, string>()
+          const noteMap = new Map<string, string>()
+          for (const f of files) {
+            const lower = f.name.toLowerCase()
+            const ext = lower.split('.').pop()
+            if (ext && IMG_EXT.has(ext)) imgMap.set(lower, f.path)
+            if (lower.endsWith('.md')) noteMap.set(lower.replace(/\.md$/, ''), f.path)
+          }
+          setVaultImageIndex(imgMap)
+          setNoteIndex(noteMap)
+        })
+        .catch((e) => console.error('Indice del vault non costruito:', e))
+    }, 250)
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
   }, [vaultPath, booting, forcePicker, fsRevision])
 
