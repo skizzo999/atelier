@@ -131,6 +131,20 @@ fn list_vault_files(app: tauri::AppHandle, root: String) -> Result<Vec<VaultFile
     Ok(out)
 }
 
+// File passato all'avvio da "Apri con" (o trascinato sull'eseguibile):
+// Windows lo mette fra gli argomenti della riga di comando. Restituiamo il
+// primo argomento che è davvero un file esistente, così i flag non contano.
+// Il frontend lo chiede al boot e lo apre.
+#[tauri::command]
+fn startup_file() -> Option<String> {
+    std::env::args()
+        .skip(1) // il primo è il percorso dell'eseguibile
+        .filter(|a| !a.starts_with('-'))
+        .map(std::path::PathBuf::from)
+        .find(|p| p.is_file())
+        .map(|p| p.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -140,7 +154,13 @@ pub fn run() {
         // Esecuzione comandi: alimenta il terminale e il pannello Git della
         // modalità Developer (interpreti consentiti nello scope della capability).
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![allow_path, set_hidden, trash_path, list_vault_files])
+        .invoke_handler(tauri::generate_handler![
+            allow_path,
+            set_hidden,
+            trash_path,
+            list_vault_files,
+            startup_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

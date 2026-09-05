@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import './App.css'
 import { exists } from '@tauri-apps/plugin-fs'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from './store/appStore'
 import { grantVaultAccess, initVaultMeta } from './lib/vault'
 import { walkFiles } from './lib/search'
@@ -41,24 +42,54 @@ function App() {
   useEffect(() => {
     let cancelled = false
     async function boot() {
+      // File chiesto con "Apri con" (o trascinato sull'eseguibile): arriva
+      // come argomento della riga di comando. Ha la precedenza su tutto:
+      // se l'utente ha chiesto un documento, quello deve aprirsi.
+      let startup: string | null = null
+      try {
+        startup = await invoke<string | null>('startup_file')
+      } catch (err) {
+        console.error('Argomenti di avvio non leggibili:', err)
+      }
+      const startupDir = startup ? startup.slice(0, startup.lastIndexOf('\\')) : null
+
       // Heartbeat di un'altra istanza (localStorage è condiviso): se è fresco,
-      // c'è già un Atelier aperto → questa finestra parte dal picker.
+      // c'è già un Atelier aperto → questa finestra parte dal picker. Ma non
+      // quando c'è un documento da aprire: lì il picker sarebbe di intralcio.
       const hb = Number(localStorage.getItem('atelier-heartbeat') || 0)
       const otherAlive = Date.now() - hb < 8000
-      if (otherAlive) setForcePicker(true)
+      if (otherAlive && !startup) setForcePicker(true)
+
       const saved = useAppStore.getState().vaultPath
-      if (saved && !otherAlive) {
+      // Senza un vault salvato, apriamo la cartella del documento: meglio di
+      // una finestra vuota. Niente metadati scritti lì dentro, però: quella
+      // cartella non l'ha scelta l'utente come vault.
+      const target = saved ?? startupDir
+      if (target && (!otherAlive || startup)) {
         try {
-          await grantVaultAccess(saved)
-          const ok = await exists(saved)
+          await grantVaultAccess(target)
+          const ok = await exists(target)
           if (!ok && !cancelled) clearVault()
           else if (ok && !cancelled) {
-            await initVaultMeta(saved) // vault "vero": .atelier\vault.json
-            useAppStore.getState().registerVault(saved)
+            const st = useAppStore.getState()
+            if (saved) await initVaultMeta(target) // vault "vero": .atelier\vault.json
+            else st.setVaultPath(target)
+            st.registerVault(target)
           }
         } catch (err) {
           console.error('Errore apertura vault salvato:', err)
           if (!cancelled) clearVault()
+        }
+      }
+
+      // Il documento può stare FUORI dal vault: gli serve il permesso sulla
+      // sua cartella, altrimenti la lettura fallisce.
+      if (startup && startupDir && !cancelled) {
+        try {
+          await grantVaultAccess(startupDir)
+          useAppStore.getState().setSelectedFile(startup)
+        } catch (err) {
+          console.error('Documento di avvio non apribile:', err)
         }
       }
       if (!cancelled) setBooting(false)
