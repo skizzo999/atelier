@@ -53,6 +53,17 @@ transizioni pptx, editor di codice, anteprima HTML con CSS e script.
 - **Audit codice**: il file vive in
   `C:\Users\matte\Documents\Obsidian Vault\Atelier-analisi-codice.md`.
 
+## Note operative su Windows (imparate sul campo)
+- **Installare sopra una versione vecchia tiene il nome di cartella vecchio**:
+  il filesystem non distingue maiuscole, quindi `AppData\Localtelier` resta
+  tale anche dopo il passaggio a productName "Atelier". Non è un problema.
+- **Le icone dei collegamenti restano in cache**: la barra delle applicazioni
+  legge l'icona dal processo (aggiornata), il desktop dal database della
+  cache (vecchia). `ie4uinit.exe -show` spesso non basta: serve chiudere
+  Esplora risorse, cancellare `%LOCALAPPDATA%\Microsoft\Windows\Explorer  iconcache*.db` e riavviarlo.
+- **Un permesso Tauri senza `allow` non autorizza niente**: capitato tre
+  volte (shell execute, shell spawn, opener open-path).
+
 ## Note operative
 - Commit/push SOLO quando l'utente lo chiede; messaggi in italiano, chiusi da
   `Co-Authored-By: Claude <modello> <noreply@anthropic.com>`.
