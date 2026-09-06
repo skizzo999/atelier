@@ -22,7 +22,7 @@ export function DevPanel() {
   const toggle = useAppStore((s) => s.toggleDevPanel)
 
   return (
-    <div className="shrink-0 flex flex-col border-t border-zinc-800 bg-zinc-950" style={{ height: open ? height : 33 }}>
+    <div className="at-dev shrink-0 flex flex-col rounded-t-2xl overflow-hidden mx-3 -mt-3 mb-3" style={{ height: open ? height : 33 }}>
       {/* Maniglia di ridimensionamento (solo a pannello aperto) */}
       {open && (
         <div

@@ -2693,7 +2693,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           <button
             title="Nessun riempimento"
             disabled={!fmtTarget}
-            className="px-1.5 py-0.5 rounded hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent"
+            className="px-1.5 py-0.5 rounded hover:bg-accent/10 disabled:opacity-40 disabled:hover:bg-transparent"
             onClick={() => styleCells((cell) => (cell.fill = { type: 'pattern', pattern: 'none' }))}
           >
             ⌀
@@ -2734,7 +2734,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           <button
             title="Bordi, riempimento e gradiente"
             disabled={!fmtTarget}
-            className="px-2 py-0.5 rounded hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
+            className="px-2 py-0.5 rounded hover:bg-accent/10 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
             onClick={() => setFmtDialog(true)}
           >
             Formato celle
@@ -2742,7 +2742,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
           <button
             title="Formatta la selezione come tabella (intestazione + righe alternate)"
             disabled={!selRange || selRange.r2 <= selRange.r1}
-            className="px-2 py-0.5 rounded hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
+            className="px-2 py-0.5 rounded hover:bg-accent/10 disabled:opacity-40 disabled:hover:bg-transparent whitespace-nowrap"
             onClick={(e) => setTableMenu({ x: e.clientX, y: e.clientY })}
           >
             Tabella
@@ -2786,7 +2786,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               title="Contenuto della cella — Invio applica, Esc annulla"
               disabled={!fmtTarget || !!editing}
               placeholder={editing ? 'Stai scrivendo nella cella…' : fmtTarget ? '' : 'Seleziona una cella'}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
+              className="w-full bg-white border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
               style={{ color: fxColors && !editing ? 'transparent' : '#e2e8f0', caretColor: '#e2e8f0' }}
               value={editing ? '' : (fxDraft ?? (anchorCell ? rawOf(anchorCell) : ''))}
               onChange={(e) => {
@@ -2825,7 +2825,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
 
       {/* Barra di ricerca nel foglio (Ctrl+F) */}
       {findQ !== null && !isCsv && (
-        <div className="absolute right-4 top-24 z-30 flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl px-2 py-1 text-xs">
+        <div className="absolute right-4 top-24 z-30 flex items-center gap-1 bg-white border border-zinc-700 rounded-xl shadow-xl px-2 py-1 text-xs">
           <input
             ref={findInputRef}
             autoFocus
@@ -2859,7 +2859,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       {/* Dropdown autocompletamento funzioni */}
       {fxSuggest && (
         <div
-          className="fixed z-50 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-xs"
+          className="fixed z-50 w-48 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-xs"
           style={{ left: fxSuggest.x, top: fxSuggest.y }}
           onMouseDown={(e) => e.preventDefault() /* niente blur dell'input */}
         >
@@ -3577,14 +3577,14 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               <div key={id} className="relative" onMouseEnter={() => setSubmenu(disabled ? null : id)}>
                 <button
                   disabled={disabled}
-                  className="w-full text-left px-3 py-1.5 text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-between"
+                  className="w-full text-left px-3 py-1.5 text-zinc-200 hover:bg-accent/10 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-between"
                 >
                   <span>{label}</span>
                   <span className="text-zinc-500">▸</span>
                 </button>
                 {submenu === id && (
                   <div
-                    className="absolute top-0 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1"
+                    className="absolute top-0 w-48 bg-white border border-zinc-700 rounded-xl shadow-xl py-1"
                     style={subFlip ? { right: '100%' } : { left: '100%' }}
                   >
                     {entries.map(([l, fn]) => (
@@ -3605,7 +3605,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             )
             return (
               <div
-                className="fixed z-50 w-56 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-sm"
+                className="fixed z-50 w-56 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
                 style={{ left: panelX, top: panelY }}
               >
                 {item('Taglia', () => cutRange(mr))}
@@ -3690,7 +3690,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setDvMenu(null)} />
           <div
-            className="fixed z-50 w-48 max-h-64 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1"
+            className="fixed z-50 w-48 max-h-64 overflow-y-auto bg-white border border-zinc-700 rounded-xl shadow-xl py-1"
             style={{ left: Math.min(dvMenu.x, window.innerWidth - 200), top: Math.min(dvMenu.y, window.innerHeight - 260) }}
           >
             {dvMenu.opts.map((o) => (
@@ -3737,7 +3737,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             <>
               <div className="fixed inset-0 z-40" onMouseDown={() => setFilterMenu(null)} />
               <div
-                className="fixed z-50 w-60 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-sm"
+                className="fixed z-50 w-60 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
                 style={{ left: Math.min(filterMenu.x, window.innerWidth - 260), top: Math.min(filterMenu.y, window.innerHeight - 360) }}
               >
                 <div className="px-3 py-1 text-xs text-zinc-400">
@@ -3784,7 +3784,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={() => setFmtDialog(false)} />
           <div
-            className="fixed z-50 w-80 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-4 text-sm text-zinc-200"
+            className="fixed z-50 w-80 bg-white border border-zinc-700 rounded-xl shadow-xl p-4 text-sm text-zinc-200"
             style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -3893,7 +3893,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setTableMenu(null)} />
           <div
-            className="fixed z-50 w-56 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-sm"
+            className="fixed z-50 w-56 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
             style={{ left: Math.min(tableMenu.x, window.innerWidth - 240), top: Math.min(tableMenu.y + 8, window.innerHeight - 280) }}
           >
             <div className="px-3 py-1 text-xs text-zinc-400">Stile tabella — 1ª riga della selezione = intestazione</div>
@@ -3920,7 +3920,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setDelMenu(null)} />
           <div
-            className="fixed z-50 w-52 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-sm"
+            className="fixed z-50 w-52 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
             style={{ left: delMenu.x, top: delMenu.y }}
           >
             <div className="px-3 py-1 text-xs text-zinc-400">Cancella dalla selezione…</div>

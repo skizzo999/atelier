@@ -1659,7 +1659,7 @@ function EditableImage({ filePath }: { filePath: string }) {
             }}
           >
             <div
-              className="w-[34rem] max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3"
+              className="w-[34rem] max-w-[90vw] bg-white border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-sm font-semibold text-zinc-200">Testo riconosciuto (OCR)</h3>
@@ -1731,7 +1731,7 @@ function ResizeModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
       <div
-        className="w-72 bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3"
+        className="w-72 bg-white border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-sm font-semibold text-zinc-200">Ridimensiona</h3>

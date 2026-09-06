@@ -294,7 +294,7 @@ export function PptxViewer({ filePath }: { filePath: string }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-zinc-900 relative">
+        <div className="flex-1 overflow-auto bg-zinc-950 relative">
           {error && <p className="absolute inset-0 grid place-items-center text-zinc-500 text-sm">Impossibile aprire la presentazione.</p>}
           {loading && !error && (
             <div className="absolute inset-0 grid place-items-center">

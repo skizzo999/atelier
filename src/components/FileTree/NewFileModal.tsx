@@ -102,7 +102,7 @@ export function NewFileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={onClose}>
       <div
-        className="w-[30rem] bg-zinc-900 border border-zinc-700 rounded-lg p-4 flex gap-4"
+        className="w-[30rem] bg-white border border-zinc-700 rounded-xl p-4 flex gap-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Sinistra: nome */}

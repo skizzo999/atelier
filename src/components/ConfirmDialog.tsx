@@ -49,7 +49,7 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
-        className="w-[26rem] max-w-[90vw] bg-zinc-800 border border-zinc-700 rounded-card shadow-2xl p-6"
+        className="w-[26rem] max-w-[90vw] bg-white border border-zinc-700 rounded-card shadow-2xl p-6"
       >
         <h2 className="font-display text-xl text-zinc-100 tracking-tight">{title}</h2>
         <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{message}</p>

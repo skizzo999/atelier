@@ -23,7 +23,7 @@ export const FORMATS: Record<string, { w: number; h: number }> = {
 
 export const cmToPx = (cm: number) => Math.round((cm / 2.54) * 96)
 
-const field = 'w-full h-8 bg-zinc-800 border border-zinc-700 rounded px-2 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500'
+const field = 'w-full h-8 bg-white border border-zinc-700 rounded px-2 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500'
 const lab = 'text-xs text-zinc-400 mb-1 block'
 
 export function DocSettings({
@@ -73,7 +73,7 @@ export function DocSettings({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end" onMouseDown={onClose}>
       <div
-        className="mt-14 mr-4 w-80 max-h-[80vh] overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-4"
+        className="mt-14 mr-4 w-80 max-h-[80vh] overflow-y-auto bg-white border border-zinc-700 rounded-xl shadow-2xl p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">

@@ -8,36 +8,64 @@ import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
 import { tags as t } from '@lezer/highlight'
-import { oneDark } from '@codemirror/theme-one-dark'
 import { livePreview } from './livePreview'
 import { tableEditor } from './tableEditor'
 
-// Stile per il SOLO codice (dentro i blocchi ```): colora i token di programmazione
-// ma NON i tag markdown (titoli/grassetto restano neutri in Ibrida).
+// Colori della sintassi, tarati per la CARTA BIANCA del tema vetro: i toni
+// sono scuri e saturi quanto basta a distinguersi fra loro restando
+// leggibili su fondo chiaro (su bianco i colori chiari spariscono).
 const codeHighlightStyle = HighlightStyle.define([
-  { tag: t.keyword, color: '#c678dd' },
-  { tag: [t.function(t.variableName), t.labelName], color: '#61afef' },
-  { tag: [t.constant(t.name), t.standard(t.name), t.bool, t.atom], color: '#d19a66' },
-  { tag: [t.typeName, t.className, t.number, t.annotation, t.self], color: '#e5c07b' },
-  { tag: [t.operator, t.operatorKeyword], color: '#56b6c2' },
-  { tag: [t.string, t.special(t.string), t.regexp], color: '#98c379' },
-  { tag: [t.comment, t.lineComment, t.blockComment], color: '#7d8799', fontStyle: 'italic' },
-  { tag: [t.propertyName], color: '#e06c75' },
-  { tag: [t.meta, t.punctuation], color: '#abb2bf' },
+  { tag: t.keyword, color: '#9333ea' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#2b6ef5' },
+  { tag: [t.constant(t.name), t.standard(t.name), t.bool, t.atom], color: '#b45309' },
+  { tag: [t.typeName, t.className, t.annotation, t.self], color: '#0f766e' },
+  { tag: [t.number], color: '#b45309' },
+  { tag: [t.operator, t.operatorKeyword], color: '#0e7490' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#15803d' },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: '#7b8aa3', fontStyle: 'italic' },
+  { tag: [t.propertyName], color: '#c2410c' },
+  { tag: [t.meta, t.punctuation], color: '#5c6a82' },
 ])
 
-// Tema di base: riempie l'altezza, font monospazio, niente outline di focus.
-const baseTheme = EditorView.theme({
-  '&': { height: '100%' },
-  '.cm-scroller': {
-    overflow: 'auto',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: '13px',
-    lineHeight: '1.6',
+// Tema di base del tema VETRO: carta bianca, gutter discreto, selezione
+// azzurra. Sostituisce oneDark, che era pensato per il fondo scuro.
+const baseTheme = EditorView.theme(
+  {
+    '&': { height: '100%', backgroundColor: '#ffffff', color: '#26303f' },
+    '.cm-scroller': {
+      overflow: 'auto',
+      fontFamily: 'ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace',
+      fontSize: '13px',
+      lineHeight: '1.6',
+    },
+    '.cm-content': { padding: '16px', caretColor: '#16202e' },
+    '&.cm-focused': { outline: 'none' },
+    '.cm-gutters': { backgroundColor: '#ffffff', color: '#a8b4c6', border: 'none' },
+    '.cm-activeLineGutter': { backgroundColor: '#f2f6fd', color: '#5c6a82' },
+    '.cm-activeLine': { backgroundColor: 'rgba(43,110,245,0.045)' },
+    '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
+      backgroundColor: 'rgba(43,110,245,0.18)',
+    },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#16202e' },
+    '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
+      backgroundColor: 'rgba(43,110,245,0.14)',
+      outline: 'none',
+    },
+    '.cm-selectionMatch': { backgroundColor: 'rgba(43,110,245,0.10)' },
+    // pannello di ricerca (Ctrl+F)
+    '.cm-panels': { backgroundColor: '#f2f6fd', color: '#26303f', borderColor: '#dbe4f0' },
+    '.cm-panels input, .cm-panels button': {
+      backgroundColor: '#ffffff',
+      color: '#26303f',
+      border: '1px solid #dbe4f0',
+      borderRadius: '6px',
+      padding: '2px 6px',
+    },
+    '.cm-searchMatch': { backgroundColor: 'rgba(250,204,21,0.4)' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(43,110,245,0.3)' },
   },
-  '.cm-content': { padding: '16px' },
-  '&.cm-focused': { outline: 'none' },
-})
+  { dark: false },
+)
 
 // ---- Menu contestuale (tasto destro nei .md, stile Obsidian) ----
 
@@ -49,7 +77,7 @@ interface CtxItem {
   separator?: boolean
 }
 
-const itemCls = 'w-full text-left px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-between gap-3'
+const itemCls = 'w-full text-left px-3 py-1.5 text-sm text-zinc-200 hover:bg-accent/10 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-between gap-3'
 
 // Sottomenu che si auto-ribalta: misura dove finisce e, se sborda dal bordo
 // destro (o dal basso) della finestra, si apre a sinistra (o si alza).
@@ -76,7 +104,7 @@ function SubMenu({ items, onClose }: { items: CtxItem[]; onClose: () => void }) 
 function CtxMenuList({ items, onClose }: { items: CtxItem[]; onClose: () => void }) {
   const [sub, setSub] = useState<string | null>(null)
   return (
-    <div className="w-52 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1">
+    <div className="w-52 bg-white border border-zinc-700 rounded-xl shadow-xl py-1">
       {items.map((it, i) =>
         it.separator ? (
           <div key={i} className="h-px bg-zinc-700 my-1" />
@@ -151,9 +179,9 @@ export function CodeMirrorEditor({
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
       EditorView.lineWrapping,
-      liveMode ? [] : oneDark,
-      // In Ibrida: evidenzia solo il codice nei blocchi, non il markdown.
-      liveMode ? syntaxHighlighting(codeHighlightStyle) : [],
+      // La palette chiara vale ovunque: in Ibrida colora solo i blocchi di
+      // codice, in Codice tutto il documento.
+      syntaxHighlighting(codeHighlightStyle),
       // Comodità da editor di codice (fuori dalla vista Ibrida, dove
       // darebbero fastidio alla resa "documento"): numeri di riga, riga
       // attiva, parentesi abbinate, rientro automatico, Ctrl+F.

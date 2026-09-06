@@ -13,7 +13,7 @@ const TOOLS: { id: Tool; label: string }[] = [
 ]
 
 const areaCls =
-  'w-full h-full bg-zinc-900 border border-zinc-700 rounded-md p-2 font-mono text-[12px] text-zinc-200 resize-none focus:border-blue-500 focus:outline-none'
+  'w-full h-full bg-white border border-zinc-700 rounded-md p-2 font-mono text-[12px] text-zinc-200 resize-none focus:border-blue-500 focus:outline-none'
 
 export function ToolBox() {
   const [tool, setTool] = useState<Tool>('json')
@@ -129,13 +129,13 @@ function RegexTool() {
           onChange={(e) => setPattern(e.target.value)}
           placeholder="espressione"
           spellCheck={false}
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1 font-mono text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
+          className="flex-1 bg-white border border-zinc-700 rounded-md px-2 py-1 font-mono text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
         />
         <span className="text-zinc-500 font-mono text-xs">/</span>
         <input
           value={flags}
           onChange={(e) => setFlags(e.target.value.replace(/[^gimsuy]/g, ''))}
-          className="w-16 bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1 font-mono text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
+          className="w-16 bg-white border border-zinc-700 rounded-md px-2 py-1 font-mono text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
         />
         <span className={`text-xs shrink-0 ${result.error ? 'text-red-400' : 'text-zinc-500'}`}>
           {result.error ? '✕ regex non valida' : `${result.count} corrisp.`}

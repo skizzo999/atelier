@@ -403,14 +403,14 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
 }
 
 // Aspetto "documento" (come la vista Lettura): font proporzionale, sfondo app.
-const HEAD = '#f1f5f9'
+const HEAD = '#16202e'
 const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
 // Titoli grandi in serif, come la landing ("workshop" caldo).
 const DISPLAY_FONT = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif'
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  '&': { backgroundColor: '#0f172a' },
+  '&': { backgroundColor: '#ffffff' },
   '.cm-scroller': { fontFamily: PROSE_FONT },
   '.cm-content': {
     fontFamily: PROSE_FONT,
@@ -419,8 +419,8 @@ const livePreviewTheme = EditorView.theme({
     // padding-bottom abbondante: spazio "arieggiato" tra il testo e la fine
     // della nota (si può scrollare oltre l'ultima riga, come Obsidian).
     padding: '28px 36px 30vh',
-    caretColor: '#f1f5f9',
-    color: '#dbe3ee',
+    caretColor: '#16202e',
+    color: '#3a4759',
   },
   // Spazio sopra il titolo e tra il titolo e il testo che segue.
   '.cm-lp-blockspace': { paddingTop: '1em', paddingBottom: '0.45em' },
@@ -432,7 +432,7 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-h6': { fontWeight: '700', color: HEAD },
   '.cm-lp-strong': { fontWeight: '700', color: HEAD },
   '.cm-lp-em': { fontStyle: 'italic' },
-  '.cm-lp-strike': { textDecoration: 'line-through', color: '#94a3b8' },
+  '.cm-lp-strike': { textDecoration: 'line-through', color: '#7b8aa3' },
   '.cm-lp-highlight': { backgroundColor: 'rgba(250, 204, 21, 0.25)', borderRadius: '3px', padding: '0 0.1em' },
   '.cm-lp-code': {
     fontFamily: MONO,
@@ -441,10 +441,10 @@ const livePreviewTheme = EditorView.theme({
     padding: '0.1em 0.35em',
     borderRadius: '4px',
   },
-  '.cm-lp-link': { color: '#60a5fa', textDecoration: 'underline' },
-  '.cm-lp-wikilink': { color: '#60a5fa', textDecoration: 'underline' },
+  '.cm-lp-link': { color: '#2b6ef5', textDecoration: 'underline' },
+  '.cm-lp-wikilink': { color: '#2b6ef5', textDecoration: 'underline' },
   '.cm-lp-callout': {
-    borderLeft: '3px solid #60a5fa',
+    borderLeft: '3px solid #2b6ef5',
     paddingLeft: '1em',
     background: 'rgba(96,165,250,0.08)',
   },
@@ -456,37 +456,37 @@ const livePreviewTheme = EditorView.theme({
     display: 'block',
     lineHeight: '1.2',
     fontWeight: '700',
-    color: '#60a5fa',
+    color: '#1e4fb0',
     fontSize: '0.85em',
     letterSpacing: '0.03em',
     marginBottom: '0.25em',
   },
-  '.cm-lp-bullet': { color: '#94a3b8' },
+  '.cm-lp-bullet': { color: '#7b8aa3' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
   '.cm-lp-quote': {
-    borderLeft: '3px solid #334155',
+    borderLeft: '3px solid #ccd9ec',
     paddingLeft: '1em',
-    color: '#94a3b8',
+    color: '#5c6a82',
     fontStyle: 'italic',
   },
   '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
-  '.cm-lp-hr': { borderBottom: '1px solid #334155' },
+  '.cm-lp-hr': { borderBottom: '1px solid #ccd9ec' },
   '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
   '.cm-lp-imagemissing': {
     display: 'inline-block',
-    color: '#94a3b8',
+    color: '#5c6a82',
     fontSize: '0.85em',
     background: 'rgba(255,255,255,0.05)',
     padding: '0.3em 0.6em',
     borderRadius: '6px',
   },
   '.cm-lp-langlabel': {
-    color: '#7d8799',
+    color: '#7b8aa3',
     fontSize: '0.75em',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
-  '.cm-cursor': { borderLeftColor: '#f1f5f9' },
+  '.cm-cursor': { borderLeftColor: '#16202e' },
   '.cm-gutters': { display: 'none' },
 }, { dark: true })
 

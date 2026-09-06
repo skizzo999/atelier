@@ -434,3 +434,52 @@ textarea.pdf-field {
   margin-right: -2px;
 }
 .cm-tablemenu-item.has-sub:hover > .cm-tablemenu-sub { display: block; }
+
+/* ===== Pannello Developer: isola di SCURO nel tema chiaro =====
+   Terminale, diff e strumenti si leggono meglio su fondo scuro, e nella
+   bozza approvata il pannello è una lastra scura traslucida agganciata in
+   basso. Invece di riscrivere le classi dei quattro componenti, qui dentro
+   ribaltiamo il significato dei colori: le regole discendenti hanno più
+   peso di quelle di Tailwind, quindi vincono senza !important. */
+.at-dev {
+  background: rgba(20, 30, 48, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  color: #cbd7e8;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+/* superfici e bordi */
+.at-dev .bg-zinc-950,
+.at-dev .bg-zinc-900 { background-color: rgba(10, 18, 32, 0.5); }
+.at-dev .bg-zinc-800 { background-color: rgba(255, 255, 255, 0.1); }
+.at-dev .border-zinc-800 { border-color: rgba(255, 255, 255, 0.12); }
+.at-dev .border-zinc-700 { border-color: rgba(255, 255, 255, 0.16); }
+.at-dev .hover\:bg-zinc-800:hover { background-color: rgba(255, 255, 255, 0.1); }
+/* testi: la scala si rovescia di nuovo */
+.at-dev .text-zinc-100 { color: #eef3fb; }
+.at-dev .text-zinc-200 { color: #dde6f4; }
+.at-dev .text-zinc-300 { color: #c3d0e2; }
+.at-dev .text-zinc-400 { color: #9aabc3; }
+.at-dev .text-zinc-500 { color: #8395ae; }
+.at-dev .text-zinc-600 { color: #6d7f99; }
+/* Campi di testo: i menu bianchi qui dentro stonerebbero. La riga di
+   comando del terminale però chiede di proposito sfondo trasparente
+   (bg-transparent) e va lasciata stare: è testo su terminale, non un campo. */
+.at-dev input:not(.bg-transparent),
+.at-dev textarea {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #e6eefb;
+}
+.at-dev input::placeholder,
+.at-dev textarea::placeholder { color: #7b8ca6; }
+/* bottoni fantasma in tinta col fondo scuro */
+.at-dev .tbtn {
+  color: #b9c6da;
+  background: rgba(255, 255, 255, 0.08);
+}
+.at-dev .tbtn:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.17);
+  box-shadow: none;
+}
