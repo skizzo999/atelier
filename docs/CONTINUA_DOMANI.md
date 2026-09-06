@@ -55,12 +55,15 @@ transizioni pptx, editor di codice, anteprima HTML con CSS e script.
 
 ## Note operative su Windows (imparate sul campo)
 - **Installare sopra una versione vecchia tiene il nome di cartella vecchio**:
-  il filesystem non distingue maiuscole, quindi `AppData\Localtelier` resta
-  tale anche dopo il passaggio a productName "Atelier". Non è un problema.
+  il filesystem non distingue maiuscole, quindi la cartella sotto
+  %LOCALAPPDATA% resta minuscola anche dopo il passaggio a productName
+  "Atelier". Non e' un problema: e' solo il nome della cartella.
 - **Le icone dei collegamenti restano in cache**: la barra delle applicazioni
   legge l'icona dal processo (aggiornata), il desktop dal database della
   cache (vecchia). `ie4uinit.exe -show` spesso non basta: serve chiudere
-  Esplora risorse, cancellare `%LOCALAPPDATA%\Microsoft\Windows\Explorer  iconcache*.db` e riavviarlo.
+  Esplora risorse, cancellare i file `iconcache*.db` in
+  `%LOCALAPPDATA%\Microsoft\Windows\Explorer` e riavviarlo. Se resta indietro
+  solo il collegamento sul desktop, si rifà da capo e riprende l'icona buona.
 - **Un permesso Tauri senza `allow` non autorizza niente**: capitato tre
   volte (shell execute, shell spawn, opener open-path).
 
