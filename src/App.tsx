@@ -27,6 +27,7 @@ function App() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const mode = useAppStore((s) => s.mode)
+  const hasTabs = useAppStore((s) => s.openTabs.length > 0)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const [booting, setBooting] = useState(true)
   // Un'altra istanza di Atelier è già aperta → mostra il picker dei vault
@@ -279,8 +280,10 @@ function App() {
           <TabBar />
           {/* Il contenuto sta su una SCHEDA di carta che galleggia sullo
               sfondo: angoli larghi, ombra morbida, bordo luminoso. È la
-              differenza fra "riempie lo schermo" e "è un documento". */}
-          <div className="flex-1 min-h-0 flex mx-3 mb-3 at-scheda bg-zinc-900">
+              differenza fra "riempie lo schermo" e "è un documento".
+              Con le tab aperte la scheda si aggancia sotto di esse; senza,
+              prende aria anche sopra invece di appiccicarsi alla titlebar. */}
+          <div className={`flex-1 min-h-0 flex mx-3 mb-3 at-scheda bg-zinc-900 ${hasTabs ? '' : 'mt-3'}`}>
             <FileView />
           </div>
         </div>

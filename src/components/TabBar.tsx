@@ -39,7 +39,7 @@ export function TabBar() {
 
   return (
     <div
-      className="flex items-end h-9 shrink-0 border-b border-white/50 overflow-x-auto"
+      className="flex items-end h-9 shrink-0 px-3 gap-1 border-b border-white/50 overflow-x-auto"
       // zona vuota della barra = sposta in fondo
       onDragOver={(e) => {
         if (!dragPath.current || e.target !== e.currentTarget) return
