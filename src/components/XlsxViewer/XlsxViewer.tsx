@@ -2906,7 +2906,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               {widths.map((w, c) => (
                 <div
                   key={c}
-                  className="relative shrink-0 text-center text-[11px] leading-6 text-zinc-500 font-medium select-none cursor-pointer hover:bg-zinc-200/60"
+                  className="relative shrink-0 text-center text-[11px] leading-6 text-zinc-500 font-medium select-none cursor-pointer hover:bg-accent/10"
                   style={{
                     width: w,
                     borderRight: c === frozenC - 1 ? '2px solid #9ca3af' : gridLine,
@@ -2962,7 +2962,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                   return (
                     <tr key={r} style={{ height: heights[r] ?? DEFAULT_ROW_PX }}>
                       <td
-                        className="sticky left-0 z-10 py-0 text-center text-[11px] text-zinc-500 select-none cursor-pointer hover:bg-zinc-200/60"
+                        className="sticky left-0 z-10 py-0 text-center text-[11px] text-zinc-500 select-none cursor-pointer hover:bg-accent/10"
                         style={{
                           background: hdrBg,
                           borderRight: gridLine,
@@ -3981,7 +3981,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                   onDoubleClick={() => !isCsv && setRenamingSheet(i)}
                   title={isCsv ? undefined : 'Doppio click per rinominare'}
                   className={`px-3 py-1 rounded text-xs whitespace-nowrap ${
-                    i === active ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-400 hover:bg-zinc-800'
+                    i === active ? 'bg-white text-zinc-100 font-medium shadow-sm' : 'text-zinc-400 hover:bg-white/60'
                   }`}
                 >
                   {name}

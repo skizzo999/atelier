@@ -2,37 +2,37 @@ import typography from '@tailwindcss/typography'
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Tema freddo "grigio · bianco · azzurro · blu" (scelta utente,
-        // 2026-07-11). L'app usa ovunque le classi zinc-*: rimappare la
-        // scala qui cambia tutta l'interfaccia in un colpo solo.
-        // Base: slate di Tailwind (grigi con una punta di blu, non "morti").
+        // Tema "vetro" chiaro — bianco · azzurro · blu (scelta utente,
+        // 2026-08-30, bozza 3).
+        //
+        // L'app usa ovunque le classi zinc-*: rimappare QUI la scala cambia
+        // tutta l'interfaccia in un colpo solo. La scala è ROVESCIATA
+        // rispetto al tema scuro precedente — zinc-900 era lo sfondo più
+        // scuro e ora è la superficie più chiara, zinc-100 era il testo
+        // chiaro e ora è il testo scuro — così ogni classe già scritta
+        // mantiene il suo RUOLO (sfondo, bordo, testo) senza toccarla.
         zinc: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#0a1020',
+          950: '#e6eefb', // era lo sfondo più scuro (Explorer) → tinta azzurrina
+          900: '#ffffff', // era lo sfondo app → carta bianca
+          800: '#e2eaf6', // pannelli, menu, bordi marcati
+          700: '#ccd9ec', // bordi, hover
+          600: '#a6b6cd', // separatori forti
+          500: '#7b8aa3', // testo attenuato
+          400: '#5c6a82', // testo secondario
+          300: '#3f4a5c', // testo normale
+          200: '#2a3442', // testo marcato
+          100: '#16202e', // TESTO principale
+          50: '#0b1220', // testo massimo contrasto
         },
-        // blue/emerald restano i DEFAULT di Tailwind (vividi): i bottoni
-        // fondamentali usano .btn-accent (gradiente azzurro→blu) e si
-        // staccano da quelli grigi secondari.
+        // Accenti: azzurro → blu. Restano vividi su fondo chiaro.
         accent: {
-          DEFAULT: '#3b82f6',
-          2: '#38bdf8',
-          soft: 'rgba(59, 130, 246, 0.12)',
+          DEFAULT: '#2b6ef5',
+          2: '#5cc6f8',
+          soft: 'rgba(43, 110, 245, 0.10)',
           ink: '#ffffff', // testo sui bottoni blu
         },
       },
@@ -40,7 +40,10 @@ export default {
         display: ['"Iowan Old Style"', '"Palatino Linotype"', 'Palatino', 'Georgia', '"Times New Roman"', 'serif'],
       },
       borderRadius: {
-        card: '14px',
+        card: '18px', // le schede che "galleggiano" hanno angoli larghi
+      },
+      backdropBlur: {
+        vetro: '30px',
       },
     },
   },

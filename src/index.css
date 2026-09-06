@@ -2,19 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Token del tema "workshop" (dalla landing): usati dai CSS fuori-Tailwind. */
+/* Token del tema VETRO (bianco · azzurro · blu). Usati dai CSS che stanno
+   fuori da Tailwind. La regola che tiene in piedi tutto: il vetro sta sulle
+   CORNICI (barra del titolo, Explorer, toolbar, tab), mai sul CONTENUTO —
+   la carta di un documento e la griglia di un foglio restano opache, o i
+   dati diventano illeggibili. */
 :root {
-  --at-bg: #0a1020;
-  --at-raise: #0f172a;
-  --at-surface: #1e293b;
-  --at-surface-2: #26334a;
-  --at-border: #334155;
-  --at-text: #f1f5f9;
-  --at-dim: #94a3b8;
-  --at-faint: #64748b;
-  --at-accent: #3b82f6;
-  --at-accent-2: #38bdf8;
-  --at-gradient: linear-gradient(100deg, #38bdf8, #2563eb);
+  --at-bg: #dce9fb; /* base sotto lo sfondo sfumato */
+  --at-raise: #ffffff; /* carta: documenti, griglia */
+  --at-surface: rgba(255, 255, 255, 0.62); /* vetro delle cornici */
+  --at-surface-2: rgba(255, 255, 255, 0.78); /* vetro più coprente */
+  --at-border: rgba(255, 255, 255, 0.65); /* bordo luminoso del vetro */
+  --at-hairline: #e2eaf6; /* riga di separazione sulla carta */
+  --at-text: #16202e;
+  --at-dim: #5c6a82;
+  --at-faint: #7b8aa3;
+  --at-accent: #2b6ef5;
+  --at-accent-2: #5cc6f8;
+  --at-gradient: linear-gradient(160deg, #4aa8f7, #2b6ef5);
+  --at-blur: 30px;
+  --at-shadow-card: 0 12px 40px rgba(30, 70, 140, 0.13);
+  --at-shadow-float: 0 8px 30px rgba(30, 70, 140, 0.16);
+}
+
+/* Lo SFONDO dell'app: aloni azzurri sfumati. Sta sotto a tutto e non
+   scorre; è quello che si intravede attraverso il vetro delle cornici. */
+.at-sfondo {
+  background:
+    radial-gradient(70% 55% at 12% 0%, #b6dcff 0%, transparent 60%),
+    radial-gradient(60% 50% at 92% 8%, #cfe3ff 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 105%, #9fc9fb 0%, transparent 60%),
+    linear-gradient(160deg, #eaf4ff, #cfe2fa);
+}
+
+/* Cornice in vetro: sfocatura di quello che c'è sotto + bordo luminoso. */
+.at-vetro {
+  background: var(--at-surface);
+  backdrop-filter: blur(var(--at-blur));
+  -webkit-backdrop-filter: blur(var(--at-blur));
+}
+.at-vetro-forte {
+  background: var(--at-surface-2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* La scheda che "galleggia": il contenuto vero, su carta, con angoli larghi
+   e un'ombra morbida che la stacca dallo sfondo. */
+.at-scheda {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: var(--at-shadow-card);
+  overflow: hidden;
 }
 
 body {
@@ -26,7 +65,7 @@ body {
 
 /* Selezione testo: ambra come la landing. */
 ::selection {
-  background: rgba(59, 130, 246, 0.35);
+  background: rgba(43, 110, 245, 0.22);
 }
 
 /* Bottone primario stile landing: gradiente ambra→corallo, testo scuro. */
@@ -34,6 +73,7 @@ body {
   background: var(--at-gradient);
   color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 4px 14px rgba(43, 110, 245, 0.38);
 }
 .btn-accent:hover:not(:disabled) {
   filter: brightness(1.08);
@@ -53,39 +93,41 @@ body {
   padding: 0 10px;
   border-radius: 6px;
   font-size: 12px;
-  color: #94a3b8;
+  color: #3d4a5f;
+  background: rgba(255, 255, 255, 0.62);
   white-space: nowrap;
   transition:
     background-color 0.12s,
     color 0.12s;
 }
 .tbtn:hover:not(:disabled) {
-  color: #f1f5f9;
-  background: rgba(30, 41, 59, 0.75);
+  color: #16202e;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(20, 50, 100, 0.12);
 }
 .tbtn:disabled {
   opacity: 0.4;
 }
 .tbtn-on {
-  background: #2563eb;
+  background: #2b6ef5;
   color: #ffffff;
   font-weight: 500;
 }
 .tbtn-on:hover:not(:disabled) {
-  background: #2f6feb;
+  background: #1f5fe0;
   color: #ffffff;
 }
 .tsep {
   width: 1px;
-  height: 20px;
-  background: #1e293b;
+  height: 18px;
+  background: rgba(30, 70, 140, 0.15);
   margin: 0 4px;
   flex-shrink: 0;
 }
 
 /* Slider in tinta ovunque (opacità, spessore, zoom…). */
 input[type='range'] {
-  accent-color: #3b82f6;
+  accent-color: #2b6ef5;
 }
 
 /* Scrollbar sottili e discrete, leggibili sia sul tema scuro sia sui fogli
@@ -99,20 +141,20 @@ input[type='range'] {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(120, 135, 160, 0.4);
+  background: rgba(90, 120, 165, 0.32);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(140, 155, 180, 0.55);
+  background: rgba(70, 105, 160, 0.48);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 /* Allinea la vista Lettura (Tailwind prose) allo stile pulito dell'Ibrida */
 .prose {
-  color: #dbe3ee;
+  color: #3a4759;
 }
 /* Titoli grandi in serif, come la landing. */
 .prose h1,
@@ -122,14 +164,14 @@ input[type='range'] {
   letter-spacing: -0.015em;
 }
 .prose a {
-  color: #60a5fa;
+  color: #2b6ef5;
   font-weight: 400;
 }
 .prose blockquote {
   font-weight: 400;
   font-style: italic;
-  color: #94a3b8;
-  border-left-color: #334155;
+  color: #5c6a82;
+  border-left-color: #ccd9ec;
 }
 /* rimuove le virgolette ricciute che prose aggiunge alle citazioni */
 .prose blockquote p:first-of-type::before,
@@ -142,7 +184,8 @@ input[type='range'] {
   content: none;
 }
 .prose :where(code):not(:where(pre code)) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(43, 110, 245, 0.09);
+  color: #1e4fb0;
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-weight: 400;
@@ -154,19 +197,19 @@ input[type='range'] {
   border-radius: 3px;
 }
 .prose a.wikilink {
-  color: #60a5fa;
+  color: #2b6ef5;
   font-weight: 400;
 }
 .prose blockquote.callout {
-  border-left: 3px solid #60a5fa;
-  background: rgba(96, 165, 250, 0.08);
+  border-left: 3px solid #2b6ef5;
+  background: rgba(43, 110, 245, 0.08);
   font-style: normal;
-  color: #dbe3ee;
+  color: #254568;
   padding: 0.5em 1em;
 }
 .prose blockquote.callout .callout-title {
   font-weight: 700;
-  color: #60a5fa;
+  color: #1e4fb0;
   margin: 0 0 0.3em;
   font-size: 0.85em;
   letter-spacing: 0.03em;
@@ -206,7 +249,7 @@ input[type='range'] {
   transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
 }
 .textLayer .markedContent { display: contents; }
-.textLayer ::selection { background: rgba(59, 130, 246, 0.35); }
+.textLayer ::selection { background: rgba(43, 110, 245, 0.3); }
 /* Evidenziazioni dei risultati di ricerca / evidenziatore (aggiunte dall'app). */
 .textLayer .app-highlight { background: rgba(250, 204, 21, 0.45); border-radius: 2px; }
 .textLayer .app-find { background: rgba(56, 138, 221, 0.45); border-radius: 2px; }

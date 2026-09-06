@@ -223,7 +223,7 @@ function App() {
   // resta trascinabile/chiudibile in ogni stato (boot, picker, app).
   if (booting) {
     return (
-      <div className="flex flex-col h-screen w-screen bg-zinc-900 overflow-hidden">
+      <div className="flex flex-col h-screen w-screen at-sfondo overflow-hidden">
         <TitleBar />
         <div className="flex-1 flex items-center justify-center text-zinc-500">Caricamento...</div>
       </div>
@@ -232,7 +232,7 @@ function App() {
 
   if (!vaultPath || forcePicker) {
     return (
-      <div className="flex flex-col h-screen w-screen bg-zinc-900 overflow-hidden">
+      <div className="flex flex-col h-screen w-screen at-sfondo overflow-hidden">
         <TitleBar />
         <Welcome onOpened={() => setForcePicker(false)} />
       </div>
@@ -240,13 +240,13 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-zinc-900 text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-screen w-screen at-sfondo text-zinc-100 overflow-hidden">
       <TitleBar />
       <div className="flex flex-1 min-h-0">
       {/* Explorer dinamico: larghezza trascinabile, nascondibile dalla titlebar */}
       {sidebarOpen && (
         <>
-          <aside style={{ width: sidebarWidth }} className="shrink-0 bg-zinc-950 flex flex-col">
+          <aside style={{ width: sidebarWidth }} className="shrink-0 at-vetro border-r border-white/60 flex flex-col">
             <div className="px-4 pt-3 pb-2">
               <h3 className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">Explorer</h3>
             </div>
@@ -277,7 +277,12 @@ function App() {
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <TabBar />
-          <FileView />
+          {/* Il contenuto sta su una SCHEDA di carta che galleggia sullo
+              sfondo: angoli larghi, ombra morbida, bordo luminoso. È la
+              differenza fra "riempie lo schermo" e "è un documento". */}
+          <div className="flex-1 min-h-0 flex mx-3 mb-3 at-scheda bg-zinc-900">
+            <FileView />
+          </div>
         </div>
         {mode === 'developer' && (
           <Suspense fallback={null}>

@@ -19,7 +19,7 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-9 shrink-0 flex items-center bg-zinc-950 border-b border-zinc-800/60 select-none"
+      className="h-9 shrink-0 flex items-center at-vetro border-b border-white/65 select-none"
     >
       {/* toggle Explorer (solo con un vault aperto) */}
       {vaultPath && (
@@ -36,7 +36,7 @@ export function TitleBar() {
         </button>
       )}
       <div data-tauri-drag-region className="flex items-center gap-2 px-3 pointer-events-none">
-        <span className="w-5 h-5 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center font-display text-[13px] text-blue-500 leading-none">
+        <span className="w-5 h-5 rounded-md flex items-center justify-center font-display text-[13px] text-white leading-none" style={{ background: 'linear-gradient(160deg,#5cc6f8,#2b6ef5)', boxShadow: '0 2px 7px rgba(43,110,245,.35)' }}>
           A
         </span>
         <span className="font-display text-sm text-zinc-300 tracking-tight">Atelier</span>

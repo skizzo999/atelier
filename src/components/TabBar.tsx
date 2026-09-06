@@ -39,7 +39,7 @@ export function TabBar() {
 
   return (
     <div
-      className="flex items-end h-9 shrink-0 bg-zinc-950/70 border-b border-zinc-800/60 overflow-x-auto"
+      className="flex items-end h-9 shrink-0 border-b border-white/50 overflow-x-auto"
       // zona vuota della barra = sposta in fondo
       onDragOver={(e) => {
         if (!dragPath.current || e.target !== e.currentTarget) return
@@ -91,8 +91,8 @@ export function TabBar() {
             }}
             className={`group flex items-center gap-1.5 h-8 max-w-52 px-3 rounded-t-lg text-[12.5px] cursor-pointer select-none shrink-0 border-x border-t ${
               active
-                ? 'bg-zinc-900 text-zinc-100 border-zinc-800/60'
-                : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-900/50'
+                ? 'at-vetro-forte text-zinc-100 border-white/60'
+                : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-white/40'
             }`}
             style={
               hint

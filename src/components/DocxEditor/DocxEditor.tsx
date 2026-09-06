@@ -192,7 +192,7 @@ function ColorPopover({ editor }: { editor: Editor }) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().unsetColor().run()}
-              className="h-6 w-6 rounded-full border border-zinc-600 bg-white text-zinc-900 text-[10px] flex items-center justify-center"
+              className="h-6 w-6 rounded-full border border-zinc-700 bg-white text-zinc-100 text-[10px] flex items-center justify-center"
               title="Nessun colore"
             >
               ⌀
