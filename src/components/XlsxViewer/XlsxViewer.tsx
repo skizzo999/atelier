@@ -1033,6 +1033,11 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const [dvMenu, setDvMenu] = useState<{ r: number; c: number; x: number; y: number; opts: string[] } | null>(null)
   // Grafici del file (sola lettura), disegnati sopra la griglia al loro posto.
   const [charts, setCharts] = useState<ChartInfo[]>([])
+  // ZOOM della griglia (percentuale, come Excel): scala larghezze,
+  // altezze e caratteri. Tutta la geometria a valle — selezione, riquadri
+  // bloccati, grafici, virtualizzazione — è derivata da questi valori,
+  // quindi segue da sola senza altre modifiche.
+  const [zoom, setZoom] = useState(100)
   const [renamingSheet, setRenamingSheet] = useState<number | null>(null)
   const [sheetAsk, setSheetAsk] = useState<number | null>(null) // conferma eliminazione foglio
   // Barra della formula (casella nome + fx) e finestre di formattazione.
@@ -1545,8 +1550,8 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     const cont = scrollRef.current
     if (!cont) return
     const rect = cont.getBoundingClientRect()
-    const x = e.clientX - rect.left + cont.scrollLeft - ROW_HDR_W
-    const y = e.clientY - rect.top + cont.scrollTop - ROW_H // header colonne
+    const x = e.clientX - rect.left + cont.scrollLeft - rowHdrW
+    const y = e.clientY - rect.top + cont.scrollTop - rowH // header colonne
     let acc = 0
     let startC = 0
     for (let i = 0; i < sheet.widths.length; i++) {
@@ -1670,10 +1675,10 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     const yTop = offsets[r] ?? 0
     const yBot = offsets[r + 1] ?? yTop + DEFAULT_ROW_PX
     if (r >= frozR && yTop < cont.scrollTop + frozH) cont.scrollTop = Math.max(0, yTop - frozH)
-    else if (yBot > cont.scrollTop + cont.clientHeight - ROW_H) cont.scrollTop = yBot - cont.clientHeight + ROW_H
+    else if (yBot > cont.scrollTop + cont.clientHeight - rowH) cont.scrollTop = yBot - cont.clientHeight + rowH
     const xL = colX(c)
     const xR = colX(c + 1)
-    if (c >= frozC && xL < cont.scrollLeft + ROW_HDR_W + frozW) cont.scrollLeft = Math.max(0, xL - ROW_HDR_W - frozW)
+    if (c >= frozC && xL < cont.scrollLeft + rowHdrW + frozW) cont.scrollLeft = Math.max(0, xL - rowHdrW - frozW)
     else if (xR > cont.scrollLeft + cont.clientWidth) cont.scrollLeft = xR - cont.clientWidth
   }
 
@@ -2401,7 +2406,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         e.preventDefault()
         const rect = scrollRef.current?.getBoundingClientRect()
         const x = rect ? rect.left + colX(sel.c1) - (scrollRef.current?.scrollLeft ?? 0) : window.innerWidth / 2
-        const y = rect ? rect.top + ROW_H + (offsets[sel.r2 + 1] ?? 0) - (scrollRef.current?.scrollTop ?? 0) + 4 : window.innerHeight / 2
+        const y = rect ? rect.top + rowH + (offsets[sel.r2 + 1] ?? 0) - (scrollRef.current?.scrollTop ?? 0) + 4 : window.innerHeight / 2
         setDelMenu({
           x: Math.max(8, Math.min(x, window.innerWidth - 210)),
           y: Math.max(8, Math.min(y, window.innerHeight - 160)),
@@ -2466,14 +2471,36 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   }
 
   const rows = sheet?.rows ?? []
-  const widths = sheet?.widths ?? []
-  const heights = sheet?.heights ?? []
-  const offsets = sheet?.offsets ?? [0]
-  const totalW = ROW_HDR_W + widths.reduce((a, b) => a + b, 0)
+  // Le misure del MODELLO restano quelle del file; qui sopra ci mettiamo lo
+  // zoom. Ricalcolare gli offset dalle altezze scalate tiene tutto coerente:
+  // arrotondare ogni riga separatamente farebbe accumulare errore.
+  const z = zoom / 100
+  const baseW = sheet?.widths ?? []
+  const baseH = sheet?.heights ?? []
+  const widths = useMemo(() => (z === 1 ? baseW : baseW.map((w) => Math.round(w * z))), [baseW, z])
+  const heights = useMemo(() => (z === 1 ? baseH : baseH.map((h) => Math.round(h * z))), [baseH, z])
+  const offsets = useMemo(
+    () => (z === 1 ? (sheet?.offsets ?? [0]) : buildOffsets(heights)),
+    [sheet, heights, z],
+  )
+  // Zoom: passi regolari, limiti come Excel (30-300%).
+  const limitaZoom = (p: number) => Math.max(30, Math.min(300, Math.round(p / 10) * 10))
+  function applyZoom(p: number) {
+    setZoom(limitaZoom(p))
+  }
+  // Per i passi relativi (bottoni, rotella) serve l'aggiornamento
+  // FUNZIONALE: leggendo `zoom` dal render, tre click rapidi partirebbero
+  // tutti dallo stesso valore e due andrebbero persi.
+  function nudgeZoom(delta: number) {
+    setZoom((z0) => limitaZoom(z0 + delta))
+  }
+  const rowH = Math.round(ROW_H * z) // altezza della riga delle lettere
+  const rowHdrW = Math.round(ROW_HDR_W * z) // larghezza della colonna dei numeri
+  const totalW = rowHdrW + widths.reduce((a, b) => a + b, 0)
   const totalH = offsets[rows.length] ?? 0
   // Ascissa (px) dell'inizio della colonna c, header righe incluso.
   const colX = (cc: number) => {
-    let x = ROW_HDR_W
+    let x = rowHdrW
     for (let i = 0; i < cc && i < widths.length; i++) x += widths[i]
     return x
   }
@@ -2767,7 +2794,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                   if (r0 >= 0 && c0 >= 0) {
                     setEditing(null)
                     setSelRange({ r1: r0, r2: r0, c1: c0, c2: c0 })
-                    scrollRef.current?.scrollTo({ top: Math.max(0, (offsets[r0] ?? 0) - 100), left: Math.max(0, colX(c0) - ROW_HDR_W - 100) })
+                    scrollRef.current?.scrollTo({ top: Math.max(0, (offsets[r0] ?? 0) - 100), left: Math.max(0, colX(c0) - rowHdrW - 100) })
                   }
                 }
                 setNameDraft(null)
@@ -2887,6 +2914,13 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         // scroll e l'ancoraggio di Chrome "compensa" → scroll che corre da solo.
         style={{ overflowAnchor: 'none' }}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        // Ctrl+rotella = zoom, come in Excel e nei browser. Senza Ctrl la
+        // rotella resta lo scorrimento normale.
+        onWheel={(e) => {
+          if (!e.ctrlKey && !e.metaKey) return
+          e.preventDefault()
+          nudgeZoom(e.deltaY < 0 ? 10 : -10)
+        }}
       >
         {error && <p className="text-zinc-500 text-sm text-center py-10">Impossibile aprire il file.</p>}
         {loading && !error && (
@@ -2898,10 +2932,10 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         {!loading && !error && rows.length > 0 && (
           <div style={{ width: totalW, position: 'relative' }}>
             {/* Intestazioni colonna (A, B, C…): sticky in alto */}
-            <div className="sticky top-0 z-20 flex" style={{ height: ROW_H, background: hdrBg }}>
+            <div className="sticky top-0 z-20 flex" style={{ height: rowH, background: hdrBg }}>
               <div
                 className="sticky left-0 z-10 shrink-0"
-                style={{ width: ROW_HDR_W, background: hdrBg, borderRight: gridLine, borderBottom: gridLine }}
+                style={{ width: rowHdrW, background: hdrBg, borderRight: gridLine, borderBottom: gridLine }}
               />
               {widths.map((w, c) => (
                 <div
@@ -2947,7 +2981,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             <div style={{ height: Math.max(0, (offsets[windowStart] ?? 0) - frozenH) }} />
             <table style={{ tableLayout: 'fixed', borderCollapse: 'collapse', width: totalW }}>
               <colgroup>
-                <col style={{ width: ROW_HDR_W }} />
+                <col style={{ width: rowHdrW }} />
                 {widths.map((w, c) => (
                   <col key={c} style={{ width: w }} />
                 ))}
@@ -2968,7 +3002,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                           borderRight: gridLine,
                           borderBottom: rowFrozen && r === frozenR - 1 ? '2px solid #9ca3af' : gridLine,
                           position: 'sticky',
-                          ...(rowFrozen ? { top: ROW_H + (offsets[r] ?? 0), zIndex: 15 } : {}),
+                          ...(rowFrozen ? { top: rowH + (offsets[r] ?? 0), zIndex: 15 } : {}),
                         }}
                         title="Seleziona la riga (trascina per più righe)"
                         onMouseDown={(e) => {
@@ -3019,7 +3053,12 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                         // Larghezza reale della cella (somma le colonne unite).
                         let colW = widths[c] ?? 64
                         if (cell.cs) for (let k = 1; k < cell.cs; k++) colW += widths[c + k] ?? 0
-                        const fs = fitFontSize(cell, colW)
+                        // L'adattamento del carattere si calcola sulle misure
+                        // del MODELLO (colW / z), poi il risultato si scala:
+                        // altrimenti a zoom diverso da 100 confronteremmo un
+                        // carattere non scalato con una larghezza scalata.
+                        const fsBase = fitFontSize(cell, colW / z)
+                        const fs = fsBase === undefined ? undefined : Math.round(fsBase * z * 10) / 10
                         // Contenuto in un div ad ALTEZZA FISSA: l'altezza resa
                         // coincide sempre col modello (un font più alto della
                         // riga non la gonfia più → overlay sempre in registro).
@@ -3029,7 +3068,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                         // Font più alto della riga (banner dei template Google):
                         // il testo DEBORDA visibilmente sulle righe sotto, come
                         // su Sheets — clippare taglierebbe il titolo a metà.
-                        const tall = (fs ?? 13) * 1.25 > innerH + 2
+                        const tall = (fs ?? 13 * z) * 1.25 > innerH + 2
                         return (
                           <td
                             key={c}
@@ -3060,14 +3099,14 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                               fontWeight: cell.b ? 700 : 400,
                               fontStyle: cell.i ? 'italic' : undefined,
                               textDecoration: cell.u || cell.st ? `${cell.u ? 'underline' : ''} ${cell.st ? 'line-through' : ''}`.trim() : undefined,
-                              fontSize: fs, // dimensione dal file, ridotta se la parola non ci sta
+                              fontSize: fs ?? 13 * z, // dal file (ridotta se la parola non ci sta), o il default — sempre scalati
                               textAlign: (cell.align as 'left' | 'center' | 'right') ?? (cell.num ? 'right' : 'left'),
                               // celle nei riquadri BLOCCATI: sticky + sfondo opaco;
                               // linea di demarcazione sul bordo del blocco
                               ...(rowFrozen || c < frozenC
                                 ? {
                                     position: 'sticky' as const,
-                                    ...(rowFrozen ? { top: ROW_H + (offsets[r] ?? 0) } : {}),
+                                    ...(rowFrozen ? { top: rowH + (offsets[r] ?? 0) } : {}),
                                     ...(c < frozenC ? { left: colX(c) } : {}),
                                     zIndex: rowFrozen && c < frozenC ? 9 : rowFrozen ? 8 : 7,
                                     background: cell.bg ?? '#ffffff',
@@ -3235,7 +3274,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                   {fxMirror('', {
                                     textAlign: 'left',
                                     color: '#1f2937',
-                                    fontSize: fs ?? 13,
+                                    fontSize: fs ?? 13 * z,
                                     fontWeight: 400,
                                     fontStyle: 'normal',
                                   })}
@@ -3252,7 +3291,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                       height: '100%',
                                       color: fxColors ? 'transparent' : (cell.color ?? '#1f2937'),
                                       caretColor: '#1f2937',
-                                      fontSize: fs ?? 13,
+                                      fontSize: fs ?? 13 * z,
                                       fontWeight: fxColors ? 400 : cell.b ? 700 : 400,
                                       fontStyle: fxColors ? 'normal' : cell.i ? 'italic' : undefined,
                                       textAlign: fxColors
@@ -3346,9 +3385,9 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               .filter((ch) => ch.sheet === active)
               .map((ch, i) => {
                 const x = colX(Math.min(ch.from.col, widths.length - 1))
-                const y = ROW_H + (offsets[Math.min(ch.from.row, offsets.length - 1)] ?? 0)
+                const y = rowH + (offsets[Math.min(ch.from.row, offsets.length - 1)] ?? 0)
                 const x2 = colX(Math.min(ch.to.col, widths.length))
-                const y2 = ROW_H + (offsets[Math.min(ch.to.row, offsets.length - 1)] ?? 0)
+                const y2 = rowH + (offsets[Math.min(ch.to.row, offsets.length - 1)] ?? 0)
                 const w = Math.max(200, x2 - x)
                 const h = Math.max(140, y2 - y)
                 return (
@@ -3370,7 +3409,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               (() => {
                 const x = colX(selRange.c1)
                 const wSel = colX(selRange.c2 + 1) - x
-                const y = ROW_H + (offsets[selRange.r1] ?? 0)
+                const y = rowH + (offsets[selRange.r1] ?? 0)
                 const hSel = (offsets[selRange.r2 + 1] ?? totalH) - (offsets[selRange.r1] ?? 0)
                 const strip = (side: 'top' | 'bottom' | 'left' | 'right'): React.CSSProperties => ({
                   position: 'absolute',
@@ -3434,7 +3473,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                     style={{
                       position: 'absolute',
                       left: x,
-                      top: ROW_H + (offsets[movePreview.r1] ?? 0),
+                      top: rowH + (offsets[movePreview.r1] ?? 0),
                       width: colX(movePreview.c2 + 1) - x,
                       height: (offsets[movePreview.r2 + 1] ?? totalH) - (offsets[movePreview.r1] ?? 0),
                       border: '2px dashed #2563eb',
@@ -3461,7 +3500,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                       style={{
                         position: 'absolute',
                         left: colX(c + 1) - 17,
-                        top: ROW_H + (offsets[f.r] ?? 0) + 2,
+                        top: rowH + (offsets[f.r] ?? 0) + 2,
                         width: 15,
                         height: 15,
                         zIndex: 4,
@@ -3512,7 +3551,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                     style={{
                       position: 'absolute',
                       left: x,
-                      top: ROW_H + (offsets[r1] ?? 0),
+                      top: rowH + (offsets[r1] ?? 0),
                       width: colX(c2 + 1) - x,
                       height: (offsets[r2 + 1] ?? totalH) - (offsets[r1] ?? 0),
                       border: `2px dashed ${color}`,
@@ -4028,6 +4067,33 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               </span>
             </div>
           )}
+          {/* ZOOM: in fondo a destra come in Excel. Il cursore scorre a passi
+              regolari, la percentuale riporta a 100 con un click. */}
+          <div className={`flex items-center gap-2 pr-1 shrink-0 ${selStats ? '' : 'ml-auto'}`}>
+            <button className="tbtn !h-6 !px-1.5" title="Riduci lo zoom" onClick={() => nudgeZoom(-10)}>
+              −
+            </button>
+            <input
+              type="range"
+              min={30}
+              max={300}
+              step={10}
+              value={zoom}
+              onChange={(e) => applyZoom(Number(e.target.value))}
+              title="Zoom della griglia"
+              className="w-24 cursor-pointer"
+            />
+            <button className="tbtn !h-6 !px-1.5" title="Ingrandisci lo zoom" onClick={() => nudgeZoom(10)}>
+              ＋
+            </button>
+            <button
+              className="tbtn !h-6 !px-1.5 tabular-nums w-12 justify-center"
+              title="Torna al 100%"
+              onClick={() => applyZoom(100)}
+            >
+              {zoom}%
+            </button>
+          </div>
         </div>
       )}
     </div>
