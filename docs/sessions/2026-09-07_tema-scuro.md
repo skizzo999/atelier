@@ -126,3 +126,36 @@ Uno script confronta tutte le variabili **usate** in `src/` e in `index.html`
 con quelle **definite**: 56 usate, 75 definite, nessuna mancante; e ogni
 token del tema chiaro ha il suo corrispettivo nello scuro (l'unica
 volutamente condivisa è `--at-blur`).
+
+---
+
+## Il difetto che ha bloccato l'app (e perché i banchi non l'hanno visto)
+
+Aprendo un file qualsiasi l'app spariva: schermo vuoto, tutto fermo.
+
+**Causa**: in `TabBar.tsx` avevo messo lo `useEffect` che porta in vista la
+scheda attiva **sotto** l'uscita anticipata `if (openTabs.length === 0) return
+null`. Con zero file aperti il componente esegue quattro hook; appena si apre
+il primo file ne esegue cinque. React conta gli hook e pretende che il numero
+non cambi: **errore #310**, e abbatte l'intero albero. Da qui lo schermo vuoto,
+con qualunque tipo di file.
+
+**Perché non l'ho visto**: i banchi montavano *un componente alla volta* —
+l'editor, il foglio, la schermata di benvenuto — e nessuno montava la barra
+delle tab. Ho verificato i colori, non il guscio.
+
+Prima di questo avevo anche accusato il pezzo sbagliato: avevo tolto il
+`backgroundColor` della finestra Tauri pensando fosse quello. Non era.
+
+### Cosa è cambiato nel metodo
+- Nuovo **`app-harness.mjs`**: monta l'**App intera** con Tauri simulato
+  (fs, core, window, dialog, opener, shell) e un vault finto di tre file, poi
+  li apre come farebbe l'utente. Col codice rotto riproduce il blocco e mostra
+  l'errore #310; col codice corretto: tre file aperti, app viva, **zero
+  messaggi in console**.
+- Nuovo **`test-hook-dopo-uscita.mjs`**: scorre tutti i componenti e segnala
+  ogni hook chiamato dopo un'uscita anticipata. Provato in entrambi i versi —
+  rimettendo l'errore lo becca, sul codice corretto passa.
+
+La funzione non è stata buttata: lo `useEffect` è tornato al suo posto,
+**sopra** l'uscita anticipata, con un commento che spiega perché deve restare lì.

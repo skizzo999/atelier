@@ -19,6 +19,15 @@ export function TabBar() {
   const dragPath = useRef<string | null>(null)
   const [dropHint, setDropHint] = useState<{ path: string | null; before: boolean } | null>(null)
 
+  // ATTENZIONE: gli hook stanno tutti PRIMA dell'uscita anticipata qui sotto.
+  // Uno messo dopo girerebbe solo con almeno una tab aperta: il numero di hook
+  // cambierebbe fra un rendering e l'altro e React abbatte l'intero albero.
+  // La tab attiva deve restare visibile: aprendo un file che sta oltre il
+  // bordo la striscia si porta da sola su di lui.
+  useEffect(() => {
+    schedaAttiva.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [selectedFile, openTabs.length])
+
   if (openTabs.length === 0) return null
 
   // Cartella del file attivo, mostrata accanto alle tab (tooltip = percorso pieno).
@@ -37,12 +46,6 @@ export function TabBar() {
     const beforePath = before ? target : (openTabs[openTabs.indexOf(target) + 1] ?? null)
     moveTab(dragged, beforePath)
   }
-
-  // La tab attiva deve restare visibile: aprendo un file che sta oltre il
-  // bordo la striscia si porta da sola su di lui.
-  useEffect(() => {
-    schedaAttiva.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [selectedFile, openTabs.length])
 
   return (
     <div
