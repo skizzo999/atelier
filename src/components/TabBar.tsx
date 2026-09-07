@@ -6,7 +6,6 @@ import { useAppStore } from '../store/appStore'
 // riordinare. A destra il PERCORSO della cartella del file attivo (la
 // vecchia riga dedicata è stata eliminata per guadagnare spazio).
 export function TabBar() {
-  const striscia = useRef<HTMLDivElement>(null)
   const schedaAttiva = useRef<HTMLDivElement>(null)
   const openTabs = useAppStore((s) => s.openTabs)
   const selectedFile = useAppStore((s) => s.selectedFile)
@@ -47,7 +46,6 @@ export function TabBar() {
 
   return (
     <div
-      ref={striscia}
       className="at-strisciatab flex items-end h-9 shrink-0 px-3 gap-1 border-b border-white/50 overflow-x-auto"
       // La rotella scorre la striscia in orizzontale: senza, con tante tab
       // aperte le ultime restano irraggiungibili (il mouse non ha un asse X).
