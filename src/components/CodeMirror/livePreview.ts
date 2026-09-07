@@ -403,14 +403,17 @@ function buildDecorations(view: EditorView, fileDir: string): DecorationSet {
 }
 
 // Aspetto "documento" (come la vista Lettura): font proporzionale, sfondo app.
-const HEAD = '#16202e'
+// I colori sono variabili CSS, definite una volta per tema in index.css: qui
+// erano scritti a mano e col tema scuro titoli e grassetti restavano scuri
+// su fondo scuro, cioè invisibili.
+const HEAD = 'var(--at-text)'
 const PROSE_FONT = 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif'
 // Titoli grandi in serif, come la landing ("workshop" caldo).
 const DISPLAY_FONT = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif'
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
 const livePreviewTheme = EditorView.theme({
-  '&': { backgroundColor: '#ffffff' },
+  '&': { backgroundColor: 'var(--gr-carta)' },
   '.cm-scroller': { fontFamily: PROSE_FONT },
   '.cm-content': {
     fontFamily: PROSE_FONT,
@@ -419,8 +422,8 @@ const livePreviewTheme = EditorView.theme({
     // padding-bottom abbondante: spazio "arieggiato" tra il testo e la fine
     // della nota (si può scrollare oltre l'ultima riga, come Obsidian).
     padding: '28px 36px 30vh',
-    caretColor: '#16202e',
-    color: '#3a4759',
+    caretColor: 'var(--at-text)',
+    color: 'rgb(var(--z-300))',
   },
   // Spazio sopra il titolo e tra il titolo e il testo che segue.
   '.cm-lp-blockspace': { paddingTop: '1em', paddingBottom: '0.45em' },
@@ -432,21 +435,22 @@ const livePreviewTheme = EditorView.theme({
   '.cm-lp-h6': { fontWeight: '700', color: HEAD },
   '.cm-lp-strong': { fontWeight: '700', color: HEAD },
   '.cm-lp-em': { fontStyle: 'italic' },
-  '.cm-lp-strike': { textDecoration: 'line-through', color: '#7b8aa3' },
+  '.cm-lp-strike': { textDecoration: 'line-through', color: 'var(--at-faint)' },
   '.cm-lp-highlight': { backgroundColor: 'rgba(250, 204, 21, 0.25)', borderRadius: '3px', padding: '0 0.1em' },
   '.cm-lp-code': {
     fontFamily: MONO,
     fontSize: '0.875em',
-    background: 'rgba(255,255,255,0.08)',
+    background: 'rgb(var(--acc) / 0.11)',
+    color: 'var(--at-codice)',
     padding: '0.1em 0.35em',
     borderRadius: '4px',
   },
-  '.cm-lp-link': { color: '#2b6ef5', textDecoration: 'underline' },
-  '.cm-lp-wikilink': { color: '#2b6ef5', textDecoration: 'underline' },
+  '.cm-lp-link': { color: 'var(--at-accent)', textDecoration: 'underline' },
+  '.cm-lp-wikilink': { color: 'var(--at-accent)', textDecoration: 'underline' },
   '.cm-lp-callout': {
-    borderLeft: '3px solid #2b6ef5',
+    borderLeft: '3px solid var(--at-accent)',
     paddingLeft: '1em',
-    background: 'rgba(96,165,250,0.08)',
+    background: 'rgb(var(--acc) / 0.1)',
   },
   // Titolo del callout (es. NOTA) come pseudo-elemento: nessun widget, quindi
   // nessuno spazio fantasma sopra. line-height piccola = niente leading sopra;
@@ -456,39 +460,39 @@ const livePreviewTheme = EditorView.theme({
     display: 'block',
     lineHeight: '1.2',
     fontWeight: '700',
-    color: '#1e4fb0',
+    color: 'var(--at-codice)',
     fontSize: '0.85em',
     letterSpacing: '0.03em',
     marginBottom: '0.25em',
   },
-  '.cm-lp-bullet': { color: '#7b8aa3' },
+  '.cm-lp-bullet': { color: 'var(--at-faint)' },
   '.cm-lp-checkbox': { marginRight: '0.4em', verticalAlign: 'middle' },
   '.cm-lp-quote': {
-    borderLeft: '3px solid #ccd9ec',
+    borderLeft: '3px solid rgb(var(--z-700))',
     paddingLeft: '1em',
-    color: '#5c6a82',
+    color: 'var(--at-dim)',
     fontStyle: 'italic',
   },
-  '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'rgba(255,255,255,0.05)' },
-  '.cm-lp-hr': { borderBottom: '1px solid #ccd9ec' },
+  '.cm-lp-codeblock': { fontFamily: MONO, fontSize: '0.875em', background: 'var(--at-codice-fondo)' },
+  '.cm-lp-hr': { borderBottom: '1px solid rgb(var(--z-700))' },
   '.cm-lp-image': { display: 'block', maxWidth: '100%', borderRadius: '6px', margin: '0.3em 0' },
   '.cm-lp-imagemissing': {
     display: 'inline-block',
-    color: '#5c6a82',
+    color: 'var(--at-dim)',
     fontSize: '0.85em',
-    background: 'rgba(255,255,255,0.05)',
+    background: 'var(--at-codice-fondo)',
     padding: '0.3em 0.6em',
     borderRadius: '6px',
   },
   '.cm-lp-langlabel': {
-    color: '#7b8aa3',
+    color: 'var(--at-faint)',
     fontSize: '0.75em',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
-  '.cm-cursor': { borderLeftColor: '#16202e' },
+  '.cm-cursor': { borderLeftColor: 'var(--at-text)' },
   '.cm-gutters': { display: 'none' },
-}, { dark: true })
+}, { dark: false })
 
 export function livePreview(fileDir: string, onWikilink: (name: string) => void): Extension {
   return [

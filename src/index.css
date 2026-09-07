@@ -68,6 +68,7 @@
   --gr-linea: #dbe4f0; /* reticolo */
   --gr-bordo: #c3cfe0; /* bordo delle intestazioni */
   --gr-testo: #16202e;
+  --docx-scrivania: #dde7f5; /* scrivania attorno al foglio Word */
   --ch-carta: #ffffff; /* fondo del riquadro del grafico */
   --ch-bordo: #cbd5e1;
   --ch-asse: #94a3b8;
@@ -134,6 +135,7 @@
   --gr-linea: #27324a;
   --gr-bordo: #35425c;
   --gr-testo: #eef3fb;
+  --docx-scrivania: #0e1726;
   --ch-carta: #16202f;
   --ch-bordo: #35425c;
   --ch-asse: #7e8ea8;
@@ -200,6 +202,13 @@
 /* Righe che separano due voci dentro una scheda di vetro. */
 .at-divisori > * + * {
   border-color: var(--at-border);
+}
+
+/* Fondo su html e body: senza, fra l'apertura della finestra e il primo
+   disegno dell'app si vede il bianco del browser — il lampo all'avvio. */
+html,
+body {
+  background: var(--at-bg);
 }
 
 body {
@@ -685,3 +694,23 @@ textarea.pdf-field {
 :root[data-tema='scuro'] .hljs-built_in,
 :root[data-tema='scuro'] .hljs-title.class_,
 :root[data-tema='scuro'] .hljs-class .hljs-title { color: #e8c07d; }
+
+/* ===== Explorer: niente barra orizzontale =====
+   react-arborist mette la lista in un contenitore che scorre in entrambe le
+   direzioni. Appena un nome sborda compare la barra in basso, che si mangia
+   una decina di pixel di ALTEZZA e taglia l'ultimo file. I nomi sono già
+   troncati con il percorso completo nel tooltip: la barra non serve. */
+.at-albero > div,
+.at-albero [role='tree'] {
+  overflow-x: hidden !important;
+}
+
+/* ===== Striscia delle tab =====
+   Con molti file aperti scorre invece di stringere le schede. La barra qui
+   ruberebbe altezza a una striscia alta 36 px: si scorre con la rotella. */
+.at-strisciatab {
+  scrollbar-width: none;
+}
+.at-strisciatab::-webkit-scrollbar {
+  display: none;
+}

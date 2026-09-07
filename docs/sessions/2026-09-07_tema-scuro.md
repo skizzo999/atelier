@@ -73,3 +73,56 @@ in cache e mostrava il tema vecchio.
 - Prova a mano dell'utente sui due temi.
 - Release: dall'ultimo tag (v0.4.1) sono passati tema vetro, zoom, i grafici
   Excel e il tema scuro.
+
+---
+
+## Seguito: sei difetti del tema scuro segnalati dall'utente
+
+### 1. Il lampo all'avvio
+Il tema si applicava in un effetto di React, cioè **dopo** il primo disegno:
+l'app dipingeva una volta chiara e poi saltava allo scuro. E `html`/`body` non
+avevano fondo, quindi fra l'apertura della finestra e il primo disegno si
+vedeva il bianco del browser.
+- Uno script in `index.html` legge la stessa preferenza dello store e mette
+  `data-tema` **prima** di qualsiasi disegno; dipinge anche il fondo a mano,
+  perché il foglio di stile può non essere ancora arrivato.
+- `html, body` hanno il fondo del tema.
+- La finestra Tauri ha ora un `backgroundColor`: si apre prima che la webview
+  dipinga, e senza colore quell'istante è bianco. Scelto il fondo scuro — un
+  lampo scuro su tema chiaro si nota appena, uno bianco su tema scuro no.
+- Provata la logica su 8 casi (nessuna preferenza, scelta esplicita, sistema,
+  storage corrotto, versione vecchia senza il campo): tutti corretti.
+
+Corretto anche il titolo della finestra, rimasto "Tauri + React + Typescript".
+
+### 2. I .md non si vedevano
+Non era la vista Lettura ma la **Ibrida**: i suoi colori stavano scritti a
+mano in `livePreview.ts` e `tableEditor.ts`, tarati sul bianco. Titoli e
+grassetti restavano quasi neri su fondo scuro. Ora sono variabili.
+Verificato nel banco col componente vero: fondo bianco→#141d2d, corpo
+#3f4a5c→#c3d0e2, titoli e grassetti #16202e→#eef3fb, link #2b6ef5→#4d8bff,
+intestazioni di tabella #f2f6fb→#1b2536.
+
+### 3. Lo sfondo dei .docx
+La **scrivania** attorno al foglio restava chiara: una lastra larga mezzo
+schermo in un'app scura. Ora segue il tema. Il FOGLIO resta bianco: quello è
+il documento che stamperesti.
+
+### 4. Le tab si schiacciavano
+Larghezza minima perché una scheda non diventi illeggibile, la rotella scorre
+la striscia in orizzontale (il mouse non ha un asse X e le ultime tab erano
+irraggiungibili), e aprendo un file la sua scheda si porta da sola in vista.
+La barra di scorrimento è nascosta: su una striscia alta 36 px si mangerebbe
+l'altezza.
+
+### 5. L'Explorer scendeva e nascondeva l'ultimo file
+Selezionando un file compariva la barra di scorrimento orizzontale della
+lista, che si mangia una decina di pixel di **altezza** e taglia l'ultima
+riga. I nomi sono già troncati col percorso nel tooltip: la barra non serve,
+ed è stata tolta.
+
+### Controllo trasversale
+Uno script confronta tutte le variabili **usate** in `src/` e in `index.html`
+con quelle **definite**: 56 usate, 75 definite, nessuna mancante; e ogni
+token del tema chiaro ha il suo corrispettivo nello scuro (l'unica
+volutamente condivisa è `--at-blur`).

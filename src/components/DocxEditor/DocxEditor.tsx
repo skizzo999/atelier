@@ -55,7 +55,9 @@ const DEFAULT_SETTINGS: FullSettings = {
 
 // Sfondo dell'area documento = colore dei "gap" tra le pagine: così i fogli A4
 // (bianchi) sembrano staccati l'uno dall'altro.
-const PAGE_BG = '#dde7f5'
+// Scrivania attorno al foglio: segue il tema. Il FOGLIO resta bianco —
+// quello è il documento, e ricolorarlo falserebbe ciò che stamperesti.
+const PAGE_BG = 'var(--docx-scrivania)'
 
 // Le tabelle molto grandi (più alte di una pagina) mandano in loop il motore
 // di paginazione (misura↔sposta senza fine → app bloccata): quei documenti

@@ -1,10 +1,31 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <title>Atelier</title>
+    <script>
+      // Il tema va deciso PRIMA del primo disegno. Applicarlo da React, in un
+      // effetto, vuol dire dipingere una volta col tema chiaro e poi saltare
+      // allo scuro: è il lampo che si vede all'avvio. Qui si legge la stessa
+      // preferenza che usa lo store, e si dipinge già giusto.
+      ;(function () {
+        try {
+          var salvato = JSON.parse(localStorage.getItem('atelier-app') || '{}')
+          var tema = (salvato.state && salvato.state.tema) || 'sistema'
+          var scuro =
+            tema === 'scuro' ||
+            (tema !== 'chiaro' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (scuro) document.documentElement.setAttribute('data-tema', 'scuro')
+          // Il fondo si mette anche a mano: il foglio di stile può non essere
+          // ancora arrivato, e nel frattempo la finestra resterebbe bianca.
+          document.documentElement.style.background = scuro ? '#0a1220' : '#dce9fb'
+        } catch (e) {
+          /* localStorage negato: si parte dal tema chiaro, senza rompere nulla */
+        }
+      })()
+    </script>
   </head>
 
   <body>

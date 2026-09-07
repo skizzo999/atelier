@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../store/appStore'
 
 // Tab dei file aperti (stile Obsidian/browser): click attiva, ✕ o click
@@ -6,6 +6,8 @@ import { useAppStore } from '../store/appStore'
 // riordinare. A destra il PERCORSO della cartella del file attivo (la
 // vecchia riga dedicata è stata eliminata per guadagnare spazio).
 export function TabBar() {
+  const striscia = useRef<HTMLDivElement>(null)
+  const schedaAttiva = useRef<HTMLDivElement>(null)
   const openTabs = useAppStore((s) => s.openTabs)
   const selectedFile = useAppStore((s) => s.selectedFile)
   const setSelectedFile = useAppStore((s) => s.setSelectedFile)
@@ -37,9 +39,23 @@ export function TabBar() {
     moveTab(dragged, beforePath)
   }
 
+  // La tab attiva deve restare visibile: aprendo un file che sta oltre il
+  // bordo la striscia si porta da sola su di lui.
+  useEffect(() => {
+    schedaAttiva.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [selectedFile, openTabs.length])
+
   return (
     <div
-      className="flex items-end h-9 shrink-0 px-3 gap-1 border-b border-white/50 overflow-x-auto"
+      ref={striscia}
+      className="at-strisciatab flex items-end h-9 shrink-0 px-3 gap-1 border-b border-white/50 overflow-x-auto"
+      // La rotella scorre la striscia in orizzontale: senza, con tante tab
+      // aperte le ultime restano irraggiungibili (il mouse non ha un asse X).
+      onWheel={(e) => {
+        const el = e.currentTarget
+        if (el.scrollWidth <= el.clientWidth) return
+        el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX
+      }}
       // zona vuota della barra = sposta in fondo
       onDragOver={(e) => {
         if (!dragPath.current || e.target !== e.currentTarget) return
@@ -89,7 +105,8 @@ export function TabBar() {
                 closeTab(path)
               }
             }}
-            className={`group flex items-center gap-1.5 h-8 max-w-52 px-3 rounded-t-lg text-[12.5px] cursor-pointer select-none shrink-0 border-x border-t ${
+            ref={active ? schedaAttiva : undefined}
+            className={`group flex items-center gap-1.5 h-8 min-w-[6.5rem] max-w-52 px-3 rounded-t-lg text-[12.5px] cursor-pointer select-none shrink-0 border-x border-t ${
               active
                 ? 'at-vetro-forte text-zinc-100 border-white/60'
                 : 'text-zinc-400 border-transparent hover:text-zinc-200 at-hover'

@@ -573,7 +573,7 @@ export function FileTree() {
 
       <div
         ref={containerRef}
-        className={`flex-1 overflow-hidden relative ${dropActive ? 'ring-2 ring-inset ring-blue-500/70 bg-blue-500/5' : ''}`}
+        className={`at-albero flex-1 overflow-hidden relative ${dropActive ? 'ring-2 ring-inset ring-blue-500/70 bg-blue-500/5' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault()
           setMenu({ target: null, x: e.clientX, y: e.clientY })

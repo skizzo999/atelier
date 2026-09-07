@@ -658,14 +658,14 @@ const tableTheme = EditorView.theme({
     width: '100%',
   },
   '.cm-lp-mdtable th, .cm-lp-mdtable td': {
-    border: '1px solid #dbe4f0',
+    border: '1px solid var(--gr-linea)',
     padding: '0.35em 0.7em',
     textAlign: 'left',
     minWidth: '3em',
     outline: 'none',
-    caretColor: '#16202e',
+    caretColor: 'var(--at-text)',
   },
-  '.cm-lp-mdtable th': { background: '#f2f6fd', fontWeight: '700', color: '#16202e' },
+  '.cm-lp-mdtable th': { background: 'var(--gr-intest)', fontWeight: '700', color: 'var(--at-text)' },
   '.cm-lp-mdtable td:focus, .cm-lp-mdtable th:focus': {
     boxShadow: 'inset 0 0 0 2px rgba(96,165,250,0.6)',
   },
@@ -699,13 +699,13 @@ const tableTheme = EditorView.theme({
     borderRadius: '4px',
   },
   '.cm-mdtable-wrap:hover .cm-mdtable-addrow, .cm-mdtable-wrap:hover .cm-mdtable-addcol': {
-    color: '#5c6a82',
-    borderColor: '#dbe4f0',
+    color: 'var(--at-dim)',
+    borderColor: 'var(--gr-linea)',
     background: 'rgba(255,255,255,0.03)',
   },
   '.cm-mdtable-addrow:hover, .cm-mdtable-addcol:hover': {
     background: 'rgba(96,165,250,0.15) !important',
-    color: '#16202e !important',
+    color: 'var(--at-text) !important',
   },
 })
 

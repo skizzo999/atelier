@@ -16,7 +16,8 @@
         "width": 1100,
         "height": 720,
         "dragDropEnabled": false,
-        "decorations": false
+        "decorations": false,
+        "backgroundColor": "#0a1220"
       }
     ],
     "security": {
