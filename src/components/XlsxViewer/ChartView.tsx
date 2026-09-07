@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { ChartInfo } from '../../lib/xlsxCharts'
 
 // Disegno di un grafico del file (sola lettura), in SVG. Copre i tipi che si
@@ -19,7 +20,19 @@ const fmt = (n: number): string => {
   return Number.isInteger(n) ? String(n) : n.toFixed(2)
 }
 
-export function ChartView({ chart, width, height }: { chart: ChartInfo; width: number; height: number }) {
+// Memoizzato: la griglia si ridisegna a ogni evento di scorrimento e senza
+// questo l'SVG del grafico verrebbe ricostruito ogni volta — con qualche
+// centinaio di elementi si vedono gli scatti. I dati del grafico cambiano
+// solo quando cambiano le celle, non quando si scorre.
+export const ChartView = memo(function ChartView({
+  chart,
+  width,
+  height,
+}: {
+  chart: ChartInfo
+  width: number
+  height: number
+}) {
   const W = Math.max(160, width)
   const H = Math.max(120, height)
   const colorOf = (i: number) => chart.series[i]?.color ?? FALLBACK[i % FALLBACK.length]
@@ -58,7 +71,7 @@ export function ChartView({ chart, width, height }: { chart: ChartInfo; width: n
         })}
     </svg>
   )
-}
+})
 
 // Barre / linee / aree / dispersione: assi, griglia orizzontale, serie.
 function Cartesian({
@@ -83,6 +96,46 @@ function Cartesian({
   const y0 = top + 4
   const w = Math.max(10, W - padL - padR)
   const h = Math.max(10, H - top - padB - 4)
+
+  // Serie lunghissime (un titolo di borsa ha migliaia di giorni) su pochi
+  // pixel: più punti che pixel non si vedono, ma il tracciato diventa un
+  // attributo da decine di kB da ridisegnare a ogni fotogramma. Si tiene un
+  // punto per pixel, tenendo di ogni intervallo il MINIMO e il MASSIMO: così
+  // nessun picco sparisce e la scala verticale resta quella vera. Stessi
+  // indici per tutte le serie, che restano allineate fra loro.
+  const nOrig = Math.max(...chart.series.map((s) => s.values.length), chart.categories.length)
+  const maxPunti = Math.max(64, Math.round(W - 48))
+  const tenuti = ((): number[] | null => {
+    if (nOrig <= maxPunti) return null
+    const rif = chart.series.reduce((a, b) => (b.values.length > a.values.length ? b : a)).values
+    const gruppi = Math.floor(maxPunti / 2)
+    const passo = nOrig / gruppi
+    const idx: number[] = []
+    for (let g = 0; g < gruppi; g++) {
+      const a = Math.floor(g * passo)
+      const b = Math.min(nOrig - 1, Math.floor((g + 1) * passo) - 1)
+      if (b < a) continue
+      let iMin = a
+      let iMax = a
+      for (let i = a; i <= b; i++) {
+        if ((rif[i] ?? 0) < (rif[iMin] ?? 0)) iMin = i
+        if ((rif[i] ?? 0) > (rif[iMax] ?? 0)) iMax = i
+      }
+      const lo = Math.min(iMin, iMax)
+      const hi = Math.max(iMin, iMax)
+      idx.push(lo)
+      if (hi !== lo) idx.push(hi)
+    }
+    return idx
+  })()
+  const scegli = <T,>(arr: T[]): T[] => (tenuti ? tenuti.map((i) => arr[i]).filter((v) => v !== undefined) : arr)
+  if (tenuti) {
+    chart = {
+      ...chart,
+      categories: scegli(chart.categories),
+      series: chart.series.map((s) => ({ ...s, values: scegli(s.values) })),
+    }
+  }
 
   const all = chart.series.flatMap((s) => s.values)
   const rawMax = Math.max(0, ...all)

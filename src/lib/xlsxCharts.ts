@@ -21,12 +21,19 @@ export interface ChartInfo {
   sheet: number // indice del foglio, 0-based
   from: { col: number; row: number } // ancoraggio (0-based)
   to: { col: number; row: number }
+  /** Scostamento dall'angolo della cella di ancoraggio, in px a 96 dpi. */
+  fromOff: { x: number; y: number }
+  toOff: { x: number; y: number }
+  /** Dove sta l'ancoraggio nel pacchetto: serve a riscriverlo dopo uno spostamento. */
+  anchor?: { drawing: string; index: number }
   type: 'bar' | 'barH' | 'line' | 'pie' | 'area' | 'scatter'
   title: string
   categories: string[]
   series: ChartSeries[]
   /** Riferimento delle celle delle categorie. */
   categoriesRef?: string
+  /** Dimensione in pixel, quando il disegno la dichiara (oneCellAnchor). */
+  sizePx?: { w: number; h: number }
 }
 
 /** Un riferimento "Foglio!$A$1:$B$9" scomposto (indici 1-based). */
@@ -180,7 +187,18 @@ export function readCharts(bytes: Uint8Array): ChartInfo[] {
       const drawDoc = parser.parseFromString(strFromU8(drawRaw), 'application/xml')
       const drawRels = rels(files, drawingPath.replace(/([^/]+)$/, '_rels/$1.rels'), parser)
 
-      for (const anchor of [...kids(drawDoc, 'twoCellAnchor'), ...kids(drawDoc, 'oneCellAnchor')]) {
+      // In ORDINE DI DOCUMENTO: l'indice serve a ritrovare lo stesso
+      // ancoraggio quando lo si riscrive dopo uno spostamento.
+      const ancoraggi: Element[] = []
+      {
+        const tutti = drawDoc.getElementsByTagName('*')
+        for (let i = 0; i < tutti.length; i++) {
+          const ln = localOf(tutti[i].localName || tutti[i].nodeName)
+          if (ln === 'twoCellAnchor' || ln === 'oneCellAnchor') ancoraggi.push(tutti[i])
+        }
+      }
+      for (let ai = 0; ai < ancoraggi.length; ai++) {
+        const anchor = ancoraggi[ai]
         const chartEl = kids(anchor, 'chart').find((e) => attr(e, 'id'))
         if (!chartEl) continue
         const chartPath = drawRels.get(attr(chartEl, 'id') ?? '')
@@ -196,13 +214,31 @@ export function readCharts(bytes: Uint8Array): ChartInfo[] {
         }
         const fromCol = num(fromEl, 'col', 0)
         const fromRow = num(fromEl, 'row', 0)
+        // colOff/rowOff sono in EMU: 1 px a 96 dpi = 9525 EMU.
+        const px = (el: Element | null, tag: string) => Math.round(num(el, tag, 0) / 9525)
         const info = parseChart(strFromU8(chartRaw), parser)
         if (!info) continue
+        // oneCellAnchor non ha <to>: dichiara la dimensione in <ext>, in EMU
+        // (1 px a 96 dpi = 9525 EMU).
+        // SOLO figlio diretto: dentro il graphicFrame c'è un altro <a:ext>
+        // (la misura della cornice) che non è la misura dell'ancoraggio.
+        const extEl =
+          Array.from(anchor.children).find((e) => localOf(e.localName || e.nodeName) === 'ext') ?? null
+        const cx = extEl ? Number(attr(extEl, 'cx')) : NaN
+        const cy = extEl ? Number(attr(extEl, 'cy')) : NaN
+        const sizePx =
+          Number.isFinite(cx) && Number.isFinite(cy) && cx > 0 && cy > 0
+            ? { w: Math.round(cx / 9525), h: Math.round(cy / 9525) }
+            : undefined
         out.push({
           ...info,
+          sizePx,
           sheet: sheetIndex,
+          anchor: { drawing: drawingPath, index: ai },
           from: { col: fromCol, row: fromRow },
+          fromOff: { x: px(fromEl, 'colOff'), y: px(fromEl, 'rowOff') },
           to: { col: num(toEl, 'col', fromCol + 8), row: num(toEl, 'row', fromRow + 15) },
+          toOff: { x: px(toEl, 'colOff'), y: px(toEl, 'rowOff') },
         })
       }
     }
@@ -211,7 +247,10 @@ export function readCharts(bytes: Uint8Array): ChartInfo[] {
 }
 
 // Contenuto di un chartN.xml → tipo, titolo, categorie, serie.
-function parseChart(xml: string, parser: DOMParser): Omit<ChartInfo, 'sheet' | 'from' | 'to'> | null {
+function parseChart(
+  xml: string,
+  parser: DOMParser,
+): Omit<ChartInfo, 'sheet' | 'from' | 'to' | 'fromOff' | 'toOff' | 'anchor' | 'sizePx'> | null {
   const doc = parser.parseFromString(xml, 'application/xml')
   const plot = first(doc, 'plotArea')
   if (!plot) return null
@@ -247,27 +286,34 @@ function parseChart(xml: string, parser: DOMParser): Omit<ChartInfo, 'sheet' | '
       `Serie ${series.length + 1}`
     const catEl = first(ser, 'cat') ?? first(ser, 'xVal')
     const cats = catEl ? points(first(catEl, 'strCache') ?? first(catEl, 'numCache')) : []
-    if (cats.length > categories.length) {
-      categories = cats
-      categoriesRef = (catEl ? first(catEl, 'f')?.textContent : null) ?? categoriesRef
-    }
+    const catRef = (catEl ? first(catEl, 'f')?.textContent : null) ?? undefined
+    if (cats.length > categories.length) categories = cats
+    // Anche senza cache teniamo il riferimento: le etichette si leggono
+    // dalle celle come i valori.
+    if (catRef && !categoriesRef) categoriesRef = catRef
     const valEl = first(ser, 'val') ?? first(ser, 'yVal')
     const values = points(valEl ? first(valEl, 'numCache') : null).map((v) => {
       const n = Number(v)
       return Number.isFinite(n) ? n : 0
     })
-    if (!values.length) continue
+    const valuesRef = (valEl ? first(valEl, 'f')?.textContent : null) ?? undefined
+    // Cache vuota ma riferimento presente: la serie è buona lo stesso, i
+    // valori arrivano dalle celle. È il caso dei file esportati da Google
+    // Sheets, che non scrivono i valori in cache.
+    if (!values.length && !valuesRef) continue
     const colorEl = first(ser, 'srgbClr')
     const color = colorEl ? `#${attr(colorEl, 'val')}` : undefined
     series.push({
       name: String(name),
       values,
       color,
-      valuesRef: (valEl ? first(valEl, 'f')?.textContent : null) ?? undefined,
+      valuesRef,
       nameRef: (nameEl ? first(nameEl, 'f')?.textContent : null) ?? undefined,
     })
   }
   if (!series.length) return null
   if (!categories.length) categories = series[0].values.map((_, i) => String(i + 1))
+  // (se anche i valori sono vuoti, categorie e valori arrivano dai
+  // riferimenti quando la griglia risolve il grafico sul foglio vivo)
   return { type, title, categories, series, categoriesRef }
 }

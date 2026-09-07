@@ -1038,6 +1038,9 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   // bloccati, grafici, virtualizzazione — è derivata da questi valori,
   // quindi segue da sola senza altre modifiche.
   const [zoom, setZoom] = useState(100)
+  // Byte del file come sta su disco: ExcelJS butta via grafici e disegni
+  // quando salva, e da qui li rimettiamo dentro.
+  const origBytes = useRef<Uint8Array | null>(null)
   const [renamingSheet, setRenamingSheet] = useState<number | null>(null)
   const [sheetAsk, setSheetAsk] = useState<number | null>(null) // conferma eliminazione foglio
   // Barra della formula (casella nome + fx) e finestre di formattazione.
@@ -1123,6 +1126,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         setDirty(true)
       } else {
         const bytes = await readFile(filePath)
+        origBytes.current = bytes
         const ExcelJS = (await import('exceljs')).default
         book = new ExcelJS.Workbook()
         await book.xlsx.load(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
@@ -2307,7 +2311,26 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     if (!wb || saving || !dirty) return
     setSaving(true)
     try {
-      const out = new Uint8Array(await wb.xlsx.writeBuffer())
+      let out = new Uint8Array(await wb.xlsx.writeBuffer())
+      // ExcelJS non conosce grafici e disegni e li lascia indietro: li
+      // rimettiamo prendendoli dal file originale, altrimenti salvare
+      // significherebbe cancellarli.
+      if (origBytes.current) {
+        const { preserveCharts } = await import('../../lib/xlsxPreserve')
+        // Se l'utente ha spostato un grafico, il nuovo ancoraggio va
+        // riscritto dentro il disegno: altrimenti tornerebbe dov'era.
+        const spostamenti = charts
+          .filter((c) => c.anchor)
+          .map((c) => ({
+            drawing: c.anchor!.drawing,
+            index: c.anchor!.index,
+            from: c.from,
+            fromOff: c.fromOff,
+            to: c.to,
+            toOff: c.toOff,
+          }))
+        out = preserveCharts(origBytes.current, out, spostamenti)
+      }
       await ensureBak()
       await writeFileBinaryAtomic(filePath, out)
       xlsxWbBuffers.delete(filePath)
@@ -2503,6 +2526,95 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     let x = rowHdrW
     for (let i = 0; i < cc && i < widths.length; i++) x += widths[i]
     return x
+  }
+  // Inversi di colX/offsets: da un punto sul foglio alla cella che lo contiene
+  // più lo scostamento al suo interno. Lo scostamento torna alla scala 100%,
+  // perché è così che va scritto nel file.
+  const colAt = (pxX: number) => {
+    let x = rowHdrW
+    let i = 0
+    while (i < widths.length - 1 && x + widths[i] <= pxX) {
+      x += widths[i]
+      i++
+    }
+    return { col: i, off: Math.max(0, Math.round((pxX - x) / z)) }
+  }
+  const rowAtPx = (pxY: number) => {
+    const y = Math.max(0, pxY - rowH)
+    const r = Math.max(0, Math.min(rows.length - 1, rowAt(offsets, y)))
+    return { row: r, off: Math.max(0, Math.round((y - (offsets[r] ?? 0)) / z)) }
+  }
+  // Angolo in alto a sinistra (px sullo schermo) di un grafico.
+  const chartXY = (ch: ChartInfo) => ({
+    x: colX(Math.min(ch.from.col, Math.max(0, widths.length - 1))) + Math.round(ch.fromOff.x * z),
+    y: rowH + (offsets[Math.min(ch.from.row, offsets.length - 1)] ?? 0) + Math.round(ch.fromOff.y * z),
+  })
+  // Misura: oneCellAnchor la dichiara, twoCellAnchor la ricava dall'angolo opposto.
+  const chartWH = (ch: ChartInfo, x: number, y: number) => {
+    if (ch.sizePx) return { w: Math.round(ch.sizePx.w * z), h: Math.round(ch.sizePx.h * z) }
+    const x2 = colX(Math.min(ch.to.col, widths.length)) + Math.round(ch.toOff.x * z)
+    const y2 = rowH + (offsets[Math.min(ch.to.row, offsets.length - 1)] ?? 0) + Math.round(ch.toOff.y * z)
+    return { w: Math.max(200, x2 - x), h: Math.max(140, y2 - y) }
+  }
+
+  // --- Spostamento dei grafici col mouse -------------------------------
+  // Mentre si trascina si muove SOLO il transform dell'elemento: nessun
+  // ridisegno di React, quindi nessuno scatto. Lo stato si aggiorna una
+  // volta sola, quando si lascia il pulsante.
+  function startChartDrag(e: React.MouseEvent, idx: number) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = e.currentTarget as HTMLElement
+    const sx = e.clientX
+    const sy = e.clientY
+    let dx = 0
+    let dy = 0
+    // Il cursore si cambia sul body, non sull'elemento: React non riapplica
+    // uno stile che secondo lui non è cambiato, e il "grab" resterebbe perso.
+    const cursorePrec = document.body.style.cursor
+    document.body.style.cursor = 'grabbing'
+    const move = (ev: MouseEvent) => {
+      dx = ev.clientX - sx
+      dy = ev.clientY - sy
+      el.style.transform = `translate(${dx}px, ${dy}px)`
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      el.style.transform = ''
+      document.body.style.cursor = cursorePrec
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return // un clic, non uno spostamento
+      moveChart(idx, dx, dy)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  // Trasla il grafico di (dx, dy) px e riscrive i suoi due ancoraggi.
+  function moveChart(idx: number, dx: number, dy: number) {
+    setCharts((prev) =>
+      prev.map((c, k) => {
+        if (k !== idx) return c
+        const { x, y } = chartXY(c)
+        const { w, h } = chartWH(c, x, y)
+        // Non si esce da sotto le intestazioni.
+        const nx = Math.max(rowHdrW, x + dx)
+        const ny = Math.max(rowH, y + dy)
+        const a = colAt(nx)
+        const b = rowAtPx(ny)
+        const a2 = colAt(nx + w)
+        const b2 = rowAtPx(ny + h)
+        return {
+          ...c,
+          from: { col: a.col, row: b.row },
+          fromOff: { x: a.off, y: b.off },
+          to: { col: a2.col, row: b2.row },
+          toOff: { x: a2.off, y: b2.off },
+        }
+      }),
+    )
+    setDirty(true)
   }
   // Bersaglio della toolbar formato: selezione, o la cella in modifica.
   const fmtTarget = selRange ?? (editing ? { r1: editing.r, c1: editing.c, r2: editing.r, c2: editing.c } : null)
@@ -3382,20 +3494,29 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
 
             {/* GRAFICI del file (sola lettura), al loro posto sul foglio. */}
             {liveCharts
-              .filter((ch) => ch.sheet === active)
-              .map((ch, i) => {
-                const x = colX(Math.min(ch.from.col, widths.length - 1))
-                const y = rowH + (offsets[Math.min(ch.from.row, offsets.length - 1)] ?? 0)
-                const x2 = colX(Math.min(ch.to.col, widths.length))
-                const y2 = rowH + (offsets[Math.min(ch.to.row, offsets.length - 1)] ?? 0)
-                const w = Math.max(200, x2 - x)
-                const h = Math.max(140, y2 - y)
+              .map((ch, idx) => ({ ch, idx }))
+              .filter(({ ch }) => ch.sheet === active)
+              .map(({ ch, idx }) => {
+                const { x, y } = chartXY(ch)
+                const { w, h } = chartWH(ch, x, y)
                 return (
                   <div
-                    key={i}
-                    style={{ position: 'absolute', left: x, top: y, width: w, height: h, zIndex: 20 }}
+                    key={idx}
+                    style={{
+                      position: 'absolute',
+                      left: x,
+                      top: y,
+                      width: w,
+                      height: h,
+                      zIndex: 20,
+                      cursor: 'grab',
+                      // Livello a sé: così scorrere il foglio non obbliga il
+                      // browser a ridisegnare tutto l'SVG del grafico.
+                      willChange: 'transform',
+                    }}
                     className="shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded"
-                    title={ch.title || 'Grafico del file (sola lettura)'}
+                    title={ch.title ? `${ch.title} — trascina per spostarlo` : 'Trascina per spostare il grafico'}
+                    onMouseDown={(e) => startChartDrag(e, idx)}
                   >
                     <ChartView chart={ch} width={w} height={h} />
                   </div>
