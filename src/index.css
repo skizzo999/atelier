@@ -155,6 +155,26 @@ input[type='range'] {
 /* Allinea la vista Lettura (Tailwind prose) allo stile pulito dell'Ibrida */
 .prose {
   color: #3a4759;
+  --tw-prose-headings: #16202e;
+  --tw-prose-bold: #16202e;
+  --tw-prose-counters: #5c6a82;
+  --tw-prose-bullets: #a6b6cd;
+  --tw-prose-quotes: #3a4759;
+  --tw-prose-code: #1e4fb0;
+  --tw-prose-hr: #dbe4f0;
+  --tw-prose-th-borders: #ccd9ec;
+  --tw-prose-td-borders: #e2eaf6;
+}
+/* Blocchi di codice: carta appena tinta e bordo tenue, coerenti con la
+   palette chiara dell'editor (il tema scuro qui stonerebbe). */
+.prose pre {
+  background: #f6f9fe;
+  border: 1px solid #e2eaf6;
+  color: #26303f;
+}
+.prose pre code {
+  background: transparent;
+  color: inherit;
 }
 /* Titoli grandi in serif, come la landing. */
 .prose h1,

@@ -2568,7 +2568,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const frozenC = !isCsv ? Math.min(sheet?.frozen?.cols ?? 0, widths.length) : 0
   const frozenH = offsets[frozenR] ?? 0
   const windowStart = Math.max(start, frozenR)
-  const hdrBg = '#f4f4f5'
+  const hdrBg = '#f2f6fb'
   const gridLine = '1px solid #d4d4d8'
 
   return (
@@ -2787,7 +2787,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               disabled={!fmtTarget || !!editing}
               placeholder={editing ? 'Stai scrivendo nella cella…' : fmtTarget ? '' : 'Seleziona una cella'}
               className="w-full bg-white border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
-              style={{ color: fxColors && !editing ? 'transparent' : '#e2e8f0', caretColor: '#e2e8f0' }}
+              style={{ color: fxColors && !editing ? 'transparent' : '#16202e', caretColor: '#16202e' }}
               value={editing ? '' : (fxDraft ?? (anchorCell ? rawOf(anchorCell) : ''))}
               onChange={(e) => {
                 setFxDraft(e.target.value)
@@ -2818,7 +2818,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               }}
             />
             {!editing &&
-              fxMirror('px-2 py-1 font-mono text-xs border border-transparent rounded', { color: '#e2e8f0', lineHeight: '16px' })}
+              fxMirror('px-2 py-1 font-mono text-xs border border-transparent rounded', { color: '#16202e', lineHeight: '16px' })}
           </div>
         </div>
       )}

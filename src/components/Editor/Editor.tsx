@@ -3,7 +3,7 @@ import { readTextFile } from '@tauri-apps/plugin-fs'
 import { marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js/lib/common'
-import 'highlight.js/styles/atom-one-dark.css'
+import 'highlight.js/styles/atom-one-light.css'
 import DOMPurify from 'dompurify'
 import type { EditorView } from '@codemirror/view'
 import { useAppStore } from '../../store/appStore'
@@ -371,7 +371,7 @@ export function Editor() {
         <div className="flex-1 overflow-y-auto p-6">
           <div
             ref={readingRef}
-            className="prose prose-invert max-w-none"
+            className="prose max-w-none"
             onClick={(e) => {
               const a = (e.target as HTMLElement).closest('a.wikilink') as HTMLElement | null
               if (a) {
