@@ -16,8 +16,15 @@ intestazioni/piè). Pronti anche: **vault stile Obsidian** (`.atelier\vault.json
 anche per la 2ª istanza), file tree con watcher, gestione file (**Cestino**),
 **drag-and-drop nel tree**, import da Explorer, **modale "Nuovo file"**, ricerca.
 Sicurezza: **CSP di produzione** + **guardia chiusura** (UI provvisoria).
-Release automatiche dai tag `v*` (ultima pubblicata: **v0.2.2**).
-Prossimi: stampa trasversale, pptx/xlsx.
+**Fogli di calcolo**: griglia con zoom 30-300%, formule (342 funzioni reali),
+validazione dati a tendina, e **grafici** letti dal file — che seguono i dati
+vivi, si spostano e si ridimensionano col mouse, e non vengono piu' persi nel
+salvataggio. **pptx**: visualizzatore fedele + modalita' Presenta con
+transizioni. **Modalita' Developer**: editor di codice, terminale, git,
+strumenti. **Tema vetro** (bianco/azzurro/blu) in tutta l'app, **con tema
+scuro** a tre posizioni (chiaro / scuro / come il sistema).
+Release automatiche dai tag `v*` (ultima pubblicata: **v0.5.0**).
+Prossimi: stampa trasversale, creazione grafici in Excel.
 
 ## Cosa è fatto
 - [x] Setup Tauri 2 + React 19 + TypeScript + Tailwind; layout sidebar + area editor
