@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Sovrapposizione } from '../Sovrapposizione'
 import { createFile } from '../../lib/fileOps'
 
 // Un tipo di file creabile dalla modale "Nuovo file".
@@ -100,70 +101,72 @@ export function NewFileModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={onClose}>
-      <div
-        className="w-[30rem] bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex gap-4"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {/* Sinistra: nome */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0">
-          <h3 className="text-sm font-semibold text-zinc-200">Nuovo file</h3>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            onFocus={(e) => e.target.select()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') create()
-              if (e.key === 'Escape') onClose()
-            }}
-            placeholder="Nome del file"
-            className="px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
-          />
-          {finalName && (
-            <p className="text-xs text-zinc-500 truncate" title={finalName}>
-              Verrà creato: <span className="text-zinc-400">{finalName}</span>
-            </p>
-          )}
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <div className="flex-1" />
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={onClose}
-              disabled={busy}
-              className="px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 rounded disabled:opacity-50"
-            >
-              Annulla
-            </button>
-            <button
-              onClick={create}
-              disabled={busy || !finalName}
-              className="px-3 py-1.5 text-xs btn-accent rounded-md disabled:opacity-50"
-            >
-              {busy ? 'Creo…' : 'Crea'}
-            </button>
+    <Sovrapposizione>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={onClose}>
+        <div
+          className="w-[30rem] bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex gap-4"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Sinistra: nome */}
+          <div className="flex-1 flex flex-col gap-3 min-w-0">
+            <h3 className="text-sm font-semibold text-zinc-200">Nuovo file</h3>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') create()
+                if (e.key === 'Escape') onClose()
+              }}
+              placeholder="Nome del file"
+              className="px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+            />
+            {finalName && (
+              <p className="text-xs text-zinc-500 truncate" title={finalName}>
+                Verrà creato: <span className="text-zinc-400">{finalName}</span>
+              </p>
+            )}
+            {error && <p className="text-xs text-red-400">{error}</p>}
+            <div className="flex-1" />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 rounded disabled:opacity-50"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={create}
+                disabled={busy || !finalName}
+                className="px-3 py-1.5 text-xs btn-accent rounded-md disabled:opacity-50"
+              >
+                {busy ? 'Creo…' : 'Crea'}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Destra: tipo di file */}
-        <div className="w-44 shrink-0 border-l border-zinc-800 pl-3 flex flex-col">
-          <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Tipo</p>
-          <div className="flex-1 overflow-y-auto max-h-72 flex flex-col gap-0.5 pr-1">
-            {MAIN_TYPES.map((t) => (
-              <TypeRow key={t.ext} t={t} />
-            ))}
-            <div className="h-px bg-zinc-800 my-1" />
-            <button
-              onClick={() => setCodeOpen((o) => !o)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm text-zinc-300 hover:bg-zinc-800"
-            >
-              <span className="text-xs">{codeOpen ? '▾' : '▸'}</span>
-              <span className="flex-1">Programmazione</span>
-            </button>
-            {codeOpen && CODE_TYPES.map((t) => <TypeRow key={t.ext} t={t} indent />)}
+          {/* Destra: tipo di file */}
+          <div className="w-44 shrink-0 border-l border-zinc-800 pl-3 flex flex-col">
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Tipo</p>
+            <div className="flex-1 overflow-y-auto max-h-72 flex flex-col gap-0.5 pr-1">
+              {MAIN_TYPES.map((t) => (
+                <TypeRow key={t.ext} t={t} />
+              ))}
+              <div className="h-px bg-zinc-800 my-1" />
+              <button
+                onClick={() => setCodeOpen((o) => !o)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                <span className="text-xs">{codeOpen ? '▾' : '▸'}</span>
+                <span className="flex-1">Programmazione</span>
+              </button>
+              {codeOpen && CODE_TYPES.map((t) => <TypeRow key={t.ext} t={t} indent />)}
+            </div>
           </div>
-        </div>
+          </div>
       </div>
-    </div>
+    </Sovrapposizione>
   )
 }

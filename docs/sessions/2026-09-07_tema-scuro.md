@@ -159,3 +159,36 @@ Prima di questo avevo anche accusato il pezzo sbagliato: avevo tolto il
 
 La funzione non è stata buttata: lo `useEffect` è tornato al suo posto,
 **sopra** l'uscita anticipata, con un commento che spiega perché deve restare lì.
+
+---
+
+## "Nuovo file" sfondava il layout
+
+Aprendo la finestra "Nuovo file" il pannello non era centrato: usciva dal
+bordo sinistro e spingeva giù l'albero dei file.
+
+**Causa**, e viene dal tema vetro, non da oggi: un elemento con
+`backdrop-filter` diventa il **riferimento** dei discendenti in
+`position: fixed`. L'Explorer è una cornice in vetro, e la finestra —
+`fixed inset-0`, cioè "tutto lo schermo" — è renderizzata dentro di lui.
+Misurato nel banco: il velo era **255×684** invece di 1280×720, esattamente
+il riquadro della barra laterale.
+
+Vale per ogni sovrapposizione aperta da lì: le due finestrelle di rinomina ed
+eliminazione e il menu del tasto destro erano nella stessa condizione.
+
+**Correzione**: nuovo componente `Sovrapposizione`, che porta il contenuto sul
+`<body>` con un portale. Il problema sparisce per costruzione, oggi e per
+qualsiasi cornice in vetro che verrà aggiunta domani.
+
+Fatto anche l'inventario delle "trappole" a runtime: nell'app ce ne sono tre
+(barra del titolo, Explorer, e il contenitore interno di react-arborist).
+Le altre sovrapposizioni — foglio di calcolo, PDF, immagini, ricerca — vivono
+nella scheda del contenuto, che non ha filtri: stanno bene dove sono.
+
+### Prova nuova: `test-app-viva.mjs`
+Prova di fumo dell'app intera guidata da un browser vero. Apre i file, apre la
+finestra, e controlla che l'app resti viva, che il velo copra lo **schermo** e
+che nessuna sovrapposizione resti intrappolata in una cornice. Verificata in
+entrambi i versi: togliendo il portale fallisce con lo stesso numero visto sul
+computer dell'utente (255×764 su 1280×800), rimettendolo torna verde.

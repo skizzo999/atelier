@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/appStore'
 import { openVaultDialog } from '../../lib/vault'
 import { createFolder, renameEntry, deleteEntry, moveEntry, importFile } from '../../lib/fileOps'
 import { NewFileModal } from './NewFileModal'
+import { Sovrapposizione } from '../Sovrapposizione'
 import { scaldaPerFile } from '../../lib/prewarm'
 
 interface FileNode {
@@ -228,6 +229,7 @@ function NameModal({
 }) {
   const [name, setName] = useState(initial)
   return (
+    <Sovrapposizione>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={onCancel}
@@ -266,6 +268,7 @@ function NameModal({
         </div>
       </div>
     </div>
+    </Sovrapposizione>
   )
 }
 
@@ -281,6 +284,7 @@ function ConfirmModal({
   onCancel: () => void
 }) {
   return (
+    <Sovrapposizione>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={onCancel}
@@ -308,6 +312,7 @@ function ConfirmModal({
         </div>
       </div>
     </div>
+    </Sovrapposizione>
   )
 }
 
@@ -626,7 +631,7 @@ export function FileTree() {
       </div>
 
       {menu && (
-        <>
+        <Sovrapposizione>
           <div
             className="fixed inset-0 z-40"
             onClick={() => setMenu(null)}
@@ -663,7 +668,7 @@ export function FileTree() {
               </>
             )}
           </div>
-        </>
+        </Sovrapposizione>
       )}
 
       {newFileDir && (
