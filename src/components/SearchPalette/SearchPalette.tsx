@@ -110,7 +110,7 @@ export function SearchPalette({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/50" onClick={onClose}>
       <div
-        className="w-[34rem] max-w-[90vw] bg-white border border-zinc-700 rounded-xl shadow-xl flex flex-col overflow-hidden"
+        className="w-[34rem] max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex border-b border-zinc-800 text-xs">

@@ -84,7 +84,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
           {knownVaults.map((v) => (
             <div
               key={v.path}
-              className="group flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/70 cursor-pointer transition-colors"
+              className="group flex items-center gap-2 px-2 py-2 rounded-lg at-hover cursor-pointer transition-colors"
               onClick={() => !busy && openKnown(v.path)}
               title={v.path}
             >
@@ -122,7 +122,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
             </p>
           </div>
 
-          <div className="at-vetro-forte at-scheda divide-y divide-white/70">
+          <div className="at-vetro-forte at-scheda divide-y at-divisori">
             <div className="flex items-center gap-4 p-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-zinc-200">Crea nuovo vault</p>
@@ -146,7 +146,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
               <button
                 onClick={handleOpen}
                 disabled={busy}
-                className="px-4 py-2 bg-white/80 text-zinc-200 border border-white/80 rounded-lg text-sm shadow-sm hover:bg-white disabled:opacity-50 transition-colors shrink-0"
+                className="px-4 py-2 at-morbido text-zinc-200 rounded-lg text-sm disabled:opacity-50 transition-colors shrink-0"
               >
                 Apri
               </button>
@@ -165,13 +165,13 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
                   if (e.key === 'Escape') setCreating(false)
                 }}
                 placeholder="Nome del vault"
-                className="w-full px-3 py-2 bg-white border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
               />
               <div className="flex gap-3">
                 <button
                   onClick={() => setCreating(false)}
                   disabled={busy}
-                  className="flex-1 px-4 py-2 bg-white/80 text-zinc-300 border border-white/80 rounded-lg text-sm shadow-sm hover:bg-white disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 at-morbido text-zinc-300 rounded-lg text-sm disabled:opacity-50 transition-colors"
                 >
                   Annulla
                 </button>

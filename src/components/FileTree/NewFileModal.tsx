@@ -88,7 +88,7 @@ export function NewFileModal({
       >
         <span
           className={`text-[9px] font-semibold tracking-wider uppercase rounded px-1 py-px w-10 text-center shrink-0 ${
-            selected ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-500'
+            selected ? 'bg-accent-ink/20 text-accent-ink' : 'bg-zinc-800 text-zinc-500'
           }`}
         >
           {t.ext}
@@ -102,7 +102,7 @@ export function NewFileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onMouseDown={onClose}>
       <div
-        className="w-[30rem] bg-white border border-zinc-700 rounded-xl p-4 flex gap-4"
+        className="w-[30rem] bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex gap-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Sinistra: nome */}

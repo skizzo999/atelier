@@ -146,7 +146,7 @@ const LINE_HEIGHTS = ['1', '1.15', '1.5', '2', '2.5']
 const TEXT_COLORS = ['#111827', '#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#0891b2']
 const HL_COLORS = ['#fde047', '#fca5a5', '#fdba74', '#bef264', '#6ee7b7', '#a5f3fc', '#a5b4fc', '#d8b4fe', '#f9a8d4', '#e5e7eb']
 
-const sel = 'h-7 bg-white border border-zinc-700 rounded text-zinc-200 text-xs px-1'
+const sel = 'h-7 bg-zinc-900 border border-zinc-700 rounded text-zinc-200 text-xs px-1'
 
 // Un unico tasto colore+evidenziatore (come il Docx editor di TipTap).
 function ColorPopover({ editor }: { editor: Editor }) {
@@ -176,7 +176,7 @@ function ColorPopover({ editor }: { editor: Editor }) {
         <span className="text-[8px]">▾</span>
       </button>
       {open && (
-        <div className="absolute z-50 top-8 left-0 w-56 bg-white border border-zinc-700 rounded-xl shadow-xl p-3">
+        <div className="absolute z-50 top-8 left-0 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3">
           <div className="text-[11px] text-zinc-400 mb-1.5">Colore testo</div>
           <div className="grid grid-cols-5 gap-2 mb-3">
             {TEXT_COLORS.map((c) => (
@@ -192,7 +192,7 @@ function ColorPopover({ editor }: { editor: Editor }) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().unsetColor().run()}
-              className="h-6 w-6 rounded-full border border-zinc-700 bg-white text-zinc-100 text-[10px] flex items-center justify-center"
+              className="h-6 w-6 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-100 text-[10px] flex items-center justify-center"
               title="Nessun colore"
             >
               ⌀

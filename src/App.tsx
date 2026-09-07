@@ -28,6 +28,7 @@ function App() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const mode = useAppStore((s) => s.mode)
+  const tema = useAppStore((s) => s.tema)
   const hasTabs = useAppStore((s) => s.openTabs.length > 0)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const [booting, setBooting] = useState(true)
@@ -38,6 +39,23 @@ function App() {
   // Guardia chiusura: n° di file sporchi quando l'utente prova a chiudere
   // (mostra la modale in-app al posto del confirm nativo di sistema).
   const [closeAsk, setCloseAsk] = useState<number | null>(null)
+
+  // Tema: un attributo sulla radice del documento, e cambiano tutte le
+  // variabili di colore in un colpo solo. Con 'sistema' si sta a sentire il
+  // PC, anche se l'utente cambia impostazione mentre l'app è aperta.
+  useEffect(() => {
+    const radice = document.documentElement
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const applica = () => {
+      const scuro = tema === 'scuro' || (tema === 'sistema' && media.matches)
+      if (scuro) radice.setAttribute('data-tema', 'scuro')
+      else radice.removeAttribute('data-tema')
+    }
+    applica()
+    if (tema !== 'sistema') return
+    media.addEventListener('change', applica)
+    return () => media.removeEventListener('change', applica)
+  }, [tema])
 
   // Boot: lo scope concesso a runtime non sopravvive al riavvio, quindi va
   // ri-concesso al vault salvato; se la cartella non esiste più, lo dimentichiamo.

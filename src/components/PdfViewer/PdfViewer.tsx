@@ -622,7 +622,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative">
       {searchOpen && (
-        <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-white border border-zinc-700 rounded-xl shadow-xl px-2 py-1.5">
+        <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl px-2 py-1.5">
           <input
             ref={searchInputRef}
             value={query}
@@ -742,7 +742,7 @@ export function PdfViewer({ filePath }: { filePath: string }) {
 
       {infoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setInfoOpen(false)}>
-          <div className="w-80 bg-white border border-zinc-700 rounded-xl p-4 flex flex-col gap-3 text-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="w-80 bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex flex-col gap-3 text-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-zinc-200">Informazioni</h3>
             <Row label="Nome">{fileName}</Row>
             <Row label="Pagine">{numPages}</Row>

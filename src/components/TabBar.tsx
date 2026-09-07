@@ -92,7 +92,7 @@ export function TabBar() {
             className={`group flex items-center gap-1.5 h-8 max-w-52 px-3 rounded-t-lg text-[12.5px] cursor-pointer select-none shrink-0 border-x border-t ${
               active
                 ? 'at-vetro-forte text-zinc-100 border-white/60'
-                : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-white/40'
+                : 'text-zinc-400 border-transparent hover:text-zinc-200 at-hover'
             }`}
             style={
               hint

@@ -233,7 +233,7 @@ function NameModal({
       onClick={onCancel}
     >
       <div
-        className="w-80 bg-white border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
+        className="w-80 bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
@@ -286,7 +286,7 @@ function ConfirmModal({
       onClick={onCancel}
     >
       <div
-        className="w-80 bg-white border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
+        className="w-80 bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm text-zinc-200">{message}</p>

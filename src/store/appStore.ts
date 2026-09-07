@@ -30,6 +30,8 @@ interface AppState {
   mode: AppMode
   // Ultima vista markdown scelta (persistita, così l'app riapre come l'hai lasciata).
   mdView: MarkdownView
+  // Tema dell'interfaccia (persistito). 'sistema' segue le impostazioni del PC.
+  tema: Tema
   // Due penne configurabili per le annotazioni (persistite).
   penPresets: [PenPreset, PenPreset]
   // Tre colori dell'evidenziatore PDF, personalizzabili e persistiti.
@@ -69,6 +71,8 @@ interface AppState {
   // Toglie un vault dalla lista (NON tocca il disco).
   forgetVault: (path: string) => void
   setMode: (mode: AppMode) => void
+  setTema: (tema: Tema) => void
+  ruotaTema: () => void
   setMdView: (view: MarkdownView) => void
   setPenPreset: (index: 0 | 1, patch: Partial<PenPreset>) => void
   setPdfHlColor: (index: 0 | 1 | 2, color: string) => void
@@ -104,6 +108,8 @@ interface AppState {
 
 // Stato globale. Solo vaultPath e mode vengono persistiti in localStorage
 // (vedi `partialize`): selectedFile e dirtyBuffers sono transitori.
+export type Tema = 'chiaro' | 'scuro' | 'sistema'
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
@@ -111,6 +117,7 @@ export const useAppStore = create<AppState>()(
       knownVaults: [],
       mode: 'standard',
       mdView: 'source',
+      tema: 'sistema',
       // Penna 1: tratto pieno rosso; Penna 2: evidenziatore giallo semitrasparente.
       penPresets: [
         { color: '#ef4444', width: 6, opacity: 1 },
@@ -142,6 +149,12 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ knownVaults: state.knownVaults.filter((v) => v.path !== path) })),
       setMode: (mode) => set({ mode }),
       setMdView: (view) => set({ mdView: view }),
+      setTema: (tema) => set({ tema }),
+      // Il giro dell'interruttore: chiaro → scuro → come il sistema.
+      ruotaTema: () =>
+        set((state) => ({
+          tema: state.tema === 'chiaro' ? 'scuro' : state.tema === 'scuro' ? 'sistema' : 'chiaro',
+        })),
       setPenPreset: (index, patch) =>
         set((state) => {
           const next: [PenPreset, PenPreset] = [{ ...state.penPresets[0] }, { ...state.penPresets[1] }]
@@ -262,6 +275,7 @@ export const useAppStore = create<AppState>()(
         knownVaults: state.knownVaults,
         mode: state.mode,
         mdView: state.mdView,
+        tema: state.tema,
         penPresets: state.penPresets,
         pdfHlColors: state.pdfHlColors,
         sidebarWidth: state.sidebarWidth,

@@ -52,7 +52,7 @@ export function ConvertButton({ filePath, className }: { filePath: string; class
         {busy ? 'Converto…' : error ? 'Errore ✕' : 'Converti'}
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-50 w-60 bg-white border border-zinc-700 rounded-xl shadow-xl py-1">
+        <div className="absolute right-0 top-8 z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1">
           <p className="px-3 py-1 text-[11px] text-zinc-500 uppercase tracking-wider">Converti in</p>
           {options.map((o) => (
             <button

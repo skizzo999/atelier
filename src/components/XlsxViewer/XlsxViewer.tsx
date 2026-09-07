@@ -15,6 +15,7 @@ import type { AdjustKind } from '../../lib/formulaEngine'
 import type { ChartInfo } from '../../lib/xlsxCharts'
 import { parseRef } from '../../lib/xlsxCharts'
 import { ChartView } from './ChartView'
+import { useScuro, luminanza } from '../../lib/tema'
 
 // Cronologia annulla/ripeti per file (valori e stili: le operazioni
 // strutturali su righe/colonne la azzerano perché gli indici slittano).
@@ -2512,6 +2513,8 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   // Le misure del MODELLO restano quelle del file; qui sopra ci mettiamo lo
   // zoom. Ricalcolare gli offset dalle altezze scalate tiene tutto coerente:
   // arrotondare ogni riga separatamente farebbe accumulare errore.
+  // Tema attivo: serve a decidere il colore del testo delle celle.
+  const scuro = useScuro()
   const z = zoom / 100
   const baseW = sheet?.widths ?? []
   const baseH = sheet?.heights ?? []
@@ -2813,8 +2816,18 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
   const frozenC = !isCsv ? Math.min(sheet?.frozen?.cols ?? 0, widths.length) : 0
   const frozenH = offsets[frozenR] ?? 0
   const windowStart = Math.max(start, frozenR)
-  const hdrBg = '#f2f6fb'
-  const gridLine = '1px solid #d4d4d8'
+  const hdrBg = 'var(--gr-intest)'
+  // Colore del testo di una cella. Senza indicazioni vale quello del tema.
+  // Col tema scuro un colore QUASI NERO scritto nel file sparirebbe sul
+  // fondo scuro: si solleva al testo del tema — a meno che la cella abbia
+  // anche un fondo suo, perché lì la coppia colore/fondo l'ha scelta chi ha
+  // fatto il file e resta leggibile com'è.
+  const testoCella = (c: { color?: string; bg?: string }): string => {
+    if (!c.color) return 'var(--gr-testo)'
+    if (!scuro || c.bg) return c.color
+    return luminanza(c.color) < 0.38 ? 'var(--gr-testo)' : c.color
+  }
+  const gridLine = '1px solid var(--gr-linea)'
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -3031,7 +3044,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
               title="Contenuto della cella — Invio applica, Esc annulla"
               disabled={!fmtTarget || !!editing}
               placeholder={editing ? 'Stai scrivendo nella cella…' : fmtTarget ? '' : 'Seleziona una cella'}
-              className="w-full bg-white border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 font-mono outline-none focus:border-zinc-500 disabled:opacity-50"
               style={{ color: fxColors && !editing ? 'transparent' : '#16202e', caretColor: '#16202e' }}
               value={editing ? '' : (fxDraft ?? (anchorCell ? rawOf(anchorCell) : ''))}
               onChange={(e) => {
@@ -3070,7 +3083,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
 
       {/* Barra di ricerca nel foglio (Ctrl+F) */}
       {findQ !== null && !isCsv && (
-        <div className="absolute right-4 top-24 z-30 flex items-center gap-1 bg-white border border-zinc-700 rounded-xl shadow-xl px-2 py-1 text-xs">
+        <div className="absolute right-4 top-24 z-30 flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl px-2 py-1 text-xs">
           <input
             ref={findInputRef}
             autoFocus
@@ -3104,7 +3117,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       {/* Dropdown autocompletamento funzioni */}
       {fxSuggest && (
         <div
-          className="fixed z-50 w-48 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-xs"
+          className="fixed z-50 w-48 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 text-xs"
           style={{ left: fxSuggest.x, top: fxSuggest.y }}
           onMouseDown={(e) => e.preventDefault() /* niente blur dell'input */}
         >
@@ -3127,7 +3140,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
       {/* Griglia */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto bg-white"
+        className="flex-1 overflow-auto bg-zinc-900"
         // overflow-anchor: la virtualizzazione cambia gli spacer durante lo
         // scroll e l'ancoraggio di Chrome "compensa" → scroll che corre da solo.
         style={{ overflowAnchor: 'none' }}
@@ -3313,7 +3326,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                     : inFill
                                       ? 'inset 0 0 0 999px rgba(59,130,246,0.09)'
                                       : undefined,
-                              color: cell.color ?? '#1f2937',
+                              color: testoCella(cell),
                               fontWeight: cell.b ? 700 : 400,
                               fontStyle: cell.i ? 'italic' : undefined,
                               textDecoration: cell.u || cell.st ? `${cell.u ? 'underline' : ''} ${cell.st ? 'line-through' : ''}`.trim() : undefined,
@@ -3327,7 +3340,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                     ...(rowFrozen ? { top: rowH + (offsets[r] ?? 0) } : {}),
                                     ...(c < frozenC ? { left: colX(c) } : {}),
                                     zIndex: rowFrozen && c < frozenC ? 9 : rowFrozen ? 8 : 7,
-                                    background: cell.bg ?? '#ffffff',
+                                    background: cell.bg ?? 'var(--gr-carta)',
                                     ...(rowFrozen && r === frozenR - 1 ? { borderBottom: '2px solid #9ca3af' } : {}),
                                     ...(c < frozenC && c === frozenC - 1 ? { borderRight: '2px solid #9ca3af' } : {}),
                                   }
@@ -3507,8 +3520,8 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                     className="block w-full outline-none bg-transparent"
                                     style={{
                                       height: '100%',
-                                      color: fxColors ? 'transparent' : (cell.color ?? '#1f2937'),
-                                      caretColor: '#1f2937',
+                                      color: fxColors ? 'transparent' : testoCella(cell),
+                                      caretColor: 'var(--gr-testo)',
                                       fontSize: fs ?? 13 * z,
                                       fontWeight: fxColors ? 400 : cell.b ? 700 : 400,
                                       fontStyle: fxColors ? 'normal' : cell.i ? 'italic' : undefined,
@@ -3575,7 +3588,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                                   Excel, il click apre le voci ammesse. */}
                               {cell.dv && !isEditing && !isCsv && (
                                 <button
-                                  className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-sm bg-white/85 text-[9px] text-zinc-600 border border-zinc-300 hover:bg-blue-600 hover:text-white hover:border-blue-600"
+                                  className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-sm bg-zinc-900/85 text-[9px] text-zinc-400 border border-zinc-700 hover:bg-blue-600 hover:text-white hover:border-blue-600"
                                   title="Scegli un valore"
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onClick={(e) => {
@@ -3640,7 +3653,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                           height: 10,
                           cursor: `${dir}-resize`,
                         }}
-                        className="rounded-full border border-blue-600 bg-white opacity-0 transition-opacity group-hover:opacity-100"
+                        className="rounded-full border border-accent bg-zinc-900 opacity-0 transition-opacity group-hover:opacity-100"
                       />
                     ))}
                   </div>
@@ -3868,7 +3881,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                 </button>
                 {submenu === id && (
                   <div
-                    className="absolute top-0 w-48 bg-white border border-zinc-700 rounded-xl shadow-xl py-1"
+                    className="absolute top-0 w-48 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1"
                     style={subFlip ? { right: '100%' } : { left: '100%' }}
                   >
                     {entries.map(([l, fn]) => (
@@ -3889,7 +3902,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             )
             return (
               <div
-                className="fixed z-50 w-56 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
+                className="fixed z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
                 style={{ left: panelX, top: panelY }}
               >
                 {item('Taglia', () => cutRange(mr))}
@@ -3974,7 +3987,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setDvMenu(null)} />
           <div
-            className="fixed z-50 w-48 max-h-64 overflow-y-auto bg-white border border-zinc-700 rounded-xl shadow-xl py-1"
+            className="fixed z-50 w-48 max-h-64 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1"
             style={{ left: Math.min(dvMenu.x, window.innerWidth - 200), top: Math.min(dvMenu.y, window.innerHeight - 260) }}
           >
             {dvMenu.opts.map((o) => (
@@ -4021,7 +4034,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             <>
               <div className="fixed inset-0 z-40" onMouseDown={() => setFilterMenu(null)} />
               <div
-                className="fixed z-50 w-60 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
+                className="fixed z-50 w-60 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
                 style={{ left: Math.min(filterMenu.x, window.innerWidth - 260), top: Math.min(filterMenu.y, window.innerHeight - 360) }}
               >
                 <div className="px-3 py-1 text-xs text-zinc-400">
@@ -4068,7 +4081,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={() => setFmtDialog(false)} />
           <div
-            className="fixed z-50 w-80 bg-white border border-zinc-700 rounded-xl shadow-xl p-4 text-sm text-zinc-200"
+            className="fixed z-50 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-4 text-sm text-zinc-200"
             style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -4177,7 +4190,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setTableMenu(null)} />
           <div
-            className="fixed z-50 w-56 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
+            className="fixed z-50 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
             style={{ left: Math.min(tableMenu.x, window.innerWidth - 240), top: Math.min(tableMenu.y + 8, window.innerHeight - 280) }}
           >
             <div className="px-3 py-1 text-xs text-zinc-400">Stile tabella — 1ª riga della selezione = intestazione</div>
@@ -4204,7 +4217,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
         <>
           <div className="fixed inset-0 z-40" onMouseDown={() => setDelMenu(null)} />
           <div
-            className="fixed z-50 w-52 bg-white border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
+            className="fixed z-50 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 text-sm"
             style={{ left: delMenu.x, top: delMenu.y }}
           >
             <div className="px-3 py-1 text-xs text-zinc-400">Cancella dalla selezione…</div>
@@ -4265,7 +4278,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                   onDoubleClick={() => !isCsv && setRenamingSheet(i)}
                   title={isCsv ? undefined : 'Doppio click per rinominare'}
                   className={`px-3 py-1 rounded text-xs whitespace-nowrap ${
-                    i === active ? 'bg-white text-zinc-100 font-medium shadow-sm' : 'text-zinc-400 hover:bg-white/60'
+                    i === active ? 'bg-zinc-900 text-zinc-100 font-medium shadow-sm' : 'text-zinc-400 at-hover'
                   }`}
                 >
                   {name}

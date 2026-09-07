@@ -11,58 +11,58 @@ import { tags as t } from '@lezer/highlight'
 import { livePreview } from './livePreview'
 import { tableEditor } from './tableEditor'
 
-// Colori della sintassi, tarati per la CARTA BIANCA del tema vetro: i toni
-// sono scuri e saturi quanto basta a distinguersi fra loro restando
-// leggibili su fondo chiaro (su bianco i colori chiari spariscono).
+// Colori della sintassi. Non sono scritti qui ma in `index.css`, una volta
+// per tema: su carta bianca servono toni scuri e saturi, di notte l'opposto,
+// e un solo set spegnerebbe metà dei colori in uno dei due.
 const codeHighlightStyle = HighlightStyle.define([
-  { tag: t.keyword, color: '#9333ea' },
-  { tag: [t.function(t.variableName), t.labelName], color: '#2b6ef5' },
-  { tag: [t.constant(t.name), t.standard(t.name), t.bool, t.atom], color: '#b45309' },
-  { tag: [t.typeName, t.className, t.annotation, t.self], color: '#0f766e' },
-  { tag: [t.number], color: '#b45309' },
-  { tag: [t.operator, t.operatorKeyword], color: '#0e7490' },
-  { tag: [t.string, t.special(t.string), t.regexp], color: '#15803d' },
-  { tag: [t.comment, t.lineComment, t.blockComment], color: '#7b8aa3', fontStyle: 'italic' },
-  { tag: [t.propertyName], color: '#c2410c' },
-  { tag: [t.meta, t.punctuation], color: '#5c6a82' },
+  { tag: t.keyword, color: 'var(--cm-chiave)' },
+  { tag: [t.function(t.variableName), t.labelName], color: 'var(--cm-funzione)' },
+  { tag: [t.constant(t.name), t.standard(t.name), t.bool, t.atom], color: 'var(--cm-costante)' },
+  { tag: [t.typeName, t.className, t.annotation, t.self], color: 'var(--cm-tipo)' },
+  { tag: [t.number], color: 'var(--cm-costante)' },
+  { tag: [t.operator, t.operatorKeyword], color: 'var(--cm-operatore)' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: 'var(--cm-stringa)' },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--cm-commento)', fontStyle: 'italic' },
+  { tag: [t.propertyName], color: 'var(--cm-proprieta)' },
+  { tag: [t.meta, t.punctuation], color: 'var(--cm-segno)' },
 ])
 
-// Tema di base del tema VETRO: carta bianca, gutter discreto, selezione
-// azzurra. Sostituisce oneDark, che era pensato per il fondo scuro.
+// Tema di base: carta, gutter discreto, selezione in tinta. Tutti i valori
+// sono variabili CSS, quindi l'editor segue il tema senza rimontarsi.
 const baseTheme = EditorView.theme(
   {
-    '&': { height: '100%', backgroundColor: '#ffffff', color: '#26303f' },
+    '&': { height: '100%', backgroundColor: 'var(--gr-carta)', color: 'var(--at-codice-testo)' },
     '.cm-scroller': {
       overflow: 'auto',
       fontFamily: 'ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace',
       fontSize: '13px',
       lineHeight: '1.6',
     },
-    '.cm-content': { padding: '16px', caretColor: '#16202e' },
+    '.cm-content': { padding: '16px', caretColor: 'var(--at-text)' },
     '&.cm-focused': { outline: 'none' },
-    '.cm-gutters': { backgroundColor: '#ffffff', color: '#a8b4c6', border: 'none' },
-    '.cm-activeLineGutter': { backgroundColor: '#f2f6fd', color: '#5c6a82' },
-    '.cm-activeLine': { backgroundColor: 'rgba(43,110,245,0.045)' },
+    '.cm-gutters': { backgroundColor: 'var(--gr-carta)', color: 'var(--cm-gutter)', border: 'none' },
+    '.cm-activeLineGutter': { backgroundColor: 'var(--at-codice-fondo)', color: 'var(--at-dim)' },
+    '.cm-activeLine': { backgroundColor: 'rgb(var(--acc) / 0.05)' },
     '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'rgba(43,110,245,0.18)',
+      backgroundColor: 'rgb(var(--acc) / 0.2)',
     },
-    '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#16202e' },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--at-text)' },
     '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
-      backgroundColor: 'rgba(43,110,245,0.14)',
+      backgroundColor: 'rgb(var(--acc) / 0.16)',
       outline: 'none',
     },
-    '.cm-selectionMatch': { backgroundColor: 'rgba(43,110,245,0.10)' },
+    '.cm-selectionMatch': { backgroundColor: 'rgb(var(--acc) / 0.11)' },
     // pannello di ricerca (Ctrl+F)
-    '.cm-panels': { backgroundColor: '#f2f6fd', color: '#26303f', borderColor: '#dbe4f0' },
+    '.cm-panels': { backgroundColor: 'var(--at-codice-fondo)', color: 'var(--at-codice-testo)', borderColor: 'var(--gr-linea)' },
     '.cm-panels input, .cm-panels button': {
-      backgroundColor: '#ffffff',
-      color: '#26303f',
-      border: '1px solid #dbe4f0',
+      backgroundColor: 'var(--gr-carta)',
+      color: 'var(--at-codice-testo)',
+      border: '1px solid var(--gr-linea)',
       borderRadius: '6px',
       padding: '2px 6px',
     },
     '.cm-searchMatch': { backgroundColor: 'rgba(250,204,21,0.4)' },
-    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(43,110,245,0.3)' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgb(var(--acc) / 0.32)' },
   },
   { dark: false },
 )
@@ -104,7 +104,7 @@ function SubMenu({ items, onClose }: { items: CtxItem[]; onClose: () => void }) 
 function CtxMenuList({ items, onClose }: { items: CtxItem[]; onClose: () => void }) {
   const [sub, setSub] = useState<string | null>(null)
   return (
-    <div className="w-52 bg-white border border-zinc-700 rounded-xl shadow-xl py-1">
+    <div className="w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1">
       {items.map((it, i) =>
         it.separator ? (
           <div key={i} className="h-px bg-zinc-700 my-1" />

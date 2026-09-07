@@ -8,12 +8,48 @@
    la carta di un documento e la griglia di un foglio restano opache, o i
    dati diventano illeggibili. */
 :root {
+  /* Scala zinc-*, letta da Tailwind (canali RGB separati da spazio, così
+     resta possibile scrivere `bg-zinc-900/60`). Cambiando questi undici
+     valori cambia l'intera interfaccia: nessun componente sa che tema c'è. */
+  --z-950: 230 238 251; /* tinta dell'Explorer */
+  --z-900: 255 255 255; /* carta */
+  --z-800: 226 234 246; /* pannelli, menu */
+  --z-700: 204 217 236; /* bordi, hover */
+  --z-600: 166 182 205; /* separatori forti */
+  --z-500: 123 138 163; /* testo attenuato */
+  --z-400: 92 106 130; /* testo secondario */
+  --z-300: 63 74 92; /* testo normale */
+  --z-200: 42 52 66; /* testo marcato */
+  --z-100: 22 32 46; /* TESTO principale */
+  --z-50: 11 18 32; /* contrasto massimo */
+  --acc: 43 110 245;
+  --acc-2: 92 198 248;
+  --acc-ink: 255 255 255;
+
   --at-bg: #dce9fb; /* base sotto lo sfondo sfumato */
   --at-raise: #ffffff; /* carta: documenti, griglia */
   --at-surface: rgba(255, 255, 255, 0.62); /* vetro delle cornici */
   --at-surface-2: rgba(255, 255, 255, 0.78); /* vetro più coprente */
   --at-border: rgba(255, 255, 255, 0.65); /* bordo luminoso del vetro */
+  --at-card-border: rgba(255, 255, 255, 0.75); /* bordo della scheda che galleggia */
   --at-hairline: #e2eaf6; /* riga di separazione sulla carta */
+  --at-hover: rgba(255, 255, 255, 0.68); /* velo del passaggio del mouse sul vetro */
+  --at-hover-forte: rgba(255, 255, 255, 0.95);
+  --at-border-forte: rgba(30, 70, 140, 0.15); /* divisori nelle toolbar */
+  --at-codice: #1e4fb0; /* codice in linea e titoli dei callout */
+  --at-codice-fondo: #f6f9fe; /* blocchi di codice e editor */
+  --at-codice-testo: #26303f;
+  /* Sintassi dell'editor: su carta bianca servono toni scuri e saturi. */
+  --cm-chiave: #9333ea;
+  --cm-funzione: #2b6ef5;
+  --cm-costante: #b45309;
+  --cm-tipo: #0f766e;
+  --cm-operatore: #0e7490;
+  --cm-stringa: #15803d;
+  --cm-commento: #7b8aa3;
+  --cm-proprieta: #c2410c;
+  --cm-segno: #5c6a82;
+  --cm-gutter: #a8b4c6;
   --at-text: #16202e;
   --at-dim: #5c6a82;
   --at-faint: #7b8aa3;
@@ -23,6 +59,86 @@
   --at-blur: 30px;
   --at-shadow-card: 0 12px 40px rgba(30, 70, 140, 0.13);
   --at-shadow-float: 0 8px 30px rgba(30, 70, 140, 0.16);
+
+  /* Superfici che NON passano da Tailwind: la griglia del foglio e il
+     disegno dei grafici, dove i colori stanno dentro attributi SVG e stili
+     in linea. Anche questi due temi vanno tenuti allineati. */
+  --gr-carta: #ffffff; /* fondo delle celle */
+  --gr-intest: #f2f6fb; /* intestazioni di righe e colonne */
+  --gr-linea: #dbe4f0; /* reticolo */
+  --gr-bordo: #c3cfe0; /* bordo delle intestazioni */
+  --gr-testo: #16202e;
+  --ch-carta: #ffffff; /* fondo del riquadro del grafico */
+  --ch-bordo: #cbd5e1;
+  --ch-asse: #94a3b8;
+  --ch-reticolo: #e2e8f0;
+  --ch-inchiostro: #334155;
+}
+
+/* ===== Tema SCURO =====
+   Stessi RUOLI, altri valori. Il vetro qui non schiarisce: scurisce e
+   lascia passare un velo di luce, altrimenti su fondo notte diventa una
+   nebbia lattiginosa. */
+:root[data-tema='scuro'] {
+  --z-950: 11 21 36;
+  --z-900: 20 29 45;
+  --z-800: 30 41 60;
+  --z-700: 43 56 80;
+  --z-600: 61 76 105;
+  --z-500: 131 149 174;
+  --z-400: 154 171 195;
+  --z-300: 195 208 226;
+  --z-200: 221 230 244;
+  --z-100: 238 243 251;
+  --z-50: 255 255 255;
+  --acc: 77 139 255;
+  --acc-2: 92 198 248;
+  --acc-ink: 255 255 255;
+
+  --at-bg: #0a1220;
+  --at-raise: #141d2d;
+  --at-surface: rgba(255, 255, 255, 0.055);
+  --at-surface-2: rgba(255, 255, 255, 0.09);
+  --at-border: rgba(255, 255, 255, 0.1);
+  --at-card-border: rgba(255, 255, 255, 0.1);
+  --at-hairline: #253148;
+  --at-hover: rgba(255, 255, 255, 0.08);
+  --at-hover-forte: rgba(255, 255, 255, 0.14);
+  --at-border-forte: rgba(255, 255, 255, 0.16);
+  --at-codice: #8ab4ff;
+  --at-codice-fondo: #10192a;
+  --at-codice-testo: #d7e2f2;
+  /* Di notte gli stessi ruoli, ma chiari: su fondo scuro i toni cupi
+     spariscono esattamente come i chiari sparivano sul bianco. */
+  --cm-chiave: #c792ea;
+  --cm-funzione: #82aaff;
+  --cm-costante: #f7a35c;
+  --cm-tipo: #7fd6c6;
+  --cm-operatore: #6ec7dd;
+  --cm-stringa: #a5d977;
+  --cm-commento: #6f8199;
+  --cm-proprieta: #f0956b;
+  --cm-segno: #9aabc3;
+  --cm-gutter: #55647d;
+  --at-text: #eef3fb;
+  --at-dim: #9aabc3;
+  --at-faint: #8395ae;
+  --at-accent: #4d8bff;
+  --at-accent-2: #5cc6f8;
+  --at-gradient: linear-gradient(160deg, #4d8bff, #2b6ef5);
+  --at-shadow-card: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --at-shadow-float: 0 8px 30px rgba(0, 0, 0, 0.55);
+
+  --gr-carta: #141d2d;
+  --gr-intest: #1b2536;
+  --gr-linea: #27324a;
+  --gr-bordo: #35425c;
+  --gr-testo: #eef3fb;
+  --ch-carta: #16202f;
+  --ch-bordo: #35425c;
+  --ch-asse: #7e8ea8;
+  --ch-reticolo: #27324a;
+  --ch-inchiostro: #c3d0e2;
 }
 
 /* Lo SFONDO dell'app: aloni azzurri sfumati. Sta sotto a tutto e non
@@ -33,6 +149,14 @@
     radial-gradient(60% 50% at 92% 8%, #cfe3ff 0%, transparent 55%),
     radial-gradient(80% 60% at 50% 105%, #9fc9fb 0%, transparent 60%),
     linear-gradient(160deg, #eaf4ff, #cfe2fa);
+}
+/* Di notte gli stessi aloni, molto più cupi: si intuiscono, non illuminano. */
+:root[data-tema='scuro'] .at-sfondo {
+  background:
+    radial-gradient(70% 55% at 12% 0%, #1b3a63 0%, transparent 60%),
+    radial-gradient(60% 50% at 92% 8%, #17304f 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 105%, #12294a 0%, transparent 60%),
+    linear-gradient(160deg, #0c1524, #0a1220);
 }
 
 /* Cornice in vetro: sfocatura di quello che c'è sotto + bordo luminoso. */
@@ -51,9 +175,31 @@
    e un'ombra morbida che la stacca dallo sfondo. */
 .at-scheda {
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--at-card-border);
   box-shadow: var(--at-shadow-card);
   overflow: hidden;
+}
+
+/* Passaggio del mouse sul VETRO: un velo, non una tinta piena, o si perde
+   la trasparenza. Di giorno schiarisce, di notte accende appena. */
+.at-hover:hover {
+  background-color: var(--at-hover);
+}
+/* Bottone secondario appoggiato sul vetro (Apri, Annulla). */
+.at-morbido {
+  background-color: var(--at-surface-2);
+  border: 1px solid var(--at-border);
+  box-shadow: 0 1px 2px rgba(15, 40, 80, 0.06);
+}
+.at-morbido:hover:not(:disabled) {
+  background-color: var(--at-hover-forte);
+}
+.at-morbido:disabled {
+  opacity: 0.5;
+}
+/* Righe che separano due voci dentro una scheda di vetro. */
+.at-divisori > * + * {
+  border-color: var(--at-border);
 }
 
 body {
@@ -65,13 +211,13 @@ body {
 
 /* Selezione testo: ambra come la landing. */
 ::selection {
-  background: rgba(43, 110, 245, 0.22);
+  background: rgb(var(--acc) / 0.24);
 }
 
 /* Bottone primario stile landing: gradiente ambra→corallo, testo scuro. */
 .btn-accent {
   background: var(--at-gradient);
-  color: #ffffff;
+  color: rgb(var(--acc-ink));
   font-weight: 600;
   box-shadow: 0 4px 14px rgba(43, 110, 245, 0.38);
 }
@@ -93,23 +239,23 @@ body {
   padding: 0 10px;
   border-radius: 6px;
   font-size: 12px;
-  color: #3d4a5f;
-  background: rgba(255, 255, 255, 0.62);
+  color: var(--at-dim);
+  background: var(--at-surface);
   white-space: nowrap;
   transition:
     background-color 0.12s,
     color 0.12s;
 }
 .tbtn:hover:not(:disabled) {
-  color: #16202e;
-  background: #ffffff;
+  color: var(--at-text);
+  background: var(--at-hover-forte);
   box-shadow: 0 1px 3px rgba(20, 50, 100, 0.12);
 }
 .tbtn:disabled {
   opacity: 0.4;
 }
 .tbtn-on {
-  background: #2b6ef5;
+  background: var(--at-accent);
   color: #ffffff;
   font-weight: 500;
 }
@@ -120,14 +266,14 @@ body {
 .tsep {
   width: 1px;
   height: 18px;
-  background: rgba(30, 70, 140, 0.15);
+  background: var(--at-border-forte);
   margin: 0 4px;
   flex-shrink: 0;
 }
 
 /* Slider in tinta ovunque (opacità, spessore, zoom…). */
 input[type='range'] {
-  accent-color: #2b6ef5;
+  accent-color: var(--at-accent);
 }
 
 /* Scrollbar sottili e discrete, leggibili sia sul tema scuro sia sui fogli
@@ -154,23 +300,22 @@ input[type='range'] {
 
 /* Allinea la vista Lettura (Tailwind prose) allo stile pulito dell'Ibrida */
 .prose {
-  color: #3a4759;
-  --tw-prose-headings: #16202e;
-  --tw-prose-bold: #16202e;
-  --tw-prose-counters: #5c6a82;
-  --tw-prose-bullets: #a6b6cd;
-  --tw-prose-quotes: #3a4759;
-  --tw-prose-code: #1e4fb0;
-  --tw-prose-hr: #dbe4f0;
-  --tw-prose-th-borders: #ccd9ec;
-  --tw-prose-td-borders: #e2eaf6;
+  color: rgb(var(--z-300));
+  --tw-prose-headings: rgb(var(--z-100));
+  --tw-prose-bold: rgb(var(--z-100));
+  --tw-prose-counters: rgb(var(--z-400));
+  --tw-prose-bullets: rgb(var(--z-600));
+  --tw-prose-quotes: rgb(var(--z-300));
+  --tw-prose-code: var(--at-codice);
+  --tw-prose-hr: var(--gr-linea);
+  --tw-prose-th-borders: rgb(var(--z-700));
+  --tw-prose-td-borders: rgb(var(--z-800));
 }
-/* Blocchi di codice: carta appena tinta e bordo tenue, coerenti con la
-   palette chiara dell'editor (il tema scuro qui stonerebbe). */
+/* Blocchi di codice: carta appena tinta e bordo tenue, come nell'editor. */
 .prose pre {
-  background: #f6f9fe;
-  border: 1px solid #e2eaf6;
-  color: #26303f;
+  background: var(--at-codice-fondo);
+  border: 1px solid rgb(var(--z-800));
+  color: var(--at-codice-testo);
 }
 .prose pre code {
   background: transparent;
@@ -184,14 +329,14 @@ input[type='range'] {
   letter-spacing: -0.015em;
 }
 .prose a {
-  color: #2b6ef5;
+  color: var(--at-accent);
   font-weight: 400;
 }
 .prose blockquote {
   font-weight: 400;
   font-style: italic;
-  color: #5c6a82;
-  border-left-color: #ccd9ec;
+  color: var(--at-dim);
+  border-left-color: rgb(var(--z-700));
 }
 /* rimuove le virgolette ricciute che prose aggiunge alle citazioni */
 .prose blockquote p:first-of-type::before,
@@ -204,8 +349,8 @@ input[type='range'] {
   content: none;
 }
 .prose :where(code):not(:where(pre code)) {
-  background: rgba(43, 110, 245, 0.09);
-  color: #1e4fb0;
+  background: rgb(var(--acc) / 0.11);
+  color: var(--at-codice);
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-weight: 400;
@@ -217,19 +362,19 @@ input[type='range'] {
   border-radius: 3px;
 }
 .prose a.wikilink {
-  color: #2b6ef5;
+  color: var(--at-accent);
   font-weight: 400;
 }
 .prose blockquote.callout {
-  border-left: 3px solid #2b6ef5;
-  background: rgba(43, 110, 245, 0.08);
+  border-left: 3px solid var(--at-accent);
+  background: rgb(var(--acc) / 0.1);
   font-style: normal;
-  color: #254568;
+  color: rgb(var(--z-200));
   padding: 0.5em 1em;
 }
 .prose blockquote.callout .callout-title {
   font-weight: 700;
-  color: #1e4fb0;
+  color: var(--at-codice);
   margin: 0 0 0.3em;
   font-size: 0.85em;
   letter-spacing: 0.03em;
@@ -503,3 +648,40 @@ textarea.pdf-field {
   background: rgba(255, 255, 255, 0.17);
   box-shadow: none;
 }
+
+/* ===== Codice nel markdown reso (highlight.js) =====
+   Il foglio di stile importato (atom-one-light) e' tarato sul bianco. Di
+   notte i suoi toni scuri sparirebbero: si rimappano gli stessi ruoli. */
+:root[data-tema='scuro'] .hljs-comment,
+:root[data-tema='scuro'] .hljs-quote { color: var(--cm-commento); font-style: italic; }
+:root[data-tema='scuro'] .hljs-keyword,
+:root[data-tema='scuro'] .hljs-formula,
+:root[data-tema='scuro'] .hljs-doctag { color: var(--cm-chiave); }
+:root[data-tema='scuro'] .hljs-section,
+:root[data-tema='scuro'] .hljs-name,
+:root[data-tema='scuro'] .hljs-selector-tag,
+:root[data-tema='scuro'] .hljs-deletion,
+:root[data-tema='scuro'] .hljs-subst { color: #ef8c96; }
+:root[data-tema='scuro'] .hljs-literal { color: var(--cm-operatore); }
+:root[data-tema='scuro'] .hljs-string,
+:root[data-tema='scuro'] .hljs-regexp,
+:root[data-tema='scuro'] .hljs-addition,
+:root[data-tema='scuro'] .hljs-attribute,
+:root[data-tema='scuro'] .hljs-meta .hljs-string { color: var(--cm-stringa); }
+:root[data-tema='scuro'] .hljs-attr,
+:root[data-tema='scuro'] .hljs-variable,
+:root[data-tema='scuro'] .hljs-template-variable,
+:root[data-tema='scuro'] .hljs-type,
+:root[data-tema='scuro'] .hljs-selector-class,
+:root[data-tema='scuro'] .hljs-selector-attr,
+:root[data-tema='scuro'] .hljs-selector-pseudo,
+:root[data-tema='scuro'] .hljs-number { color: var(--cm-costante); }
+:root[data-tema='scuro'] .hljs-symbol,
+:root[data-tema='scuro'] .hljs-bullet,
+:root[data-tema='scuro'] .hljs-link,
+:root[data-tema='scuro'] .hljs-meta,
+:root[data-tema='scuro'] .hljs-selector-id,
+:root[data-tema='scuro'] .hljs-title { color: var(--cm-funzione); }
+:root[data-tema='scuro'] .hljs-built_in,
+:root[data-tema='scuro'] .hljs-title.class_,
+:root[data-tema='scuro'] .hljs-class .hljs-title { color: #e8c07d; }

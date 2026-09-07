@@ -12,6 +12,8 @@ export function TitleBar() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const mode = useAppStore((s) => s.mode)
   const toggleMode = useAppStore((s) => s.toggleMode)
+  const tema = useAppStore((s) => s.tema)
+  const ruotaTema = useAppStore((s) => s.ruotaTema)
 
   const btn =
     'h-full w-11 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors'
@@ -42,6 +44,33 @@ export function TitleBar() {
         <span className="font-display text-sm text-zinc-300 tracking-tight">Atelier</span>
       </div>
       <div data-tauri-drag-region className="flex-1 h-full" />
+      {/* Tema: sole → luna → "come il sistema". Sta accanto alla modalità
+          perché è la stessa famiglia di comandi, quelli che riguardano
+          l'app e non il documento. */}
+      <button
+        onClick={ruotaTema}
+        className="w-7 h-6 self-center mr-0.5 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800/70 rounded-md transition-colors shrink-0"
+        title={
+          tema === 'chiaro' ? 'Tema chiaro — clic per lo scuro' : tema === 'scuro' ? 'Tema scuro — clic per seguire il sistema' : 'Come il sistema — clic per il chiaro'
+        }
+      >
+        {tema === 'chiaro' ? (
+          <svg viewBox="0 0 16 16" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+            <circle cx="8" cy="8" r="3.1" />
+            <path d="M8 1.4v1.5M8 13.1v1.5M14.6 8h-1.5M2.9 8H1.4M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1M12.7 12.7l-1.1-1.1M4.4 4.4L3.3 3.3" />
+          </svg>
+        ) : tema === 'scuro' ? (
+          <svg viewBox="0 0 16 16" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+            <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6a5.9 5.9 0 1 0 7.3 7.3z" />
+          </svg>
+        ) : (
+          // Metà sole e metà luna: "decide il sistema".
+          <svg viewBox="0 0 16 16" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
+            <circle cx="8" cy="8" r="5.2" />
+            <path d="M8 2.8a5.2 5.2 0 0 0 0 10.4z" fill="currentColor" stroke="none" />
+          </svg>
+        )}
+      </button>
       {/* modalità (era nella riga del percorso, ora eliminata) */}
       {vaultPath && (
         <button

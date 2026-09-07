@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { ChartInfo } from '../../lib/xlsxCharts'
+import { useScuro, luminanza } from '../../lib/tema'
 
 // Disegno di un grafico del file (sola lettura), in SVG. Copre i tipi che si
 // incontrano davvero nei fogli di lavoro: barre (verticali e orizzontali),
@@ -8,9 +9,12 @@ import type { ChartInfo } from '../../lib/xlsxCharts'
 // Colori di riserva quando il file non li dichiara: la palette dell'app.
 const FALLBACK = ['#2563eb', '#38bdf8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b', '#14b8a6']
 
-const AXIS = '#94a3b8'
-const GRID = '#e2e8f0'
-const INK = '#334155'
+// Assi, reticolo e testo seguono il tema: sono variabili CSS, valide anche
+// dentro gli attributi SVG. I colori delle SERIE no — quelli li dichiara il
+// file e vanno rispettati com'erano.
+const AXIS = 'var(--ch-asse)'
+const GRID = 'var(--ch-reticolo)'
+const INK = 'var(--ch-inchiostro)'
 
 // Etichetta numerica leggibile (niente code di decimali inutili).
 const fmt = (n: number): string => {
@@ -33,16 +37,25 @@ export const ChartView = memo(function ChartView({
   width: number
   height: number
 }) {
+  const scuro = useScuro()
   const W = Math.max(160, width)
   const H = Math.max(120, height)
-  const colorOf = (i: number) => chart.series[i]?.color ?? FALLBACK[i % FALLBACK.length]
+  // Colore di una serie: quello del file. Col tema scuro, però, una serie
+  // quasi nera sparirebbe sul riquadro scuro: in quel caso si ripiega sulla
+  // palette dell'app, che resta leggibile e distingue le serie fra loro.
+  const colorOf = (i: number) => {
+    const riserva = FALLBACK[i % FALLBACK.length]
+    const dal = chart.series[i]?.color
+    if (!dal) return riserva
+    return scuro && luminanza(dal) < 0.3 ? riserva : dal
+  }
 
   const titleH = chart.title ? 22 : 6
   const legendH = chart.series.length > 1 ? 18 : 0
 
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
-      <rect x={0} y={0} width={W} height={H} fill="#ffffff" stroke="#cbd5e1" rx={4} />
+      <rect x={0} y={0} width={W} height={H} fill="var(--ch-carta)" stroke="var(--ch-bordo)" rx={4} />
       {chart.title && (
         <text x={W / 2} y={15} textAnchor="middle" fontSize={12} fontWeight={600} fill={INK}>
           {chart.title}
@@ -267,7 +280,7 @@ function Pie({
         return (
           <g key={i}>
             {d ? (
-              <path d={d} fill={colorOf(0) && chart.series.length > 1 ? colorOf(i) : FALLBACK[i % FALLBACK.length]} stroke="#fff" strokeWidth={1} />
+              <path d={d} fill={colorOf(0) && chart.series.length > 1 ? colorOf(i) : FALLBACK[i % FALLBACK.length]} stroke="var(--ch-carta)" strokeWidth={1} />
             ) : (
               <circle cx={cx} cy={cy} r={r} fill={FALLBACK[0]} />
             )}

@@ -149,7 +149,7 @@ export function GitPanel() {
             value={message}
             onChange={(ev) => setMessage(ev.target.value)}
             placeholder="Messaggio del commit"
-            className="w-full bg-white border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:border-blue-500 focus:outline-none"
           />
           <div className="flex items-center gap-1.5">
             <button
