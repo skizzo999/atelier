@@ -84,6 +84,52 @@ posizione si sposta esattamente di +87/+43, Salva si accende.
 ## Da fare
 - Confermare gli scatti sulla macchina dell'utente (la parte di
   rasterizzazione non è misurabile in headless).
-- Ridimensionare i grafici col mouse: ora è tecnicamente possibile, il
+- ~~Ridimensionare i grafici col mouse~~ → fatto, vedi il seguito qui sotto. Il
   round-trip del disegno regge.
 - Tema scuro — esplicitamente per ultimo.
+
+---
+
+## Seguito: ridimensionamento e apertura lenta
+
+### Ridimensionare i grafici
+Otto maniglie come in Excel (quattro angoli e quattro lati), visibili passando
+col mouse per non coprire il disegno. Mentre trascini il disegno si stira come
+anteprima (`scale`) e si ridisegna nitido al rilascio; lo stato cambia una
+volta sola. Chi ha un ancoraggio a una cella scrive la nuova misura in
+`<xdr:ext>`, chi ne ha due la ricava dall'angolo opposto.
+
+Verificato nel banco col componente vero, tre maniglie diverse:
+- angolo in basso a destra +120/+60 → 630×229 diventa 750×289, posizione ferma
+- angolo in alto a sinistra −40/−20 → l'origine si sposta e la misura cresce
+- lato destro −200 → cambia solo la larghezza
+
+E nel file (`test-sposta-grafico.mjs`): misura riletta 900×400, posizione
+intatta, serie intatte, file riapribile, e l'`<a:ext>` della cornice — che è
+un'altra cosa — non viene toccato.
+
+### L'apertura da mezzo secondo
+Misurato, non indovinato: aprire il foglio vero costava **560 ms per importare
+ExcelJS** e 162 ms per leggere il file. Il file è 48 kB; il pacchetto di codice
+che lo apre è **915 kB**. Stessa storia per gli altri tipi: il renderer pptx è
+974 kB, l'editor di testo 745, DocxEditor 512, pdf.js 418.
+
+Nuovo `src/lib/prewarm.ts`: il codice è già sul disco, lo si carica **prima**
+che serva.
+- All'avvio, quando l'indice del vault è pronto, si scaldano i visualizzatori
+  dei tipi che l'utente ha **davvero**, i più frequenti per primi: chi non ha
+  nessun .pptx non paga i 974 kB.
+- Il mouse sopra un file nell'albero scalda il suo visualizzatore: quando
+  clicchi, il codice è già pronto.
+- Sempre dentro `requestIdleCallback` e uno alla volta: scaldare non deve mai
+  rubare tempo a chi sta usando l'app.
+- Per i fogli si fa anche un giro a vuoto su una cartella minuscola: scalda il
+  motore, non solo il caricamento del modulo (lettura del file vero 162 → 115 ms).
+
+Verificato: `import('exceljs')` dopo il riscaldamento **0,3 ms** contro 16,8 a
+freddo nel banco (560 ms in Node, dove il modulo va letto da disco); un solo
+pacchetto per visualizzatore nella build, nessun doppione.
+
+⚠ Nota di misura: il tempo di *lettura* del file nel browser non l'ho potuto
+misurare (col pannello nascosto ExcelJS viene strozzato e segna 10 s sia a
+freddo che a caldo). Il numero buono è quello di Node: 162 → 115 ms.

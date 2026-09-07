@@ -211,6 +211,20 @@ function rawOf(cell: Cell): string {
 
 const ROW_H = 24
 const ROW_HDR_W = 46
+
+// Grafici: misura minima e le otto maniglie, nell'ordine di Excel.
+const MIN_CHART_W = 120
+const MIN_CHART_H = 90
+const CHART_HANDLES = [
+  { dir: 'nw', x: '0%', y: '0%' },
+  { dir: 'n', x: '50%', y: '0%' },
+  { dir: 'ne', x: '100%', y: '0%' },
+  { dir: 'e', x: '100%', y: '50%' },
+  { dir: 'se', x: '100%', y: '100%' },
+  { dir: 's', x: '50%', y: '100%' },
+  { dir: 'sw', x: '0%', y: '100%' },
+  { dir: 'w', x: '0%', y: '50%' },
+]
 const MAX_ROWS = 10000 // oltre: troncato con avviso (v1)
 const MAX_COLS = 256
 
@@ -2328,6 +2342,7 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
             fromOff: c.fromOff,
             to: c.to,
             toOff: c.toOff,
+            sizePx: c.sizePx,
           }))
         out = preserveCharts(origBytes.current, out, spostamenti)
       }
@@ -2589,6 +2604,97 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
+  }
+
+  // Ridimensionamento con le maniglie. Come per lo spostamento, mentre si
+  // trascina si muove solo l'elemento; lo stato cambia una volta sola.
+  function startChartResize(e: React.MouseEvent, idx: number, dir: string) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = (e.currentTarget as HTMLElement).parentElement
+    if (!el) return
+    const svg = el.querySelector('svg') as SVGElement | null
+    const sx = e.clientX
+    const sy = e.clientY
+    const x0 = el.offsetLeft
+    const y0 = el.offsetTop
+    const w0 = el.offsetWidth
+    const h0 = el.offsetHeight
+    let nx = x0
+    let ny = y0
+    let nw = w0
+    let nh = h0
+    const cursorePrec = document.body.style.cursor
+    document.body.style.cursor = `${dir}-resize`
+    const move = (ev: MouseEvent) => {
+      const dx = ev.clientX - sx
+      const dy = ev.clientY - sy
+      nx = x0
+      ny = y0
+      nw = w0
+      nh = h0
+      if (dir.includes('e')) nw = Math.max(MIN_CHART_W, w0 + dx)
+      if (dir.includes('s')) nh = Math.max(MIN_CHART_H, h0 + dy)
+      if (dir.includes('w')) {
+        nw = Math.max(MIN_CHART_W, w0 - dx)
+        nx = x0 + (w0 - nw)
+      }
+      if (dir.includes('n')) {
+        nh = Math.max(MIN_CHART_H, h0 - dy)
+        ny = y0 + (h0 - nh)
+      }
+      el.style.left = `${nx}px`
+      el.style.top = `${ny}px`
+      el.style.width = `${nw}px`
+      el.style.height = `${nh}px`
+      // Anteprima: il disegno si stira mentre trascini, poi si ridisegna nitido.
+      if (svg) {
+        svg.style.transformOrigin = '0 0'
+        svg.style.transform = `scale(${nw / w0}, ${nh / h0})`
+      }
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      document.body.style.cursor = cursorePrec
+      if (svg) svg.style.transform = ''
+      // Si rimettono i valori che React crede di aver scritto: se il nuovo
+      // stato coincide non riapplicherebbe nulla e resterebbero quelli finti.
+      el.style.left = `${x0}px`
+      el.style.top = `${y0}px`
+      el.style.width = `${w0}px`
+      el.style.height = `${h0}px`
+      if (nw === w0 && nh === h0 && nx === x0 && ny === y0) return
+      resizeChart(idx, nx, ny, nw, nh)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  // Nuova posizione E nuova misura, in px sullo schermo.
+  function resizeChart(idx: number, x: number, y: number, w: number, h: number) {
+    setCharts((prev) =>
+      prev.map((c, k) => {
+        if (k !== idx) return c
+        const nx = Math.max(rowHdrW, x)
+        const ny = Math.max(rowH, y)
+        const a = colAt(nx)
+        const b = rowAtPx(ny)
+        const a2 = colAt(nx + w)
+        const b2 = rowAtPx(ny + h)
+        return {
+          ...c,
+          from: { col: a.col, row: b.row },
+          fromOff: { x: a.off, y: b.off },
+          to: { col: a2.col, row: b2.row },
+          toOff: { x: a2.off, y: b2.off },
+          // La misura torna alla scala 100%, che è quella scritta nel file.
+          sizePx: c.sizePx ? { w: Math.round(w / z), h: Math.round(h / z) } : undefined,
+        }
+      }),
+    )
+    setDirty(true)
   }
 
   // Trasla il grafico di (dx, dy) px e riscrive i suoi due ancoraggi.
@@ -3514,11 +3620,29 @@ export function XlsxViewer({ filePath }: { filePath: string }) {
                       // browser a ridisegnare tutto l'SVG del grafico.
                       willChange: 'transform',
                     }}
-                    className="shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded"
+                    className="group shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded"
                     title={ch.title ? `${ch.title} — trascina per spostarlo` : 'Trascina per spostare il grafico'}
                     onMouseDown={(e) => startChartDrag(e, idx)}
                   >
                     <ChartView chart={ch} width={w} height={h} />
+                    {/* Maniglie: gli otto punti di Excel, visibili al passaggio
+                        del mouse per non coprire il disegno. */}
+                    {CHART_HANDLES.map(({ dir, x: hx, y: hy }) => (
+                      <div
+                        key={dir}
+                        onMouseDown={(e) => startChartResize(e, idx, dir)}
+                        title="Trascina per ridimensionare"
+                        style={{
+                          position: 'absolute',
+                          left: `calc(${hx} - 5px)`,
+                          top: `calc(${hy} - 5px)`,
+                          width: 10,
+                          height: 10,
+                          cursor: `${dir}-resize`,
+                        }}
+                        className="rounded-full border border-blue-600 bg-white opacity-0 transition-opacity group-hover:opacity-100"
+                      />
+                    ))}
                   </div>
                 )
               })}

@@ -64,6 +64,9 @@ export interface Spostamento {
   fromOff: { x: number; y: number } // px a 96 dpi
   to: { col: number; row: number }
   toOff: { x: number; y: number }
+  /** Nuova misura in px: serve solo agli ancoraggi a una cella, che la
+   *  dichiarano in <ext> invece di dedurla dall'angolo opposto. */
+  sizePx?: { w: number; h: number }
 }
 
 const EMU = 9525 // EMU per pixel a 96 dpi
@@ -106,6 +109,19 @@ function applicaSpostamenti(xml: string, mosse: Spostamento[]): string {
     out = out.replace(new RegExp('<' + TAG + 'to>[\\s\\S]*?</' + TAG + 'to>'), (t) =>
       riscriviAngolo(t, m.to.col, m.toOff.x, m.to.row, m.toOff.y),
     )
+    // Ancoraggio a una cella: la misura sta nell'<ext> subito dopo <from>.
+    // Va preso proprio quello: dentro il graphicFrame ce n'è un altro.
+    if (m.sizePx) {
+      out = out.replace(
+        new RegExp('(</' + TAG + 'from>\\s*<' + TAG + 'ext\\b)([^>]*?)(/?>)'),
+        (_tutto, testa: string, attributi: string, coda: string) =>
+          testa +
+          attributi
+            .replace(/cx="\d+"/, `cx="${Math.round(m.sizePx!.w * EMU)}"`)
+            .replace(/cy="\d+"/, `cy="${Math.round(m.sizePx!.h * EMU)}"`) +
+          coda,
+      )
+    }
     return out
   })
 }

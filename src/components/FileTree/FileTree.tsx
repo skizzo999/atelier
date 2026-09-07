@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/appStore'
 import { openVaultDialog } from '../../lib/vault'
 import { createFolder, renameEntry, deleteEntry, moveEntry, importFile } from '../../lib/fileOps'
 import { NewFileModal } from './NewFileModal'
+import { scaldaPerFile } from '../../lib/prewarm'
 
 interface FileNode {
   id: string
@@ -128,6 +129,11 @@ function FileNodeComponent({ node, style, dragHandle }: NodeRendererProps<FileNo
       className={`group flex items-center h-full cursor-pointer rounded-md mx-1 ${
         isActive || node.isSelected ? 'bg-zinc-700/50 text-zinc-100' : 'text-zinc-300 hover:bg-zinc-800/70'
       } ${node.isDragging ? 'opacity-40' : ''} ${node.willReceiveDrop ? 'bg-blue-500/10 ring-1 ring-blue-500/50' : ''}`}
+      // Il mouse sopra un file basta a preparare il suo visualizzatore: quando
+      // l'utente clicca, il codice è già pronto e l'apertura è immediata.
+      onMouseEnter={() => {
+        if (!data.isFolder) scaldaPerFile(data.path)
+      }}
       onClick={() => {
         if (data.isFolder) {
           node.toggle()

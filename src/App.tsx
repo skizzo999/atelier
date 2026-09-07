@@ -8,6 +8,7 @@ import { grantVaultAccess, initVaultMeta } from './lib/vault'
 import { walkFiles } from './lib/search'
 import { setVaultImageIndex } from './lib/images'
 import { setNoteIndex } from './lib/notes'
+import { scaldaPerVault } from './lib/prewarm'
 
 const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 import { FileTree } from './components/FileTree/FileTree'
@@ -146,6 +147,10 @@ function App() {
           }
           setVaultImageIndex(imgMap)
           setNoteIndex(noteMap)
+          // Prepara i visualizzatori dei tipi che l'utente ha davvero, nei
+          // momenti morti: il primo .xlsx costava mezzo secondo di solo
+          // caricamento del codice, non del file.
+          scaldaPerVault(files.map((f) => f.path))
         })
         .catch((e) => console.error('Indice del vault non costruito:', e))
     }, 250)
