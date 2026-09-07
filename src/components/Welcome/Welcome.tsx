@@ -66,11 +66,14 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 w-full bg-zinc-900 text-zinc-100">
+    // Nessun fondo pieno: lo sfondo dell'app si vede attraverso, come nel
+    // resto del tema. La colonna dei vault è la stessa cornice in vetro
+    // dell'Explorer, così la prima schermata e l'app parlano la stessa lingua.
+    <div className="flex flex-1 min-h-0 w-full text-zinc-100">
       {/* Sinistra: vault conosciuti */}
-      <aside className="w-72 shrink-0 bg-zinc-950 border-r border-zinc-800 flex flex-col">
-        <div className="px-4 py-3 border-b border-zinc-800">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">I tuoi vault</h2>
+      <aside className="w-72 shrink-0 at-vetro border-r border-white/60 flex flex-col">
+        <div className="px-4 pt-3 pb-2">
+          <h2 className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">I tuoi vault</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {knownVaults.length === 0 && (
@@ -81,7 +84,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
           {knownVaults.map((v) => (
             <div
               key={v.path}
-              className="group flex items-center gap-2 px-2 py-2 rounded hover:bg-zinc-800 cursor-pointer"
+              className="group flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/70 cursor-pointer transition-colors"
               onClick={() => !busy && openKnown(v.path)}
               title={v.path}
             >
@@ -90,7 +93,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
                 <p className="text-[11px] text-zinc-500 truncate">{v.path}</p>
               </div>
               <button
-                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1"
+                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-100 px-1"
                 title="Togli dalla lista (non elimina la cartella)"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -109,7 +112,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
         <div className="w-[26rem] flex flex-col gap-6">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-display text-2xl text-blue-500 leading-none">
+              <span className="w-11 h-11 rounded-2xl btn-accent flex items-center justify-center font-display text-2xl leading-none">
                 A
               </span>
               <h1 className="text-4xl font-display font-medium tracking-tight">Atelier</h1>
@@ -119,7 +122,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
             </p>
           </div>
 
-          <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl divide-y divide-zinc-800">
+          <div className="at-vetro-forte at-scheda divide-y divide-white/70">
             <div className="flex items-center gap-4 p-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-zinc-200">Crea nuovo vault</p>
@@ -143,7 +146,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
               <button
                 onClick={handleOpen}
                 disabled={busy}
-                className="px-4 py-2 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-lg text-sm hover:bg-zinc-700 disabled:opacity-50 transition-colors shrink-0"
+                className="px-4 py-2 bg-white/80 text-zinc-200 border border-white/80 rounded-lg text-sm shadow-sm hover:bg-white disabled:opacity-50 transition-colors shrink-0"
               >
                 Apri
               </button>
@@ -151,7 +154,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
           </div>
 
           {creating && (
-            <div className="flex flex-col gap-3 bg-zinc-800/40 border border-zinc-800 rounded-xl p-4">
+            <div className="flex flex-col gap-3 at-vetro-forte at-scheda p-4">
               <input
                 autoFocus
                 type="text"
@@ -162,20 +165,20 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
                   if (e.key === 'Escape') setCreating(false)
                 }}
                 placeholder="Nome del vault"
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                className="w-full px-3 py-2 bg-white border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
               />
               <div className="flex gap-3">
                 <button
                   onClick={() => setCreating(false)}
                   disabled={busy}
-                  className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded text-sm hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 bg-white/80 text-zinc-300 border border-white/80 rounded-lg text-sm shadow-sm hover:bg-white disabled:opacity-50 transition-colors"
                 >
                   Annulla
                 </button>
                 <button
                   onClick={handleCreate}
                   disabled={busy || !name.trim()}
-                  className="flex-1 px-4 py-2 btn-accent rounded text-sm disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 btn-accent rounded-lg text-sm disabled:opacity-50 transition-colors"
                 >
                   Scegli posizione e crea
                 </button>
@@ -183,7 +186,7 @@ export function Welcome({ onOpened }: { onOpened?: () => void }) {
             </div>
           )}
 
-          {error && <p className="text-xs text-red-400 text-center">{error}</p>}
+          {error && <p className="text-xs text-red-600 text-center">{error}</p>}
         </div>
       </main>
     </div>
